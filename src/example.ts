@@ -15,7 +15,7 @@ import { Market } from '@project-serum/serum';
 function readKeypair() {
   return JSON.parse(
     process.env.KEYPAIR ||
-      fs.readFileSync(os.homedir() + '/.config/solana/id.json', 'utf-8'),
+      fs.readFileSync(os.homedir() + '/mango-explorer/id.json', 'utf-8'),
   );
 }
 
@@ -32,7 +32,7 @@ async function examplePerp() {
   // load group & market
   const perpMarketConfig = getMarketByBaseSymbolAndKind(
     groupConfig,
-    'BTC',
+    'SOL',
     'perp',
   );
   const mangoGroup = await client.getMangoGroup(groupConfig.publicKey);
@@ -52,17 +52,6 @@ async function examplePerp() {
     console.log(price, size);
   }
 
-  // L3 orderbook data
-  for (const order of asks) {
-    console.log(
-      order.owner.toBase58(),
-      order.orderId.toString('hex'),
-      order.price,
-      order.size,
-      order.side, // 'buy' or 'sell'
-    );
-  }
-
   // Place order
   const owner = Keypair.fromSecretKey(Uint8Array.from(readKeypair()));
   const mangoAccount = (
@@ -76,152 +65,11 @@ async function examplePerp() {
     perpMarket,
     owner,
     'buy', // or 'sell'
-    39000,
-    0.0001,
-    { orderType: 'postOnlySlide', expiryTimestamp: getUnixTs() + 5 },
+    50,
+    1,
+    { orderType: 'limit'},
   ); // or 'ioc' or 'postOnly'
 
-  // retrieve open orders for account
-  const openOrders = await perpMarket.loadOrdersForAccount(
-    connection,
-    mangoAccount,
-  );
-
-  // cancel orders
-  for (const order of openOrders) {
-    await client.cancelPerpOrder(
-      mangoGroup,
-      mangoAccount,
-      owner,
-      perpMarket,
-      order,
-    );
-  }
-
-  // Retrieve fills
-  for (const fill of await perpMarket.loadFills(connection)) {
-    console.log(
-      fill.maker.toBase58(),
-      fill.taker.toBase58(),
-      fill.price,
-      fill.quantity,
-    );
-  }
 }
 
-async function exampleSpot() {
-  // setup client
-  const config = new Config(configFile);
-  const groupConfig = config.getGroup(
-    'devnet',
-    'devnet.2',
-  ) as GroupConfig;
-  const connection = new Connection(
-    'https://api.devnet.solana.com',
-    'processed' as Commitment,
-  );
-  const client = new MangoClient(connection, groupConfig.mangoProgramId);
-
-  // load group & market
-  const spotMarketConfig = getMarketByBaseSymbolAndKind(
-    groupConfig,
-    'BTC',
-    'spot',
-  );
-  const mangoGroup = await client.getMangoGroup(groupConfig.publicKey);
-  const spotMarket = await Market.load(
-    connection,
-    spotMarketConfig.publicKey,
-    undefined,
-    groupConfig.serumProgramId,
-  );
-
-  // Fetch orderbooks
-  let bids = await spotMarket.loadBids(connection);
-  let asks = await spotMarket.loadAsks(connection);
-
-  // L2 orderbook data
-  for (const [price, size] of bids.getL2(20)) {
-    console.log(price, size);
-  }
-
-  // L3 orderbook data
-  for (const order of asks) {
-    console.log(
-      order.openOrdersAddress.toBase58(),
-      order.orderId.toString('hex'),
-      order.price,
-      order.size,
-      order.side, // 'buy' or 'sell'
-    );
-  }
-
-  // Place order
-  const owner = Keypair.fromSecretKey(Uint8Array.from(readKeypair()));
-  const mangoAccount = (
-    await client.getMangoAccountsForOwner(mangoGroup, owner.publicKey)
-  )[0];
-  await client.placeSpotOrder2(
-    mangoGroup,
-    mangoAccount,
-    spotMarket,
-    owner,
-    'buy', // or 'sell'
-    41000,
-    0.0001,
-    'limit',
-    ZERO_BN, // client order id, set to whatever you want
-    true, // use the mango MSRM vault for fee discount
-  ); // or 'ioc' or 'postOnly'
-
-  // Reload bids and asks and find your open orders
-  // Possibly have a wait here so RPC node can catch up
-  const openOrders = await mangoAccount.loadSpotOrdersForMarket(
-    connection,
-    spotMarket,
-    spotMarketConfig.marketIndex,
-  );
-
-  // cancel orders
-  for (const order of openOrders) {
-    await client.cancelSpotOrder(
-      mangoGroup,
-      mangoAccount,
-      owner,
-      spotMarket,
-      order,
-    );
-  }
-
-  // Retrieve fills
-  for (const fill of await spotMarket.loadFills(connection)) {
-    console.log(
-      fill.openOrders.toBase58(),
-      fill.eventFlags.maker ? 'maker' : 'taker',
-      fill.size * (fill.side === 'buy' ? 1 : -1),
-      spotMarket.quoteSplSizeToNumber(
-        fill.side === 'buy'
-          ? fill.nativeQuantityPaid
-          : fill.nativeQuantityReleased,
-      ),
-    );
-  }
-
-  // Settle funds
-  for (const openOrders of await mangoAccount.loadOpenOrders(
-    connection,
-    groupConfig.serumProgramId,
-  )) {
-    if (!openOrders) continue;
-
-    if (
-      openOrders.baseTokenFree.gt(ZERO_BN) ||
-      openOrders.quoteTokenFree.gt(ZERO_BN)
-    ) {
-      await client.settleFunds(mangoGroup, mangoAccount, owner, spotMarket);
-    }
-  }
-}
-
-//examplePerp();
-exampleSpot();
+examplePerp();

@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "@blockworks-foundation/mango-client": "^3.6.9"
+  }
+}

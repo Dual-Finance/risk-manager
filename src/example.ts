@@ -7,15 +7,15 @@ import {
   GroupConfig,
   MangoClient,
   ZERO_BN,
-} from '../src';
+} from '@blockworks-foundation/mango-client';
 import { Keypair, Commitment, Connection } from '@solana/web3.js';
-import configFile from '../src/ids.json';
+import configFile from './ids.json';
 import { Market } from '@project-serum/serum';
 
 function readKeypair() {
   return JSON.parse(
     process.env.KEYPAIR ||
-      fs.readFileSync(os.homedir() + '/.config/solana/devnet.json', 'utf-8'),
+      fs.readFileSync(os.homedir() + '/.config/solana/id.json', 'utf-8'),
   );
 }
 
@@ -114,7 +114,7 @@ async function exampleSpot() {
   const config = new Config(configFile);
   const groupConfig = config.getGroup(
     'devnet',
-    'mango_test_v2.2',
+    'devnet.2',
   ) as GroupConfig;
   const connection = new Connection(
     'https://api.devnet.solana.com',
@@ -223,5 +223,5 @@ async function exampleSpot() {
   }
 }
 
-examplePerp();
+//examplePerp();
 exampleSpot();

@@ -47,7 +47,7 @@ async function mm() {
   const payer = new Keypair(
     JSON.parse(
       fs.readFileSync(
-        process.env.KEYPAIR || os.homedir() + '/.config/solana/id.json',
+        process.env.KEYPAIR || os.homedir() + '/mango-explorer/id.json',
         'utf-8',
       ),
     ),

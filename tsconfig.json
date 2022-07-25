@@ -10,8 +10,9 @@
     "noImplicitAny": false,
     "resolveJsonModule": true,
     "sourceMap": true,
-    "esModuleInterop": true
+    "esModuleInterop": true,
+    "moduleResolution": "node",
   },
-  "include": ["./src/**/*", "examples/example.ts"],
+  "include": ["./src/**/*", "example.ts", "scalper.ts"],
   "exclude": ["./src/**/*.test.js", "node_modules", "**/node_modules"]
 }

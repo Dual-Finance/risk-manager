@@ -13,6 +13,7 @@ import {
   MangoClient,
   MangoCache,
   ZERO_BN,
+  BN,
 } from '@blockworks-foundation/mango-client';
 import { Keypair, Commitment, Connection } from '@solana/web3.js';
 import configFile from './ids.json';
@@ -51,15 +52,6 @@ async function scalperPerp() {
     perpMarketConfig.baseDecimals,
     perpMarketConfig.quoteDecimals,
   );
-
-  // Fetch orderbooks
-  const bids = await perpMarket.loadBids(connection);
-  const asks = await perpMarket.loadAsks(connection);
-
-  // L2 orderbook data
-  for (const [price, size] of bids.getL2(20)) {
-    console.log(price, size);
-  }
   
   const [mangoCache]: [
     MangoCache,
@@ -84,6 +76,18 @@ async function scalperPerp() {
   )
   let netDelta = positionDelta * dip.qty;
   console.log('Position Delta of ', netDelta)
+
+  // Fetch orderbooks
+  const bids = await perpMarket.loadBids(connection);
+  const asks = await perpMarket.loadAsks(connection);
+
+  // L2 orderbook data
+  for (const [price, size] of bids.getL2(20)) {
+    console.log(price, size);
+  }
+
+  const hedgeDelta = bids.getImpactPriceUi(100000);
+  console.log('Hedge Impact', hedgeDelta)
 
   // Place order
   const owner = Keypair.fromSecretKey(Uint8Array.from(readKeypair()));

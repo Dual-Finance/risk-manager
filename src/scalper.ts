@@ -117,15 +117,15 @@ async function scalperPerp() {
   // Calc whether the order book can support the size order
   const [_, nativeQuantity] = perpMarket.uiToNativePriceQuantity(0, hedgeDeltaTotal);
   const sizeReduction = 2; // TODO add logic based off order book depth
-  const slippageTolerance = 0.0025; // Allow 25bps above/below FMV on limit orders
+  const slippageTolerance = 0.005; // Allow 50bps above/below FMV on limit orders
   let hedgeDeltaClip : number;
   if (dipDelta > 0 && bids.getImpactPriceUi(nativeQuantity) < (fairValue * (1-slippageTolerance))) {
     console.log('Sell Price Impact: ', bids.getImpactPriceUi(nativeQuantity));
-    hedgeDeltaClip = hedgeDeltaTotal * sizeReduction;
+    hedgeDeltaClip = hedgeDeltaTotal / sizeReduction;
   }
   else if (dipDelta < 0 && asks.getImpactPriceUi(nativeQuantity) > (fairValue * (1+slippageTolerance))) {
     console.log('Buy Price Impact: ', asks.getImpactPriceUi(nativeQuantity))
-    hedgeDeltaClip = hedgeDeltaTotal * sizeReduction;
+    hedgeDeltaClip = hedgeDeltaTotal / sizeReduction;
   }
   else {
     console.log('Slippage Tolerable', asks.getImpactPriceUi(nativeQuantity))
@@ -134,21 +134,23 @@ async function scalperPerp() {
   console.log('Hedge Delta Clip:', hedgeDeltaClip)
 
   // Determine if hedge needs to buy or sell delta
-  let dipHedgeSide;
-  dipDelta < 0 ? dipHedgeSide = 'buy' : dipHedgeSide = 'sell';
-  console.log('Order Side ', dipHedgeSide)
+  let hedgeSide;
+  hedgeDeltaTotal < 0 ? hedgeSide = 'buy' : hedgeSide = 'sell';
+  console.log('Hedge Side ', hedgeSide)
 
   const twapInterval = 10; // Number of seconds to space spliced orders across
-
-  // Delta Hedging Orders, iterate order over sizeReduction & twapInterval
+  let hedgePrice = hedgeDeltaTotal < 0 ? fairValue * (1+slippageTolerance) : fairValue * (1-slippageTolerance);
+  console.log('Hedge Price ', hedgePrice)
+  // Delta Hedging Orders
+  // TODO iterate order over sizeReduction & twapInterval, recalc hedgePrice
     //for (let i=0; i < sizeReduction; i++){  
       await client.placePerpOrder2(
         mangoGroup,
         mangoAccount,
         perpMarket,
         owner,
-        dipHedgeSide,
-        fairValue,
+        hedgeSide,
+        hedgePrice,
         Math.abs(hedgeDeltaClip),
         { orderType: 'limit'},
       );

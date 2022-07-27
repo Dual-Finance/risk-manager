@@ -25,10 +25,16 @@ function readKeypair() {
   );
 }
 
-interface DIP {splToken: string; premiumAsset: string; expiration: Date; strike: number; type: string; qty: number}
+// TODO Risk Manager feeds in new DIP position automatically
+// Example for Hedging and Scalping a single hardcoded DIP
+interface DIP {splToken: string; premiumAsset: string; expiration: Date; 
+  strike: number; type: string; qty: number}
+let dip: DIP = {splToken:'SOL', premiumAsset:'USD', expiration:new Date('2022/12/31'), 
+strike:60, type:'call', qty:10};
 
-let dip: DIP = {splToken:'SOL', premiumAsset:'USD', expiration:new Date('2022/12/31'), strike:60, type:'call', qty:10};
+let dipArray = []; // Initialize Array to hold all DIP positions
 
+// Iterate by splToken or run seperate instances per
 async function scalperPerp() {
   // setup client
   const config = new Config(configFile);
@@ -59,13 +65,36 @@ async function scalperPerp() {
     mangoGroup.loadCache(connection),
   ]);
 
+  // Order Authority
+  const owner = Keypair.fromSecretKey(Uint8Array.from(readKeypair()));
+  const mangoAccount = (
+    await client.getMangoAccountsForOwner(mangoGroup, owner.publicKey)
+  )[0];
+
+  // Fetch orderbooks
+  const bids = await perpMarket.loadBids(connection);
+  const asks = await perpMarket.loadAsks(connection);
+
+  // // L2 orderbook data
+  // for (const [price, size] of bids.getL2(20)) {
+  //   console.log(price, size);
+  // }
+
+  // Option Parameters
   const rfRate = 0.03;
   const marketIndex = perpMarketConfig.marketIndex;
   const fairValue = mangoGroup.getPrice(marketIndex, mangoCache).toNumber();
   const yearsUntilMaturity = (dip.expiration.getTime() - Date.now()) / (365 * 60 * 60 * 24 * 1000) + (0.5/365);
   const impliedVolMap = new Map<string, number> ([['BTC', 0.60], ['ETH', 0.70], ['SOL', 0.80]]);
   const impliedVol = impliedVolMap.get(dip.splToken);
-  console.log(fairValue)
+  console.log('Fair Value: ', fairValue)
+
+  // DELTA HEDGING
+  // Add new DIP to DIP Position Array 
+  dipArray.push(dip);
+  // TODO Initially calc dip array delta and add to new DIP OR recalc total each run
+
+  // Calc DIP delta for new position
   const positionDelta = greeks.getDelta(
     fairValue,
     dip.strike,
@@ -74,40 +103,60 @@ async function scalperPerp() {
     rfRate,
     dip.type
   )
-  let netDelta = positionDelta * dip.qty;
-  console.log('Position Delta of ', netDelta)
+  let dipDelta = positionDelta * dip.qty; // + existing position DIP delta
+  console.log('DIP Delta: ', dipDelta)
 
-  // Fetch orderbooks
-  const bids = await perpMarket.loadBids(connection);
-  const asks = await perpMarket.loadAsks(connection);
+  // Get Mango delta position
+  const perpAccount = mangoAccount.perpAccounts[marketIndex];
+  const mangoDelta = perpAccount.getBasePositionUi(perpMarket);
+  console.log('Mango Delta: ', mangoDelta)
+  
+  // Get total Delta Position to hedge
+  const hedgeDeltaTotal = mangoDelta + dipDelta;
 
-  // L2 orderbook data
-  for (const [price, size] of bids.getL2(20)) {
-    console.log(price, size);
+  // Calc whether the order book can support the size order
+  const [_, nativeQuantity] = perpMarket.uiToNativePriceQuantity(0, hedgeDeltaTotal);
+  const sizeReduction = 2; // TODO add logic based off order book depth
+  const slippageTolerance = 0.0025; // Allow 25bps above/below FMV on limit orders
+  let hedgeDeltaClip : number;
+  if (dipDelta > 0 && bids.getImpactPriceUi(nativeQuantity) < (fairValue * (1-slippageTolerance))) {
+    console.log('Sell Price Impact: ', bids.getImpactPriceUi(nativeQuantity));
+    hedgeDeltaClip = hedgeDeltaTotal * sizeReduction;
   }
+  else if (dipDelta < 0 && asks.getImpactPriceUi(nativeQuantity) > (fairValue * (1+slippageTolerance))) {
+    console.log('Buy Price Impact: ', asks.getImpactPriceUi(nativeQuantity))
+    hedgeDeltaClip = hedgeDeltaTotal * sizeReduction;
+  }
+  else {
+    console.log('Slippage Tolerable', asks.getImpactPriceUi(nativeQuantity))
+    hedgeDeltaClip = hedgeDeltaTotal;
+  }
+  console.log('Hedge Delta Clip:', hedgeDeltaClip)
 
-  const hedgeDelta = bids.getImpactPriceUi(100000);
-  console.log('Hedge Impact', hedgeDelta)
+  // Determine if hedge needs to buy or sell delta
+  let dipHedgeSide;
+  dipDelta < 0 ? dipHedgeSide = 'buy' : dipHedgeSide = 'sell';
+  console.log('Order Side ', dipHedgeSide)
 
-  // Place order
-  const owner = Keypair.fromSecretKey(Uint8Array.from(readKeypair()));
-  const mangoAccount = (
-    await client.getMangoAccountsForOwner(mangoGroup, owner.publicKey)
-  )[0];
+  const twapInterval = 10; // Number of seconds to space spliced orders across
 
-  // Initial Delta Hedge, if sum(bids/asks) > delta, splice order
-  await client.placePerpOrder2(
-    mangoGroup,
-    mangoAccount,
-    perpMarket,
-    owner,
-    'sell', // or 'sell'
-    50,
-    netDelta,
-    { orderType: 'market'},
-  );
+  // Delta Hedging Orders, iterate order over sizeReduction & twapInterval
+    //for (let i=0; i < sizeReduction; i++){  
+      await client.placePerpOrder2(
+        mangoGroup,
+        mangoAccount,
+        perpMarket,
+        owner,
+        dipHedgeSide,
+        fairValue,
+        Math.abs(hedgeDeltaClip),
+        { orderType: 'limit'},
+      );
+      // Wait for the twapInterval of time before sending next order
+      // sleep(twapInterval);
+    //}
 
-  // Calc gamma
+  // Calc gamma of DIP array
   const positionGamma = greeks.getGamma(
     fairValue,
     dip.strike,
@@ -121,7 +170,7 @@ async function scalperPerp() {
   let netGamma = positionGamma * dip.qty * hrStdDev * fairValue;
   console.log('Position Gamma of ', netGamma)
 
-  // place bid/offer, start timer
+  // Place Gamma scalp bid & offer
   let gammaBid = fairValue * (1 - hrStdDev)
   let gammaAsk = fairValue * (1 + hrStdDev)
   await client.placePerpOrder2(
@@ -129,27 +178,29 @@ async function scalperPerp() {
     mangoAccount,
     perpMarket,
     owner,
-    'buy', // or 'sell'
+    'buy',
     gammaBid,
     netGamma,
     { orderType: 'limit'},
   );
-
   await client.placePerpOrder2(
     mangoGroup,
     mangoAccount,
     perpMarket,
     owner,
-    'sell', // or 'sell'
+    'sell',
     fairValue * (1 + hrStdDev),
     netGamma,
     { orderType: 'limit'},
   );
   console.log('Bid', gammaBid)
   console.log('Ask', gammaAsk)
-  // listen for fill, replace bid/offer
 
-  // 1 hr elpase, recalc delta, take delta, go to gamma
+  // Start 1 hour timer
+
+  // Listen for fills, replace bid/offer
+
+  // 1 hr elpase, go back to begining, calc delta & hedge, replace gamma b/o
 
 }
 

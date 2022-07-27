@@ -89,7 +89,7 @@ async function scalperPerp() {
   const impliedVol = impliedVolMap.get(dip.splToken);
   console.log('Fair Value: ', fairValue)
 
-  // DELTA HEDGING
+  // DELTA HEDGING //
   // Add new DIP to DIP Position Array 
   dipArray.push(dip);
   // TODO Initially calc dip array delta and add to new DIP OR recalc total each run
@@ -156,6 +156,7 @@ async function scalperPerp() {
       // sleep(twapInterval);
     //}
 
+  // GAMMA SCALPING //
   // Calc gamma of DIP array
   const positionGamma = greeks.getGamma(
     fairValue,

@@ -205,6 +205,8 @@ async function scalperPerp() {
 
   // 1 hr elpase, go back to begining, calc delta & hedge, replace gamma b/o
 
+    // Expiration, remove DIP from array, rerun
+
 }
 
 scalperPerp();

@@ -168,7 +168,7 @@ async function scalperPerp() {
     rfRate
   )
 
-  // Calc 1hr Std dev
+  // Calc 1hr Std dev for gamma levels
   let hrStdDev = impliedVol / Math.sqrt(365 * 24);
   let netGamma = positionGamma * dip.qty * hrStdDev * fairValue;
   console.log('Position Gamma of ', netGamma)
@@ -201,12 +201,20 @@ async function scalperPerp() {
 
   // Start 1 hour timer
 
-  // Listen for fills, replace bid/offer
-
-  // 1 hr elpase, go back to begining, calc delta & hedge, replace gamma b/o
-
-    // Expiration, remove DIP from array, rerun
-
 }
 
 scalperPerp();
+
+// Recieve DIP token balance change
+// addDIP()
+// scalperPerp()
+
+// Receive order fill from gamma levels
+// scalperPerp()
+
+// 1 Hour Timer Expires
+// scalperPerp()
+
+// DIP Expires
+// removeDIP()
+// scalperPerp()

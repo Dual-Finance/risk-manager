@@ -37,15 +37,15 @@ interface DIP {splToken: string; premiumAsset: string; expiration: Date; strike:
   type: string; qty: number
 }
 
-let oldDIP: DIP = {splToken:'SOL', premiumAsset:'USD', expiration:new Date('2022/12/31'), 
+const oldDIP: DIP = {splToken:'SOL', premiumAsset:'USD', expiration:new Date('2022/12/31'), 
 strike:60, type:'call', qty:0};
 
-let dipArray = [oldDIP]; // Initialize Array to hold all old DIP positions
+const dipArray = [oldDIP]; // Initialize Array to hold all old DIP positions
 
-let newDIP: DIP = {splToken:'SOL', premiumAsset:'USD', expiration:new Date('2022/12/31'), 
+const newDIP: DIP = {splToken:'SOL', premiumAsset:'USD', expiration:new Date('2022/12/31'), 
 strike:60, type:'call', qty:10};
 
-let impliedVol = THEO_VOL_MAP.get(newDIP.splToken);
+const impliedVol = THEO_VOL_MAP.get(newDIP.splToken);
 
 // Add new DIP to DIP Position Array 
 dipArray.push(newDIP);
@@ -63,14 +63,14 @@ async function scalperPerp() {
   const client = new MangoClient(connection, groupConfig.mangoProgramId);
 
   // Load Group & Market
-  let perpMarketConfig = getMarketByBaseSymbolAndKind(
+  const perpMarketConfig = getMarketByBaseSymbolAndKind(
     groupConfig,
     newDIP.splToken,
     'perp',
   );
-  let mangoGroup = await client.getMangoGroup(groupConfig.publicKey);
+  const mangoGroup = await client.getMangoGroup(groupConfig.publicKey);
 
-  let perpMarket = await mangoGroup.loadPerpMarket(
+  const perpMarket = await mangoGroup.loadPerpMarket(
     connection,
     perpMarketConfig.marketIndex,
     perpMarketConfig.baseDecimals,
@@ -86,18 +86,18 @@ async function scalperPerp() {
   )[0];
 
   // Option Parameters
-  let marketIndex = perpMarketConfig.marketIndex;
+  const marketIndex = perpMarketConfig.marketIndex;
   let fairValue = mangoGroup.getPrice(marketIndex, mangoCache).toNumber();
   console.log('Fair Value: ', fairValue)
 
   // DELTA HEDGING //
   // Calc DIP delta for new position
-  let dipTotalDelta = getDIPDelta(dipArray, fairValue);
+  const dipTotalDelta = getDIPDelta(dipArray, fairValue);
   console.log('DIP Delta: ', dipTotalDelta)
 
   // Get Mango delta position
-  let perpAccount = mangoAccount.perpAccounts[marketIndex];
-  let mangoDelta = perpAccount.getBasePositionUi(perpMarket);
+  const perpAccount = mangoAccount.perpAccounts[marketIndex];
+  const mangoDelta = perpAccount.getBasePositionUi(perpMarket);
   console.log('Mango Delta: ', mangoDelta)
   
   // Get Total Delta Position to hedge
@@ -105,13 +105,15 @@ async function scalperPerp() {
   console.log('Total Hedge Delta: ', hedgeDeltaTotal)
 
   // Determine if hedge needs to buy or sell delta
-  let hedgeSide;
-  hedgeDeltaTotal < 0 ? hedgeSide = 'buy' : hedgeSide = 'sell';
+  const hedgeSide = hedgeDeltaTotal < 0 ? 'buy' : 'sell';
   console.log('Hedge Side ', hedgeSide)
 
   // Fetch proper orderbook
-  let bookSide = hedgeDeltaTotal < 0 ? await perpMarket.loadAsks(connection) : await perpMarket.loadBids(connection);
+  const bookSide = hedgeDeltaTotal < 0 ? await perpMarket.loadAsks(connection) : await perpMarket.loadBids(connection);
   
+  // Cancel All stale orders
+  await client.cancelAllPerpOrders(mangoGroup, [perpMarket], mangoAccount, owner,);
+
   // Delta Hedging Orders
   let hedgeDeltaClip : number;
   let hedgePrice : number;
@@ -135,7 +137,7 @@ async function scalperPerp() {
       );
       // Check if any size in theory left
       if (hedgeDeltaTotal==hedgeDeltaClip){
-        console.log('End TWAP')
+        console.log('Delta Hedge Complete')
         break
       }
       // Wait the twapInterval of time before sending updated hedge price & qty
@@ -151,16 +153,16 @@ async function scalperPerp() {
     }
 
   // GAMMA SCALPING //
-  let dipTotalGamma = getDIPGamma(dipArray, fairValue);
+  const dipTotalGamma = getDIPGamma(dipArray, fairValue);
 
   // Calc 1hr Std dev for gamma levels
-  let hrStdDev = impliedVol / Math.sqrt(365 * 24);
-  let netGamma = dipTotalGamma * hrStdDev * fairValue;
+  const hrStdDev = impliedVol / Math.sqrt(365 * 24);
+  const netGamma = dipTotalGamma * hrStdDev * fairValue;
   console.log('Position Gamma of ', netGamma)
 
   // Place Gamma scalp bid & offer
-  let gammaBid = fairValue * (1 - hrStdDev)
-  let gammaAsk = fairValue * (1 + hrStdDev)
+  const gammaBid = fairValue * (1 - hrStdDev)
+  const gammaAsk = fairValue * (1 + hrStdDev)
   await client.placePerpOrder2(
     mangoGroup,
     mangoAccount,
@@ -223,7 +225,7 @@ function getDIPDelta(dipArray: DIP[], fairValue: number){
 // Splice delta hedge orders if available liquidity not supportive
 function orderSplice (qty: number, price: number, notionalMax: number,
    slippage: number, side: BookSide, market: PerpMarket){
-  let [_, nativeQty] = market.uiToNativePriceQuantity(0, qty);
+  const [_, nativeQty] = market.uiToNativePriceQuantity(0, qty);
   if (qty > 0 && side.getImpactPriceUi(nativeQty) < (price * (1-slippage))){
     console.log('Sell Price Impact: ', side.getImpactPriceUi(nativeQty), 'High Slippage!');
     return Math.max(qty * price / notionalMax, 1)
@@ -247,7 +249,7 @@ function twapTime(period: number){
 }
 
 function getDIPGamma(dipArray: DIP[], fairValue: number){
-  let impliedVol = THEO_VOL_MAP.get(newDIP.splToken);
+  const impliedVol = THEO_VOL_MAP.get(newDIP.splToken);
   let yearsUntilMaturity: number;
   let gammaSum = 0;
   for (const dip of dipArray){

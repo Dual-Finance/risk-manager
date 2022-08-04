@@ -8,3 +8,4 @@ export const rfRate = 0.03; // Risk Free Rate of Return ~ T-Bill Rate
 export const maxNotional = 10000; // Max hedging order size of $10,000
 export const slippageTolerance = 0.003; // Allow 30bps above/below FMV on limit orders
 export const twapInterval = 15; // Number of seconds to space spliced orders across
+export const scalperWindow = 3600; // Number of seconds for each gamma scalping window

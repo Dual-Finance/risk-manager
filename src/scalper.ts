@@ -11,7 +11,7 @@ import {
   BookSide,
   PerpMarket,
   MangoGroup,
-  MarketConfig,
+  getUnixTs
 } from '@blockworks-foundation/mango-client';
 import { Keypair, Commitment, Connection } from '@solana/web3.js';
 import configFile from './ids.json';
@@ -22,71 +22,71 @@ import {
   maxNotional, 
   slippageTolerance, 
   twapInterval,
+  scalperWindow,
 } from './config';
 
-function readKeypair() {
-  return JSON.parse(
-    process.env.KEYPAIR ||
-      fs.readFileSync(os.homedir() + '/mango-explorer/id.json', 'utf-8'),
-  );
-}
-
 // TODO Risk Manager feeds in new DIP position automatically
+// Risk Manager sends new DIP positions upon User deposit into DIPs without MM fill
+// See DIP object below for fields
 // Example for Hedging and Scalping current + new DIP Position
 interface DIP {splToken: string; premiumAsset: string; expiration: Date; strike: number;
   type: string; qty: number
 }
 
-const oldDIP: DIP = {splToken:'SOL', premiumAsset:'USD', expiration:new Date('2022/12/31'), 
-strike:60, type:'call', qty:0};
+const oldDIP: DIP = {splToken:'SOL', premiumAsset:'USD', expiration:new Date('2022/08/05'), 
+strike:40, type:'call', qty:10};
 
 const dipArray = [oldDIP]; // Initialize Array to hold all old DIP positions
 
 const newDIP: DIP = {splToken:'SOL', premiumAsset:'USD', expiration:new Date('2022/12/31'), 
-strike:60, type:'call', qty:10};
+strike:60, type:'call', qty:7};
 
-const impliedVol = THEO_VOL_MAP.get(newDIP.splToken);
+const symbol = newDIP.splToken;
+const impliedVol = THEO_VOL_MAP.get(symbol);
 
 // Add new DIP to DIP Position Array 
 dipArray.push(newDIP);
-console.log('DIP Array: ', dipArray)
+//console.log('DIP Array: ', dipArray)
+
+// Setup Client
+const config = new Config(configFile);
+const groupConfig = config.getGroupWithName(networkName) as GroupConfig;
+const connection = new Connection(
+  config.cluster_urls[groupConfig.cluster],
+  'processed' as Commitment,
+);
+const client = new MangoClient(connection, groupConfig.mangoProgramId);
+
+// Load Group & Market
+const perpMarketConfig = getMarketByBaseSymbolAndKind(
+  groupConfig,
+  symbol,
+  'perp',
+);
+const marketIndex = perpMarketConfig.marketIndex;
+
+// Order Authority
+const owner = Keypair.fromSecretKey(Uint8Array.from(readKeypair()));
 
 // TODO Iterate by splToken or run seperate instances per
-async function scalperPerp() {
-  // Setup Client
-  const config = new Config(configFile);
-  const groupConfig = config.getGroupWithName(networkName) as GroupConfig;
-  const connection = new Connection(
-    config.cluster_urls[groupConfig.cluster],
-    'processed' as Commitment,
-  );
-  const client = new MangoClient(connection, groupConfig.mangoProgramId);
+async function scalperMango() {
 
-  // Load Group & Market
-  const perpMarketConfig = getMarketByBaseSymbolAndKind(
-    groupConfig,
-    newDIP.splToken,
-    'perp',
-  );
   const mangoGroup = await client.getMangoGroup(groupConfig.publicKey);
 
   const perpMarket = await mangoGroup.loadPerpMarket(
     connection,
-    perpMarketConfig.marketIndex,
+    marketIndex,
     perpMarketConfig.baseDecimals,
     perpMarketConfig.quoteDecimals,
   );
 
-  let [mangoCache] = await loadPrices(mangoGroup, connection, perpMarketConfig);
+  let [mangoCache] = await loadPrices(mangoGroup, connection);
 
-  // Order Authority
-  const owner = Keypair.fromSecretKey(Uint8Array.from(readKeypair()));
-  const mangoAccount = (
+  let mangoAccount = (
     await client.getMangoAccountsForOwner(mangoGroup, owner.publicKey)
   )[0];
 
   // Option Parameters
-  const marketIndex = perpMarketConfig.marketIndex;
   let fairValue = mangoGroup.getPrice(marketIndex, mangoCache).toNumber();
   console.log('Fair Value: ', fairValue)
 
@@ -106,25 +106,27 @@ async function scalperPerp() {
 
   // Determine if hedge needs to buy or sell delta
   const hedgeSide = hedgeDeltaTotal < 0 ? 'buy' : 'sell';
-  console.log('Hedge Side ', hedgeSide)
 
   // Fetch proper orderbook
   const bookSide = hedgeDeltaTotal < 0 ? await perpMarket.loadAsks(connection) : await perpMarket.loadBids(connection);
   
   // Cancel All stale orders
-  await client.cancelAllPerpOrders(mangoGroup, [perpMarket], mangoAccount, owner,);
+  let openOrders = mangoAccount.getPerpOpenOrders();
+  if (openOrders.length > 0){ 
+    await client.cancelAllPerpOrders(mangoGroup, [perpMarket], mangoAccount, owner,);
+    console.log('Canceling Old Orders')
+  }
 
-  // Delta Hedging Orders
+  // Delta Hedging Orders, send limit orders through book that should fill
   let hedgeDeltaClip : number;
   let hedgePrice : number;
   let hedgeCount = 1;
+  let orderId = new Date().getTime();
   // Break up order depending on whether the book can support it
     while (Math.abs(hedgeDeltaTotal*fairValue) > 1){
       hedgeDeltaClip = hedgeDeltaTotal / orderSplice(hedgeDeltaTotal, fairValue, 
         maxNotional, slippageTolerance, bookSide, perpMarket)
-      console.log('Hedge', hedgeCount, 'Size:', hedgeDeltaClip)
-      hedgePrice = hedgeDeltaTotal < 0 ? fairValue * (1+slippageTolerance) : fairValue * (1-slippageTolerance);
-      console.log('Hedge', hedgeCount, 'Price:', hedgePrice)  
+      hedgePrice = hedgeDeltaTotal < 0 ? fairValue * (1+slippageTolerance*hedgeCount) : fairValue * (1-slippageTolerance*hedgeCount); // adjust hedgecount change for mainnet 
       await client.placePerpOrder2(
         mangoGroup,
         mangoAccount,
@@ -133,36 +135,44 @@ async function scalperPerp() {
         hedgeSide,
         hedgePrice,
         Math.abs(hedgeDeltaClip),
-        { orderType: 'limit'},
+        { orderType: 'limit', expiryTimestamp: getUnixTs() + twapInterval-1, clientOrderId: orderId},
       );
-      // Check if any size in theory left
-      if (hedgeDeltaTotal==hedgeDeltaClip){
+      console.log(hedgeSide,'#', orderId, hedgeCount, 'Size:', hedgeDeltaClip,'Price:', hedgePrice)
+      // Reduce hedge by what actually got filled
+      let filledSize = await fillSize(perpMarket, connection, orderId)
+      console.log('Filled Size', filledSize)
+      hedgeDeltaTotal = hedgeDeltaTotal + filledSize;
+      console.log('Remaining Size ', hedgeDeltaTotal)
+
+      // No need to wait for the twap interval if filled
+      if (Math.abs(hedgeDeltaTotal*fairValue) < 1){
         console.log('Delta Hedge Complete')
         break
       }
       // Wait the twapInterval of time before sending updated hedge price & qty
-      await twapTime(twapInterval);
+      await sleepTime(twapInterval);
       //Update Price
-      [mangoCache] = await loadPrices(mangoGroup, connection, perpMarketConfig)
+      [mangoCache] = await loadPrices(mangoGroup, connection);
       fairValue = mangoGroup.getPrice(marketIndex, mangoCache).toNumber();
-      // Calc remaining position
-      // Todo reduce hedge by what actually got filled
-      hedgeDeltaTotal = hedgeDeltaTotal - hedgeDeltaClip;
-      console.log('Remaining Size ', hedgeDeltaTotal)
+      // Keep count of # of hedges
+      orderId = orderId +1;
       hedgeCount = hedgeCount + 1;
     }
 
   // GAMMA SCALPING //
   const dipTotalGamma = getDIPGamma(dipArray, fairValue);
 
-  // Calc 1hr Std dev for gamma levels
-  const hrStdDev = impliedVol / Math.sqrt(365 * 24);
+  // Calc scalperWindow (1 hr) Std dev for gamma levels
+  const hrStdDev = impliedVol / Math.sqrt(365 * 24 * 60 * 60 / scalperWindow);
   const netGamma = dipTotalGamma * hrStdDev * fairValue;
   console.log('Position Gamma of ', netGamma)
 
   // Place Gamma scalp bid & offer
-  const gammaBid = fairValue * (1 - hrStdDev)
-  const gammaAsk = fairValue * (1 + hrStdDev)
+  const gammaBid = fairValue * (1 - hrStdDev);
+  const gammaBidID = orderId+1;
+  const gammaAsk = fairValue * (1 + hrStdDev);
+  const gammaAskID = orderId+2;
+  // const gammaExpiryTime = new Date((getUnixTs() + scalperWindow-1)*1000);
   await client.placePerpOrder2(
     mangoGroup,
     mangoAccount,
@@ -171,7 +181,7 @@ async function scalperPerp() {
     'buy',
     gammaBid,
     netGamma,
-    { orderType: 'limit'},
+    { orderType: 'postOnly', clientOrderId: gammaBidID}, // expiryTimestamp: getUnixTs() + scalperWindow-1
   );
   await client.placePerpOrder2(
     mangoGroup,
@@ -181,19 +191,52 @@ async function scalperPerp() {
     'sell',
     fairValue * (1 + hrStdDev),
     netGamma,
-    { orderType: 'limit'},
+    { orderType: 'postOnly', clientOrderId: gammaAskID},
   );
-  console.log('Bid', gammaBid)
-  console.log('Ask', gammaAsk)
-
-  // TODO Start 1 hour timer
-
+  console.log('Bid', gammaBid, 'ID', gammaBidID)
+  console.log('Ask', gammaAsk, 'ID', gammaAskID)
+  
+  // Receive order fill from gamma levels
+  // Maybe better to Run Websocket from https://docs.mango.markets/api-and-websocket/fills-websocket-feed
+  // Check by periods per scalperWindow for fills matching either gamma scalp and rerun after scalperWindow expires
+  let periods = 180;
+  let timeWaited = 0;
+  let filledBidGamma: number;
+  let filledAskGamma: number;
+  while (timeWaited < scalperWindow){
+    // Check this was buggy here updating account orders
+    mangoAccount = (await client.getMangoAccountsForOwner(mangoGroup, owner.publicKey))[0];
+    console.log('OpenOrders', mangoAccount.getPerpOpenOrders())
+    await sleepTime(scalperWindow/periods);
+    filledBidGamma = Math.abs(await fillSize(perpMarket, connection, gammaBidID));
+    filledAskGamma = Math.abs(await fillSize(perpMarket, connection, gammaAskID));
+    if (filledBidGamma > 0 || filledAskGamma > 0){
+      console.log('Bid filled', filledBidGamma, 'Ask filled', filledAskGamma)
+      break
+    }
+    timeWaited = timeWaited + scalperWindow/periods;
+  }
+  console.log('Event Trigger Rerun')
+  scalperMango();
 }
 
-scalperPerp();
+// TODO Reconnect logic
+try {
+  scalperMango();
+} catch(e) 
+{
+  sleepTime(twapInterval);
+  scalperMango();
+}
 
-async function loadPrices(mangoGroup: MangoGroup, connection: Connection,
-  perpMarketConfig: MarketConfig){
+function readKeypair() {
+  return JSON.parse(
+    process.env.KEYPAIR ||
+      fs.readFileSync(os.homedir() + '/mango-explorer/id.json', 'utf-8'),
+  );
+}
+
+async function loadPrices(mangoGroup: MangoGroup, connection: Connection){
  let [mangoCache]: [
    MangoCache,
  ] = await Promise.all([
@@ -206,8 +249,8 @@ function getDIPDelta(dipArray: DIP[], fairValue: number){
   let yearsUntilMaturity: number;
   let deltaSum = 0;
   for (const dip of dipArray){
-    if (dip.splToken == newDIP.splToken){
-      yearsUntilMaturity = (dip.expiration.getTime() - Date.now()) / (365 * 60 * 60 * 24 * 1000) + (0.5/365);
+    if (dip.splToken == symbol){
+      yearsUntilMaturity = (dip.expiration.getTime() - Date.now()) / (365 * 60 * 60 * 24 * 1000) + (0.5/365); // double check this needs half a day extra
       deltaSum = (greeks.getDelta(
         fairValue,
         dip.strike,
@@ -240,8 +283,25 @@ function orderSplice (qty: number, price: number, notionalMax: number,
   }
 }
 
-// TWAP Time Required
-function twapTime(period: number){
+// Fill Size from Delta Hedging & Gamma Scalps
+async function fillSize(perpMarket: PerpMarket, connection: Connection, orderID: number){
+  let filledQty = 0;
+  // Possible issue using loadFills instead of Websocket?
+  for (const fill of await perpMarket.loadFills(connection)) {
+  if (fill.makerClientOrderId.toNumber() == orderID || fill.takerClientOrderId.toNumber() == orderID){    
+    if (fill.takerSide == "buy"){
+        filledQty = filledQty + fill.quantity
+      } else if ( fill.takerSide == "sell") {
+        filledQty = filledQty - fill.quantity
+      }
+      console.log(fill.takerSide, fill.price, fill.quantity, fill.makerClientOrderId.toNumber(), fill.takerClientOrderId.toNumber());
+    }
+  }
+  return filledQty;
+}
+
+// Sleep Time Required
+function sleepTime(period: number){
   console.log('Wait ', period, 'seconds')
   return new Promise(function(resolve){
     setTimeout(resolve,period*1000)
@@ -249,11 +309,10 @@ function twapTime(period: number){
 }
 
 function getDIPGamma(dipArray: DIP[], fairValue: number){
-  const impliedVol = THEO_VOL_MAP.get(newDIP.splToken);
   let yearsUntilMaturity: number;
   let gammaSum = 0;
   for (const dip of dipArray){
-    if (dip.splToken == newDIP.splToken){
+    if (dip.splToken == symbol){
       yearsUntilMaturity = (dip.expiration.getTime() - Date.now()) / (365 * 60 * 60 * 24 * 1000) + (0.5/365);
       gammaSum = (greeks.getGamma(
         fairValue,
@@ -272,14 +331,10 @@ function getDIPGamma(dipArray: DIP[], fairValue: number){
 // EVENT TODO's//
 // Recieve DIP token balance change
 // addDIP()
-// scalperPerp()
-
-// Receive order fill from gamma levels
-// scalperPerp()
-
-// 1 Hour Timer Expires
-// scalperPerp()
+// scalperMango()
 
 // DIP Expires
 // removeDIP()
-// scalperPerp()
+// scalperMango()
+
+// TODO run on Serum using RLP collateral!

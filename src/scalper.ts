@@ -26,6 +26,8 @@ import {
 } from './config';
 
 // TODO Risk Manager feeds in new DIP position automatically
+// Risk Manager sends new DIP positions upon User deposit into DIPs without MM fill
+// See DIP object below for fields
 // Example for Hedging and Scalping current + new DIP Position
 interface DIP {splToken: string; premiumAsset: string; expiration: Date; strike: number;
   type: string; qty: number

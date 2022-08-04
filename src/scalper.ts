@@ -2,7 +2,6 @@ import * as os from 'os';
 import * as fs from 'fs';
 // @ts-ignore
 import * as greeks from 'greeks';
-import WebSocket from "ws";
 import {
   Config,
   getMarketByBaseSymbolAndKind,
@@ -13,8 +12,6 @@ import {
   PerpMarket,
   MangoGroup,
   MarketConfig,
-  PerpEventLayout,
-  FillEvent,
   getUnixTs
 } from '@blockworks-foundation/mango-client';
 import { Keypair, Commitment, Connection } from '@solana/web3.js';
@@ -199,7 +196,9 @@ async function scalperPerp() {
   );
   console.log('Bid', gammaBid, 'ID', gammaBidID)
   console.log('Ask', gammaAsk, 'ID', gammaAskID)
-
+  
+  // Receive order fill from gamma levels
+  // Maybe better to Run Websocket from https://docs.mango.markets/api-and-websocket/fills-websocket-feed
   // Check by periods per scalperWindow for fills matching either gamma scalp and rerun after scalperWindow expires
   let periods = 180;
   let timeWaited = 0;
@@ -321,13 +320,6 @@ function getDIPGamma(dipArray: DIP[], fairValue: number){
 // EVENT TODO's//
 // Recieve DIP token balance change
 // addDIP()
-// scalperPerp()
-
-// Receive order fill from gamma levels
-// Maybe better to Run Websocket from https://docs.mango.markets/api-and-websocket/fills-websocket-feed
-// scalperPerp()
-
-// 1 Hour Timer Expires
 // scalperPerp()
 
 // DIP Expires

@@ -29,11 +29,11 @@ import {
 // TODO Risk Manager feeds in new DIP position automatically
 // Risk Manager sends new DIP positions upon User deposit into DIPs without MM fill
 // See DIP object below for fields
-// Example for Hedging and Scalping current + new DIP Position
 interface DIP {splToken: string; premiumAsset: string; expiration: Date; strike: number;
   type: string; qty: number
 }
 
+// Example for Hedging and Scalping current + new DIP Position
 const oldDIP: DIP = {splToken:'SOL', premiumAsset:'USD', expiration:new Date(Date.UTC(2022,8-monthAdj,7,12,0,0,0)), 
 strike:40, type:'call', qty:6};
 const otherDIP: DIP = {splToken:'BTC', premiumAsset:'USD', expiration:new Date(Date.UTC(2022,8-monthAdj,6,12,0,0,0)), 
@@ -50,8 +50,8 @@ allDIP.push(newDIP); // Add new DIP to DIP Position Array
 
 // Remove All Expired DIP
 const currentDIP = allDIP.filter(dip => ((dip.expiration.getTime() - Date.now()) / (365 * 60 * 60 * 24 * 1000)) >0)
-// scalperMango()
 console.log('Live Positions', currentDIP);
+
 // Sort DIP by product
 const BTC_DIP = [];
 const ETH_DIP = [];
@@ -81,6 +81,7 @@ const client = new MangoClient(connection, groupConfig.mangoProgramId);
 // Order Authority
 const owner = Keypair.fromSecretKey(Uint8Array.from(readKeypair()));
 
+// TODO setup process to restart at 12:01 UTC each day
 // TODO Reconnect logic
 // try {
 //   scalperMango();
@@ -98,8 +99,7 @@ if (ETH_DIP.length > 0){scalperMango(ETH_DIP);}
 async function scalperMango(dipProduct: DIP[]) {
   
   // Symbol specific parameters
-  const assetDIP = dipProduct[0]
-  const symbol = assetDIP.splToken;
+  const symbol = dipProduct[0].splToken;
   const impliedVol = THEO_VOL_MAP.get(symbol);
   
   // Load Group & Market
@@ -125,7 +125,7 @@ async function scalperMango(dipProduct: DIP[]) {
   // Underlying price for option calculation
   let fairValue = mangoGroup.getPrice(marketIndex, mangoCache).toNumber();
   // Calc DIP delta for new position
-  const dipTotalDelta = getDIPDelta(dipProduct, fairValue, symbol);
+  const dipTotalDelta = getDIPDelta(dipProduct, fairValue);
 
   // Get Mango delta position
   const perpAccount = mangoAccount.perpAccounts[marketIndex];
@@ -164,6 +164,7 @@ async function scalperMango(dipProduct: DIP[]) {
       hedgeDeltaClip = hedgeDeltaTotal / orderSplice(hedgeDeltaTotal, fairValue, 
         maxNotional, slippageTolerance, bookSide, perpMarket)
       hedgePrice = hedgeDeltaTotal < 0 ? fairValue * (1+slippageTolerance*hedgeCount) : fairValue * (1-slippageTolerance*hedgeCount); // adjust hedgecount change for mainnet 
+      
       await client.placePerpOrder2(
         mangoGroup,
         mangoAccount,
@@ -175,6 +176,7 @@ async function scalperMango(dipProduct: DIP[]) {
         { orderType: 'limit', expiryTimestamp: getUnixTs() + twapInterval-1, clientOrderId: orderId},
       );
       console.log(symbol, hedgeSide,'#', hedgeCount,"-", orderId, 'Size:', hedgeDeltaClip,'Price:', hedgePrice)
+      
       // Reduce hedge by what actually got filled
       let filledSize = await fillSize(perpMarket, connection, orderId)
       hedgeDeltaTotal = hedgeDeltaTotal + filledSize;
@@ -182,22 +184,24 @@ async function scalperMango(dipProduct: DIP[]) {
 
       // No need to wait for the twap interval if filled
       if (Math.abs(hedgeDeltaTotal*fairValue) < 1){
-        console.log(symbol,'Delta Hedge Complete')
         break
       }
       // Wait the twapInterval of time before sending updated hedge price & qty
       console.log(symbol, 'Wait:', twapInterval, 'seconds');
       await sleepTime(twapInterval);
+
       //Update Price
       [mangoCache] = await loadPrices(mangoGroup, connection);
       fairValue = mangoGroup.getPrice(marketIndex, mangoCache).toNumber();
-      // Keep count of # of hedges
-      orderId = orderId +1;
+
+      // Keep count of # of hedges & create new orderID
+      orderId = orderId + 1;
       hedgeCount = hedgeCount + 1;
     }
+  console.log(symbol,'Delta Hedge Complete')
 
   // GAMMA SCALPING //
-  const dipTotalGamma = getDIPGamma(dipProduct, fairValue, symbol);
+  const dipTotalGamma = getDIPGamma(dipProduct, fairValue);
 
   // Calc scalperWindow (1 hr) Std dev for gamma levels
   const hrStdDev = impliedVol / Math.sqrt(365 * 24 * 60 * 60 / scalperWindow);
@@ -273,23 +277,21 @@ async function loadPrices(mangoGroup: MangoGroup, connection: Connection){
  return [mangoCache]
 }
 
-function getDIPDelta(dipProduct: DIP[], fairValue: number, symbol:string){
-  const impliedVol = THEO_VOL_MAP.get(symbol);
+function getDIPDelta(dipProduct: DIP[], fairValue: number){
+  const impliedVol = THEO_VOL_MAP.get(dipProduct[0].splToken);
   let yearsUntilMaturity: number;
   let deltaSum = 0;
   for (const dip of dipProduct){
-    if (dip.splToken == symbol){ //redundant
-      yearsUntilMaturity = (dip.expiration.getTime() - Date.now()) / (365 * 60 * 60 * 24 * 1000); // double check this needs half a day extra
-      deltaSum = (greeks.getDelta(
-        fairValue,
-        dip.strike,
-        yearsUntilMaturity,
-        impliedVol,
-        rfRate,
-        dip.type
-      )* dip.qty) + deltaSum;
-      deltaSum = deltaSum;  
-    }
+    yearsUntilMaturity = (dip.expiration.getTime() - Date.now()) / (365 * 60 * 60 * 24 * 1000);
+    deltaSum = (greeks.getDelta(
+      fairValue,
+      dip.strike,
+      yearsUntilMaturity,
+      impliedVol,
+      rfRate,
+      dip.type
+    )* dip.qty) + deltaSum;
+    deltaSum = deltaSum;  
   }
   return deltaSum
 }
@@ -336,23 +338,21 @@ function sleepTime(period: number){
   });
 }
 
-function getDIPGamma(dipProduct: DIP[], fairValue: number, symbol:string){
-  const impliedVol = THEO_VOL_MAP.get(symbol);
+function getDIPGamma(dipProduct: DIP[], fairValue: number){
+  const impliedVol = THEO_VOL_MAP.get(dipProduct[0].splToken);
   let yearsUntilMaturity: number;
   let gammaSum = 0;
   for (const dip of dipProduct){
-    if (dip.splToken == symbol){ //redundant
-      yearsUntilMaturity = (dip.expiration.getTime() - Date.now()) / (365 * 60 * 60 * 24 * 1000);
-      gammaSum = (greeks.getGamma(
-        fairValue,
-        dip.strike,
-        yearsUntilMaturity,
-        impliedVol,
-        rfRate,
-        dip.type
-      )* dip.qty) + gammaSum;
-      gammaSum = gammaSum;  
-    }
+    yearsUntilMaturity = (dip.expiration.getTime() - Date.now()) / (365 * 60 * 60 * 24 * 1000);
+    gammaSum = (greeks.getGamma(
+      fairValue,
+      dip.strike,
+      yearsUntilMaturity,
+      impliedVol,
+      rfRate,
+      dip.type
+    )* dip.qty) + gammaSum;
+    gammaSum = gammaSum;  
   }
   return gammaSum
 }

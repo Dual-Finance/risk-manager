@@ -158,7 +158,6 @@ async function scalperMango(dipProduct: DIP[]) {
       }
     }
   }
-  
 
   // Delta Hedging Orders, send limit orders through book that should fill
   let hedgeDeltaClip : number;
@@ -260,7 +259,19 @@ async function scalperMango(dipProduct: DIP[]) {
     // Check this was buggy here updating account orders
     // Maybe better to Run Websocket from https://docs.mango.markets/api-and-websocket/fills-websocket-feed
     mangoAccount = (await client.getMangoAccountsForOwner(mangoGroup, owner.publicKey))[0];
-    console.log(symbol, 'Periods Elpased:', timeWaited/(scalperWindow/periods),'OpenOrders:', mangoAccount.getPerpOpenOrders().length, 'Wait:', scalperWindow/periods, 'seconds')
+    const gammaOrders = mangoAccount.getPerpOpenOrders();
+    let numGammaOrders = 0; 
+    for(const order of gammaOrders){ 
+      if (order.marketIndex == marketIndex){
+        numGammaOrders = numGammaOrders + 1;
+      }
+    }
+    console.log(symbol, 'Periods Elpased:', timeWaited/(scalperWindow/periods),'GammaOrders:', numGammaOrders, 'Wait:', scalperWindow/periods, 'seconds')
+    // Check for lost orders
+    if (numGammaOrders != 2){
+      console.log('Lost Orders!')
+      break
+    }
     await sleepTime(scalperWindow/periods);
     filledBidGamma = Math.abs(await fillSize(perpMarket, connection, gammaBidID));
     filledAskGamma = Math.abs(await fillSize(perpMarket, connection, gammaAskID));
@@ -383,4 +394,5 @@ function timeSinceMidDay(){
   const diff = (timeNow.getTime() - timeCheckUTC)/1000;
   return diff
 }
+
 // TODO run on Serum using RLP collateral!

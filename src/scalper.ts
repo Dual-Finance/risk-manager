@@ -1,6 +1,5 @@
 import * as os from 'os';
 import * as fs from 'fs';
-// @ts-ignore
 import * as greeks from 'greeks';
 import {
   Config,
@@ -32,68 +31,64 @@ import {
 interface DIP {splToken: string; premiumAsset: string; expiration: Date; strike: number;
   type: string; qty: number
 }
-
 // Example for Hedging and Scalping current + new DIP Position
-const oldDIP: DIP = {splToken:'SOL', premiumAsset:'USD', expiration:new Date(Date.UTC(2022,8-monthAdj,7,12,0,0,0)), 
-strike:40, type:'call', qty:6};
+const oldDIP: DIP = {splToken:'SOL', premiumAsset:'USD', expiration:new Date(Date.UTC(2022,8-monthAdj,9,12,0,0,0)), 
+strike:44, type:'call', qty:6};
 const otherDIP: DIP = {splToken:'BTC', premiumAsset:'USD', expiration:new Date(Date.UTC(2022,8-monthAdj,6,12,0,0,0)), 
 strike:25000, type:'call', qty:0.01};
-const lastDIP: DIP = {splToken:'ETH', premiumAsset:'USD', expiration:new Date(Date.UTC(2022,8-monthAdj,9,12,0,0,0)), 
+const lastDIP: DIP = {splToken:'ETH', premiumAsset:'USD', expiration:new Date(Date.UTC(2022,8-monthAdj,8,12,0,0,0)), 
 strike:1800, type:'call', qty:0.1};
 
 const allDIP = [oldDIP, otherDIP, lastDIP]; // Initialize Array to hold all old DIP positions
+let BTC_DIP = [];
+let ETH_DIP = [];
+let SOL_DIP = [];
 
-// Recieve DIP token balance change, new DIP fed from risk manager
 const newDIP: DIP = {splToken:'SOL', premiumAsset:'USD', expiration:new Date(Date.UTC(2022,12-monthAdj,31,12,0,0,0)), 
-strike:60, type:'call', qty:7};
-allDIP.push(newDIP); // Add new DIP to DIP Position Array 
+  strike:60, type:'call', qty:7};
+// Recieve DIP token balance change, new DIP fed from risk manager
+allDIP.push(newDIP);  // Add new DIP to DIP Position Array 
 
-// Remove All Expired DIP
-const currentDIP = allDIP.filter(dip => ((dip.expiration.getTime() - Date.now()) / (365 * 60 * 60 * 24 * 1000)) >0)
-
-// Sort DIP by product
-const BTC_DIP = [];
-const ETH_DIP = [];
-const SOL_DIP = [];
-for (const dip of currentDIP){
-  if (dip.splToken == 'BTC'){
-    BTC_DIP.push(dip);
-  } else if (dip.splToken == 'ETH') {
-    ETH_DIP.push(dip);
-  } else if (dip.splToken == 'SOL') {
-    SOL_DIP.push(dip);
+function updateDIP(allDIP:DIP[]){
+  // Remove expired DIPs
+  let currentDIP = allDIP.filter(dip => ((dip.expiration.getTime() - Date.now()) / (365 * 60 * 60 * 24 * 1000)) >0)
+  // Sort DIP by product
+  BTC_DIP = [];
+  ETH_DIP = [];
+  SOL_DIP = [];
+  for (const dip of currentDIP){
+    if (dip.splToken == 'BTC'){
+      BTC_DIP.push(dip);
+    } else if (dip.splToken == 'ETH') {
+      ETH_DIP.push(dip);
+    } else if (dip.splToken == 'SOL') {
+      SOL_DIP.push(dip);
+    }
   }
+  console.log('BTC', BTC_DIP)
+  console.log('ETH', ETH_DIP)
+  console.log('SOL', SOL_DIP)
+  console.log('Updated DIPs')
 }
-console.log('BTC', BTC_DIP)
-console.log('ETH', ETH_DIP)
-console.log('SOL', SOL_DIP)
 
-// Setup Client
-const config = new Config(configFile);
-const groupConfig = config.getGroupWithName(networkName) as GroupConfig;
-const connection = new Connection(
-  config.cluster_urls[groupConfig.cluster],
-  'processed' as Commitment,
-);
-const client = new MangoClient(connection, groupConfig.mangoProgramId);
+// Rerun logic
+var cluster = require('cluster');
+if (cluster.isMaster) {
+  cluster.fork();
 
-// Order Authority
-const owner = Keypair.fromSecretKey(Uint8Array.from(readKeypair()));
+  cluster.on('exit', function() {
+    console.log('Error. Re-run!')
+    cluster.fork();
+  });
+}
 
-// TODO setup process to restart at 12:01 UTC each day
-// TODO Reconnect logic
-// try {
-//   scalperMango();
-// } catch(e) 
-// {
-//   sleepTime(twapInterval);
-//   scalperMango();
-// }
-
-// Run Scalper for each splToken
-if (SOL_DIP.length > 0){scalperMango(SOL_DIP);}
-//if (BTC_DIP.length > 0){scalperMango(BTC_DIP);}
-if (ETH_DIP.length > 0){scalperMango(ETH_DIP);}
+if (cluster.isWorker) {
+  updateDIP (allDIP);
+  // Run Scalper for each splToken
+  if (SOL_DIP.length > 0){scalperMango(SOL_DIP);}
+  //if (BTC_DIP.length > 0){scalperMango(BTC_DIP);}
+  if (ETH_DIP.length > 0){scalperMango(ETH_DIP);}
+}
 
 async function scalperMango(dipProduct: DIP[]) {
   
@@ -101,6 +96,18 @@ async function scalperMango(dipProduct: DIP[]) {
   const symbol = dipProduct[0].splToken;
   const impliedVol = THEO_VOL_MAP.get(symbol);
   
+  // Setup Client
+  const config = new Config(configFile);
+  const groupConfig = config.getGroupWithName(networkName) as GroupConfig;
+  const connection = new Connection(
+    config.cluster_urls[groupConfig.cluster],
+    'processed' as Commitment,
+  );
+  const client = new MangoClient(connection, groupConfig.mangoProgramId);
+
+  // Order Authority
+  const owner = Keypair.fromSecretKey(Uint8Array.from(readKeypair()));
+
   // Load Group & Market
   const perpMarketConfig = getMarketByBaseSymbolAndKind(
    groupConfig,
@@ -141,12 +148,12 @@ async function scalperMango(dipProduct: DIP[]) {
   
   // Cancel All stale orders
   let openOrders = mangoAccount.getPerpOpenOrders();
-  // console.log('All Open Orders', openOrders)
   if (openOrders.length > 0){
     for(const order of openOrders){ 
       if (order.marketIndex == marketIndex){
         await client.cancelAllPerpOrders(mangoGroup, [perpMarket], mangoAccount, owner,);
         console.log('Canceling', symbol, 'Orders')
+        break
       }
     }
   }
@@ -199,6 +206,12 @@ async function scalperMango(dipProduct: DIP[]) {
     }
   console.log(symbol,'Delta Hedge Complete')
 
+  if (timeSinceMidDay() < (twapInterval*hedgeCount) && timeSinceMidDay() >= 0){
+    console.log('MidDay Reset post Delta Hedge', timeSinceMidDay(), 'seconds past 12:00 UTC')
+    updateDIP(allDIP)
+    scalperMango(dipProduct)
+  }
+
   // GAMMA SCALPING //
   const dipTotalGamma = getDIPGamma(dipProduct, fairValue);
 
@@ -246,7 +259,19 @@ async function scalperMango(dipProduct: DIP[]) {
     // Check this was buggy here updating account orders
     // Maybe better to Run Websocket from https://docs.mango.markets/api-and-websocket/fills-websocket-feed
     mangoAccount = (await client.getMangoAccountsForOwner(mangoGroup, owner.publicKey))[0];
-    console.log(symbol, 'Periods Elpased:', timeWaited/(scalperWindow/periods),'OpenOrders:', mangoAccount.getPerpOpenOrders().length, 'Wait:', scalperWindow/periods, 'seconds')
+    const gammaOrders = mangoAccount.getPerpOpenOrders();
+    let numGammaOrders = 0; 
+    for(const order of gammaOrders){ 
+      if (order.marketIndex == marketIndex){
+        numGammaOrders = numGammaOrders + 1;
+      }
+    }
+    console.log(symbol, 'Periods Elpased:', timeWaited/(scalperWindow/periods),'GammaOrders:', numGammaOrders, 'Wait:', scalperWindow/periods, 'seconds')
+    // Check for lost orders
+    if (numGammaOrders != 2){
+      console.log('Lost Orders!')
+      break
+    }
     await sleepTime(scalperWindow/periods);
     filledBidGamma = Math.abs(await fillSize(perpMarket, connection, gammaBidID));
     filledAskGamma = Math.abs(await fillSize(perpMarket, connection, gammaAskID));
@@ -254,9 +279,15 @@ async function scalperMango(dipProduct: DIP[]) {
       console.log(symbol, 'Bid filled', filledBidGamma, 'Ask filled', filledAskGamma)
       break
     }
+    // Check if near just pasted 12UTC to reset in case of DIP exiry
+    if (timeSinceMidDay() < ((scalperWindow/periods)) && timeSinceMidDay() >= 0){
+      console.log('MidDay Reset during Gamma Scalp', timeSinceMidDay(), 'seconds past 12:00 UTC')
+      break
+    }
     timeWaited = timeWaited + scalperWindow/periods;
   }
   console.log(symbol, 'Event Trigger Rerun')
+  updateDIP(allDIP)
   scalperMango(dipProduct);
 }
 
@@ -353,6 +384,16 @@ function getDIPGamma(dipProduct: DIP[], fairValue: number){
     gammaSum = gammaSum;  
   }
   return gammaSum
+}
+
+function timeSinceMidDay(){
+  const timeNow = new Date();
+  const year = timeNow.getUTCFullYear();
+  const month = timeNow.getUTCMonth();
+  const day = timeNow.getUTCDate();
+  const timeCheckUTC = Date.UTC(year, month, day, 12, 0 ,0 ,0);
+  const diff = (timeNow.getTime() - timeCheckUTC)/1000;
+  return diff
 }
 
 // TODO run on Serum using RLP collateral!

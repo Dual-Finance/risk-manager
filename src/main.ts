@@ -3,7 +3,7 @@ function main() {
 
     // Poll the blockchain for new deposits
     
-    // Forward any new deposits to the scalper
+    // Forward any new deposits to the scalper or send to MM
 
     // Sleep and run again in a few minutes
 

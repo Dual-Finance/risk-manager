@@ -80,7 +80,6 @@ const client = new MangoClient(connection, groupConfig.mangoProgramId);
 // Order Authority
 const owner = Keypair.fromSecretKey(Uint8Array.from(readKeypair()));
 
-// TODO setup process to restart at 12:01 UTC each day
 // TODO Reconnect logic
 // try {
 //   scalperMango();
@@ -141,15 +140,11 @@ async function scalperMango(dipProduct: DIP[]) {
   
   // Cancel All stale orders
   let openOrders = mangoAccount.getPerpOpenOrders();
-  // console.log('All Open Orders', openOrders)
-  if (openOrders.length > 0){
-    for(const order of openOrders){ 
-      if (order.marketIndex == marketIndex){
-        await client.cancelAllPerpOrders(mangoGroup, [perpMarket], mangoAccount, owner,);
-        console.log('Canceling', symbol, 'Orders')
-      }
-    }
+  if (openOrders.length > 0) {
+    await client.cancelAllPerpOrders(mangoGroup, [perpMarket], mangoAccount, owner,);
+    console.log('Canceling', symbol, 'Orders')
   }
+  
 
   // Delta Hedging Orders, send limit orders through book that should fill
   let hedgeDeltaClip : number;
@@ -198,6 +193,11 @@ async function scalperMango(dipProduct: DIP[]) {
       hedgeCount = hedgeCount + 1;
     }
   console.log(symbol,'Delta Hedge Complete')
+
+  if (timeSinceMidDay() < (twapInterval*hedgeCount) && timeSinceMidDay() >= 0){
+    console.log('MidDay Reset post Delta Hedge', timeSinceMidDay(), 'seconds past 12:00 UTC')
+    scalperMango(dipProduct)
+  }
 
   // GAMMA SCALPING //
   const dipTotalGamma = getDIPGamma(dipProduct, fairValue);
@@ -255,8 +255,8 @@ async function scalperMango(dipProduct: DIP[]) {
       break
     }
     // Check if near just pasted 12UTC to reset in case of DIP exiry
-    if (timeUntilMidDay() < ((scalperWindow/periods) + twapInterval) && timeUntilMidDay() > 0){
-      console.log('MidDay Reset', timeUntilMidDay(), 'seconds past 12:00 UTC')
+    if (timeSinceMidDay() < ((scalperWindow/periods)) && timeSinceMidDay() >= 0){
+      console.log('MidDay Reset during Gamma Scalp', timeSinceMidDay(), 'seconds past 12:00 UTC')
       break
     }
     timeWaited = timeWaited + scalperWindow/periods;
@@ -360,7 +360,7 @@ function getDIPGamma(dipProduct: DIP[], fairValue: number){
   return gammaSum
 }
 
-function timeUntilMidDay(){
+function timeSinceMidDay(){
   const timeNow = new Date();
   const year = timeNow.getUTCFullYear();
   const month = timeNow.getUTCMonth();

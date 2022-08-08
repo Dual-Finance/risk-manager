@@ -13,6 +13,6 @@
     "esModuleInterop": true,
     "moduleResolution": "node",
   },
-  "include": ["./src/**/*", "example.ts", "scalper.ts"],
+  "include": ["./src/**/*", "scalper.ts"],
   "exclude": ["./src/**/*.test.js", "node_modules", "**/node_modules"]
 }

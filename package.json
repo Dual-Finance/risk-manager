@@ -1,5 +1,9 @@
 {
   "dependencies": {
-    "@blockworks-foundation/mango-client": "^3.6.9"
+    "@blockworks-foundation/mango-client": "^3.6.9",
+    "greeks": "^1.0.0"
+  },
+  "scripts": {
+    "scalper": "npx ts-node src/scalper.ts"
   }
 }

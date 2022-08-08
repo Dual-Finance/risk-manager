@@ -50,7 +50,6 @@ allDIP.push(newDIP); // Add new DIP to DIP Position Array
 
 // Remove All Expired DIP
 const currentDIP = allDIP.filter(dip => ((dip.expiration.getTime() - Date.now()) / (365 * 60 * 60 * 24 * 1000)) >0)
-console.log('Live Positions', currentDIP);
 
 // Sort DIP by product
 const BTC_DIP = [];
@@ -325,7 +324,6 @@ async function fillSize(perpMarket: PerpMarket, connection: Connection, orderID:
       } else if ( fill.takerSide == "sell") {
         filledQty = filledQty - fill.quantity
       }
-      //console.log(symbol, fill.takerSide, fill.price, fill.quantity, fill.makerClientOrderId.toString(), fill.takerClientOrderId.toString());
     }
   }
   return filledQty;

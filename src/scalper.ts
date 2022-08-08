@@ -32,7 +32,6 @@ import {
 interface DIP {splToken: string; premiumAsset: string; expiration: Date; strike: number;
   type: string; qty: number
 }
-
 // Example for Hedging and Scalping current + new DIP Position
 const oldDIP: DIP = {splToken:'SOL', premiumAsset:'USD', expiration:new Date(Date.UTC(2022,8-monthAdj,9,12,0,0,0)), 
 strike:44, type:'call', qty:6};
@@ -64,35 +63,27 @@ for (const dip of currentDIP){
     SOL_DIP.push(dip);
   }
 }
-console.log('BTC', BTC_DIP)
-console.log('ETH', ETH_DIP)
-console.log('SOL', SOL_DIP)
 
-// Setup Client
-const config = new Config(configFile);
-const groupConfig = config.getGroupWithName(networkName) as GroupConfig;
-const connection = new Connection(
-  config.cluster_urls[groupConfig.cluster],
-  'processed' as Commitment,
-);
-const client = new MangoClient(connection, groupConfig.mangoProgramId);
+// Rerun logic
+var cluster = require('cluster');
+if (cluster.isMaster) {
+  cluster.fork();
 
-// Order Authority
-const owner = Keypair.fromSecretKey(Uint8Array.from(readKeypair()));
+  cluster.on('exit', function() {
+    console.log('Error. Re-run!')
+    cluster.fork();
+  });
+}
 
-// TODO Reconnect logic
-// try {
-//   scalperMango();
-// } catch(e) 
-// {
-//   sleepTime(twapInterval);
-//   scalperMango();
-// }
-
-// Run Scalper for each splToken
-if (SOL_DIP.length > 0){scalperMango(SOL_DIP);}
-//if (BTC_DIP.length > 0){scalperMango(BTC_DIP);}
-if (ETH_DIP.length > 0){scalperMango(ETH_DIP);}
+if (cluster.isWorker) {
+  console.log('BTC', BTC_DIP)
+  console.log('ETH', ETH_DIP)
+  console.log('SOL', SOL_DIP)
+  // Run Scalper for each splToken
+  if (SOL_DIP.length > 0){scalperMango(SOL_DIP);}
+  //if (BTC_DIP.length > 0){scalperMango(BTC_DIP);}
+  if (ETH_DIP.length > 0){scalperMango(ETH_DIP);}
+}
 
 async function scalperMango(dipProduct: DIP[]) {
   
@@ -100,6 +91,18 @@ async function scalperMango(dipProduct: DIP[]) {
   const symbol = dipProduct[0].splToken;
   const impliedVol = THEO_VOL_MAP.get(symbol);
   
+  // Setup Client
+  const config = new Config(configFile);
+  const groupConfig = config.getGroupWithName(networkName) as GroupConfig;
+  const connection = new Connection(
+    config.cluster_urls[groupConfig.cluster],
+    'processed' as Commitment,
+  );
+  const client = new MangoClient(connection, groupConfig.mangoProgramId);
+
+  // Order Authority
+  const owner = Keypair.fromSecretKey(Uint8Array.from(readKeypair()));
+
   // Load Group & Market
   const perpMarketConfig = getMarketByBaseSymbolAndKind(
    groupConfig,
@@ -140,9 +143,14 @@ async function scalperMango(dipProduct: DIP[]) {
   
   // Cancel All stale orders
   let openOrders = mangoAccount.getPerpOpenOrders();
-  if (openOrders.length > 0) {
-    await client.cancelAllPerpOrders(mangoGroup, [perpMarket], mangoAccount, owner,);
-    console.log('Canceling', symbol, 'Orders')
+  if (openOrders.length > 0){
+    for(const order of openOrders){ 
+      if (order.marketIndex == marketIndex){
+        await client.cancelAllPerpOrders(mangoGroup, [perpMarket], mangoAccount, owner,);
+        console.log('Canceling', symbol, 'Orders')
+        break
+      }
+    }
   }
   
 

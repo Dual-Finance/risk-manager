@@ -1,6 +1,5 @@
 import * as os from 'os';
 import * as fs from 'fs';
-// @ts-ignore
 import * as greeks from 'greeks';
 import {
   Config,
@@ -41,25 +40,22 @@ const lastDIP: DIP = {splToken:'ETH', premiumAsset:'USD', expiration:new Date(Da
 strike:1800, type:'call', qty:0.1};
 
 const allDIP = [oldDIP, otherDIP, lastDIP]; // Initialize Array to hold all old DIP positions
-// Sort DIP by product
-const BTC_DIP = [];
-const ETH_DIP = [];
-const SOL_DIP = [];
+let BTC_DIP = [];
+let ETH_DIP = [];
+let SOL_DIP = [];
 
 const newDIP: DIP = {splToken:'SOL', premiumAsset:'USD', expiration:new Date(Date.UTC(2022,12-monthAdj,31,12,0,0,0)), 
   strike:60, type:'call', qty:7};
-
 // Recieve DIP token balance change, new DIP fed from risk manager
-updateDIP (newDIP);
+allDIP.push(newDIP);  // Add new DIP to DIP Position Array 
 
-// Remove expire DIPs
-function expireDIP(allDIP: DIP[]){
-  return allDIP.filter(dip => ((dip.expiration.getTime() - Date.now()) / (365 * 60 * 60 * 24 * 1000)) >0)
-}
-
-function updateDIP(newDIP:DIP){
-  allDIP.push(newDIP); // Add new DIP to DIP Position Array 
-  let currentDIP = expireDIP (allDIP);
+function updateDIP(allDIP:DIP[]){
+  // Remove expired DIPs
+  let currentDIP = allDIP.filter(dip => ((dip.expiration.getTime() - Date.now()) / (365 * 60 * 60 * 24 * 1000)) >0)
+  // Sort DIP by product
+  BTC_DIP = [];
+  ETH_DIP = [];
+  SOL_DIP = [];
   for (const dip of currentDIP){
     if (dip.splToken == 'BTC'){
       BTC_DIP.push(dip);
@@ -69,7 +65,12 @@ function updateDIP(newDIP:DIP){
       SOL_DIP.push(dip);
     }
   }
+  console.log('BTC', BTC_DIP)
+  console.log('ETH', ETH_DIP)
+  console.log('SOL', SOL_DIP)
+  console.log('Updated DIPs')
 }
+
 // Rerun logic
 var cluster = require('cluster');
 if (cluster.isMaster) {
@@ -82,9 +83,7 @@ if (cluster.isMaster) {
 }
 
 if (cluster.isWorker) {
-  console.log('BTC', BTC_DIP)
-  console.log('ETH', ETH_DIP)
-  console.log('SOL', SOL_DIP)
+  updateDIP (allDIP);
   // Run Scalper for each splToken
   if (SOL_DIP.length > 0){scalperMango(SOL_DIP);}
   //if (BTC_DIP.length > 0){scalperMango(BTC_DIP);}
@@ -209,6 +208,7 @@ async function scalperMango(dipProduct: DIP[]) {
 
   if (timeSinceMidDay() < (twapInterval*hedgeCount) && timeSinceMidDay() >= 0){
     console.log('MidDay Reset post Delta Hedge', timeSinceMidDay(), 'seconds past 12:00 UTC')
+    updateDIP(allDIP)
     scalperMango(dipProduct)
   }
 
@@ -287,6 +287,7 @@ async function scalperMango(dipProduct: DIP[]) {
     timeWaited = timeWaited + scalperWindow/periods;
   }
   console.log(symbol, 'Event Trigger Rerun')
+  updateDIP(allDIP)
   scalperMango(dipProduct);
 }
 

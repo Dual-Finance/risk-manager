@@ -41,29 +41,35 @@ const lastDIP: DIP = {splToken:'ETH', premiumAsset:'USD', expiration:new Date(Da
 strike:1800, type:'call', qty:0.1};
 
 const allDIP = [oldDIP, otherDIP, lastDIP]; // Initialize Array to hold all old DIP positions
-
-// Recieve DIP token balance change, new DIP fed from risk manager
-const newDIP: DIP = {splToken:'SOL', premiumAsset:'USD', expiration:new Date(Date.UTC(2022,12-monthAdj,31,12,0,0,0)), 
-strike:60, type:'call', qty:7};
-allDIP.push(newDIP); // Add new DIP to DIP Position Array 
-
-// Remove All Expired DIP
-const currentDIP = allDIP.filter(dip => ((dip.expiration.getTime() - Date.now()) / (365 * 60 * 60 * 24 * 1000)) >0)
-
 // Sort DIP by product
 const BTC_DIP = [];
 const ETH_DIP = [];
 const SOL_DIP = [];
-for (const dip of currentDIP){
-  if (dip.splToken == 'BTC'){
-    BTC_DIP.push(dip);
-  } else if (dip.splToken == 'ETH') {
-    ETH_DIP.push(dip);
-  } else if (dip.splToken == 'SOL') {
-    SOL_DIP.push(dip);
-  }
+
+const newDIP: DIP = {splToken:'SOL', premiumAsset:'USD', expiration:new Date(Date.UTC(2022,12-monthAdj,31,12,0,0,0)), 
+  strike:60, type:'call', qty:7};
+
+// Recieve DIP token balance change, new DIP fed from risk manager
+updateDIP (newDIP);
+
+// Remove expire DIPs
+function expireDIP(allDIP: DIP[]){
+  return allDIP.filter(dip => ((dip.expiration.getTime() - Date.now()) / (365 * 60 * 60 * 24 * 1000)) >0)
 }
 
+function updateDIP(newDIP:DIP){
+  allDIP.push(newDIP); // Add new DIP to DIP Position Array 
+  let currentDIP = expireDIP (allDIP);
+  for (const dip of currentDIP){
+    if (dip.splToken == 'BTC'){
+      BTC_DIP.push(dip);
+    } else if (dip.splToken == 'ETH') {
+      ETH_DIP.push(dip);
+    } else if (dip.splToken == 'SOL') {
+      SOL_DIP.push(dip);
+    }
+  }
+}
 // Rerun logic
 var cluster = require('cluster');
 if (cluster.isMaster) {

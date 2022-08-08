@@ -34,11 +34,11 @@ interface DIP {splToken: string; premiumAsset: string; expiration: Date; strike:
 }
 
 // Example for Hedging and Scalping current + new DIP Position
-const oldDIP: DIP = {splToken:'SOL', premiumAsset:'USD', expiration:new Date(Date.UTC(2022,8-monthAdj,7,12,0,0,0)), 
-strike:40, type:'call', qty:6};
+const oldDIP: DIP = {splToken:'SOL', premiumAsset:'USD', expiration:new Date(Date.UTC(2022,8-monthAdj,9,12,0,0,0)), 
+strike:44, type:'call', qty:6};
 const otherDIP: DIP = {splToken:'BTC', premiumAsset:'USD', expiration:new Date(Date.UTC(2022,8-monthAdj,6,12,0,0,0)), 
 strike:25000, type:'call', qty:0.01};
-const lastDIP: DIP = {splToken:'ETH', premiumAsset:'USD', expiration:new Date(Date.UTC(2022,8-monthAdj,9,12,0,0,0)), 
+const lastDIP: DIP = {splToken:'ETH', premiumAsset:'USD', expiration:new Date(Date.UTC(2022,8-monthAdj,8,12,0,0,0)), 
 strike:1800, type:'call', qty:0.1};
 
 const allDIP = [oldDIP, otherDIP, lastDIP]; // Initialize Array to hold all old DIP positions
@@ -254,6 +254,11 @@ async function scalperMango(dipProduct: DIP[]) {
       console.log(symbol, 'Bid filled', filledBidGamma, 'Ask filled', filledAskGamma)
       break
     }
+    // Check if near just pasted 12UTC to reset in case of DIP exiry
+    if (timeUntilMidDay() < ((scalperWindow/periods) + twapInterval) && timeUntilMidDay() > 0){
+      console.log('MidDay Reset', timeUntilMidDay(), 'seconds past 12:00 UTC')
+      break
+    }
     timeWaited = timeWaited + scalperWindow/periods;
   }
   console.log(symbol, 'Event Trigger Rerun')
@@ -355,4 +360,13 @@ function getDIPGamma(dipProduct: DIP[], fairValue: number){
   return gammaSum
 }
 
+function timeUntilMidDay(){
+  const timeNow = new Date();
+  const year = timeNow.getUTCFullYear();
+  const month = timeNow.getUTCMonth();
+  const day = timeNow.getUTCDate();
+  const timeCheckUTC = Date.UTC(year, month, day, 12, 0 ,0 ,0);
+  const diff = (timeNow.getTime() - timeCheckUTC)/1000;
+  return diff
+}
 // TODO run on Serum using RLP collateral!

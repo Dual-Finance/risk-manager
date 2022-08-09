@@ -8,11 +8,11 @@
     "declaration": true,
     "declarationMap": true,
     "noImplicitAny": false,
-    "moduleResolution": "node",
     "resolveJsonModule": true,
     "sourceMap": true,
     "esModuleInterop": true,
+    "moduleResolution": "node",
   },
-  "include": ["./src/**/*", "scalper.ts"],
-  "exclude": ["./src/**/*.test.js", "node_modules", "**/node_modules"]
+  "include": ["./src//*", "example.ts", "scalper.ts"],
+  "exclude": ["./src//*.test.js", "node_modules", "**/node_modules"]
 }

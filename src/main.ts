@@ -1,12 +1,13 @@
 function main() {
-    // Start the scalper
+    // Create a poller
+    // Create a router
+    // Create a scalper
 
-    // Poll the blockchain for new deposits
-    
-    // Forward any new deposits to the scalper or send to MM
+    // Connect the poller to the router
 
-    // Sleep and run again in a few minutes
+    // Connect the router to the scalper
 
+    // Start polling
 }
 
 main();

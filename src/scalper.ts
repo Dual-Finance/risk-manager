@@ -184,19 +184,19 @@ async function scalperMango(dipProduct: DIP[]) {
         Math.abs(hedgeDeltaClip),
         { orderType: 'limit', expiryTimestamp: getUnixTs() + twapInterval-1, clientOrderId: orderId},
       );
-      console.log(symbol, hedgeSide,'#', hedgeCount,"-", orderId, 'Size:', hedgeDeltaClip,'Price:', hedgePrice)
+      console.log(symbol, hedgeSide,'#', hedgeCount,"-", orderId, 'Size:', Math.abs(hedgeDeltaClip),'Price:', hedgePrice)
       
       // Reduce hedge by what actually got filled
       let filledSize = await fillSize(perpMarket, connection, orderId)
       hedgeDeltaTotal = hedgeDeltaTotal + filledSize;
-      console.log(symbol,'Filled Size', filledSize, 'Remaining Size ', hedgeDeltaTotal)
+      console.log(symbol,'Filled', hedgeSide, 'Size', filledSize, 'Remaining Size ', hedgeDeltaTotal)
 
       // No need to wait for the twap interval if filled
       if (Math.abs(hedgeDeltaTotal*fairValue) < 1){
         break
       }
       // Wait the twapInterval of time before sending updated hedge price & qty
-      console.log(symbol, 'Wait:', twapInterval, 'seconds');
+      console.log(symbol, 'Delta Hedge', hedgeCount+1, 'Wait:', twapInterval, 'seconds');
       await sleepTime(twapInterval);
 
       //Update Price
@@ -269,12 +269,12 @@ async function scalperMango(dipProduct: DIP[]) {
         numGammaOrders = numGammaOrders + 1;
       }
     }
-    console.log(symbol, 'Periods Elpased:', timeWaited/(scalperWindow/periods),'GammaOrders:', numGammaOrders, 'Wait:', scalperWindow/periods, 'seconds')
     // Check for lost orders
     if (numGammaOrders != 2){
       console.log('Lost Orders!')
       break
     }
+    console.log(symbol, 'Periods Elpased:', timeWaited/(scalperWindow/periods),'GammaOrders:', numGammaOrders, 'Wait:', scalperWindow/periods, 'seconds')
     await sleepTime(scalperWindow/periods);
     filledBidGamma = Math.abs(await fillSize(perpMarket, connection, gammaBidID));
     filledAskGamma = Math.abs(await fillSize(perpMarket, connection, gammaAskID));

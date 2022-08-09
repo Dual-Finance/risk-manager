@@ -1,7 +1,7 @@
 export interface DIPDeposit {
     splToken: string;
     premiumAsset: string;
-    expiration: Date;
+    expiration: number;
     strike: number;
     type: string;
     qty: number

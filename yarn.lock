@@ -1432,10 +1432,10 @@
     "buffer-layout" "^1.2.0"
     "dotenv" "10.0.0"
 
-"@solana/web3.js@^1.17.0", "@solana/web3.js@^1.2.0", "@solana/web3.js@^1.21.0", "@solana/web3.js@^1.43.5", "@solana/web3.js@^1.5.0":
-  "integrity" "sha512-Gb6XvdhGjGI7CdAXLmlMIEvEYvrwqc78JOtwCsSrTqzz7Ek/BhJpZ/Cv89gxRDrWxf6kHegAfaN2FxwuYMmDZQ=="
-  "resolved" "https://registry.npmjs.org/@solana/web3.js/-/web3.js-1.48.0.tgz"
-  "version" "1.48.0"
+"@solana/web3.js@^1.17.0", "@solana/web3.js@^1.2.0", "@solana/web3.js@^1.21.0", "@solana/web3.js@^1.43.5", "@solana/web3.js@^1.5.0", "@solana/web3.js@^1.50.1":
+  "integrity" "sha512-1l9N/nS8pJEA2YibNT8wa072718O0/A1eKWE0+pdWC5wDGQgBNxZSLuv7Cq5Dcn46WsZ5J5ZstK89q8J/ZZaQA=="
+  "resolved" "https://registry.npmjs.org/@solana/web3.js/-/web3.js-1.50.1.tgz"
+  "version" "1.50.1"
   dependencies:
     "@babel/runtime" "^7.12.5"
     "@ethersproject/sha2" "^5.5.0"
@@ -5050,6 +5050,11 @@
   "integrity" "sha512-VlZwKPCkYKxQgeSbH5EyngOmRp7Ww7I9rQLERETtf5ofd9pGeswWiOtogpEO850jziPRarreGxn5QIiTqpb2wA=="
   "resolved" "https://registry.npmjs.org/webidl-conversions/-/webidl-conversions-5.0.0.tgz"
   "version" "5.0.0"
+
+"websocket-ts@^1.1.1":
+  "integrity" "sha512-rm+S60J74Ckw5iizzgID12ju+OfaHAa6dhXhULIOrXkl0e05RzxfY42/vMStpz5jWL3iz9mkyjPcFUY1IgI0fw=="
+  "resolved" "https://registry.npmjs.org/websocket-ts/-/websocket-ts-1.1.1.tgz"
+  "version" "1.1.1"
 
 "whatwg-fetch@^3.0.0":
   "integrity" "sha512-bJlen0FcuU/0EMLrdbJ7zOnW6ITZLrZMIarMUVmdKtsGvZna8vxKYaexICWPfZ8qwf9fzNq+UEIZrnSaApt6RA=="

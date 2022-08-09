@@ -1,4 +1,4 @@
-interface DIPDeposit {
+export interface DIPDeposit {
     splToken: string;
     premiumAsset: string;
     expiration: Date;

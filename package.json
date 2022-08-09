@@ -1,9 +1,12 @@
 {
   "dependencies": {
     "@blockworks-foundation/mango-client": "^3.6.9",
-    "greeks": "^1.0.0"
+    "@solana/web3.js": "^1.50.1",
+    "greeks": "^1.0.0",
+    "websocket-ts": "^1.1.1"
   },
   "scripts": {
-    "scalper": "npx ts-node src/scalper.ts"
+    "scalper": "npx ts-node src/scalper.ts",
+    "main": "npx ts-node src/main.ts"
   }
 }

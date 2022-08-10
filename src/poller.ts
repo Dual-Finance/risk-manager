@@ -38,7 +38,7 @@ export class Poller {
 
   subscribe(address: string): void {
     console.log("Listening at:", address);
-    const connection: Connection = new Connection(clusterApiUrl(this.cluster));
+    const connection: Connection = new Connection(clusterApiUrl('mainnet-beta'));
     const callback: AccountChangeCallback = (
       accountInfo: solanaAccountInfo<Buffer>,
       _context: Context

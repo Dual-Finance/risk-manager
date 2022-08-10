@@ -39,7 +39,6 @@ export class Scalper {
   marketIndex: number;
 
   constructor(symbol: string) {
-    console.log('constructor');
     // Setup Client
     this.config = new Config(configFile);
     this.groupConfig = this.config.getGroupWithName(networkName) as GroupConfig;
@@ -60,7 +59,7 @@ export class Scalper {
   }
 
   async scalperMango(dipProduct: DIPDeposit[]): Promise<void> {
-    console.log('Received a deposit');
+    console.log('Received a deposit', dipProduct);
 
     this.perpMarketConfig = getMarketByBaseSymbolAndKind(
       this.groupConfig,

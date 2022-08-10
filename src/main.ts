@@ -1,34 +1,95 @@
-import { DIPDeposit } from './common';
-import { monthAdj } from './config';
-import { Poller } from './poller';
-import { Router } from './router';
-import { Scalper } from './scalper';
+import { clusterApiUrl, Connection, PublicKey } from "@solana/web3.js";
+import { DIPDeposit } from "./common";
+import { Poller } from "./poller";
+import { Router } from "./router";
+import { Scalper } from "./scalper";
+import {
+  findProgramAddressWithMintAndStrikeAndExpiration,
+  getAssociatedTokenAddress,
+  parseDipState,
+} from "./utils";
 
 function main() {
-    // Create a scalper
-    const scalper: Scalper = new Scalper('BTC');
+  const cluster = "devnet";
+  const dualMarketProgramID = new PublicKey(
+    "DiPbvUUJkDhV9jFtQsDFnMEMRJyjW5iS6NMwoySiW8ki"
+  );
+  const usdcMintPk = new PublicKey(
+    "HJiQv33nKujRmZQ3sJBSosXgCEmiHs3mG1yd9VcLawPM"
+  );
+  const mmWalletPk = new PublicKey(
+    "9SgZKdeTMaNuEZnhccK2crHxi1grXRmZKQCvNSKgVrCQ"
+  );
+  const OPTION_MINT_ADDRESS_SEED = "option-mint";
+  const wsolPk = new PublicKey("So11111111111111111111111111111111111111112");
+  const connection: Connection = new Connection(clusterApiUrl(cluster));
+  // Create a scalper
+  const solScalper: Scalper = new Scalper("SOL");
 
-    // Create a router
-    const router: Router = new Router(
-        (deposit: DIPDeposit) => { console.log('Route to MM'); },
+  const solRouter: Router = new Router(
+    (deposit: DIPDeposit[]) => {
+      console.log("Route to MM");
+    },
+    (deposits: DIPDeposit[]) => {
+      console.log(deposits);
+      solScalper.scalperMango(deposits);
+    },
+    'SOL'
+  );
 
-        // TODO: Make this handle multiple DIPs for the same asset
-        (deposit: DIPDeposit) => { console.log(deposit); scalper.scalperMango([deposit]) },
-    );
+  const programAccountsPromise =
+    connection.getProgramAccounts(dualMarketProgramID);
+  programAccountsPromise.then(async (data) => {
+    for (const programAccount of data) {
+      if (programAccount.account.data.length !== 260) {
+        continue;
+      }
+      const dipState = parseDipState(programAccount.account.data);
 
-    // Create a poller
-    const poller: Poller = new Poller(
-        'mainnet-beta',
-        "BTC",
-        "USD",
-        new Date(Date.UTC(2022, 8, 12, 12, 0, 0, 0)).getTime() / 1000,
-        25000,
-        "call",
-        (deposit: DIPDeposit) => { router.route(deposit); }
-    );
+      const strike: number = dipState.strike / 1_000_000;
+      const { expiration } = dipState;
+      const { splMint } = dipState;
 
-    // Start polling for a specific DIP option token account
-    poller.subscribe('GoBGzcR8kDTLKwPxhKb7NX3kmmt3mZKBgYwsbYf5hDcF');
+      const durationMs = expiration * 1_000 - Date.now();
+      if (durationMs < 0) {
+        continue;
+      }
+
+      if (splMint.toBase58() == wsolPk.toBase58()) {
+        solRouter.add_dip(expiration, strike);
+
+        const [optionMint] =
+          await findProgramAddressWithMintAndStrikeAndExpiration(
+            OPTION_MINT_ADDRESS_SEED,
+            strike * 1_000_000,
+            expiration,
+            splMint,
+            usdcMintPk,
+            dualMarketProgramID
+          );
+        const mmOptionAccount = await getAssociatedTokenAddress(
+          optionMint,
+          mmWalletPk
+        );
+
+        // Create a poller
+        const poller: Poller = new Poller(
+          cluster,
+          "SOL",
+          "USD",
+          expiration,
+          strike,
+          "call",
+          (deposit: DIPDeposit) => {
+            solRouter.route(deposit);
+          }
+        );
+
+        // Start polling for a specific DIP option token account
+        poller.subscribe(mmOptionAccount.toBase58());
+      }
+    }
+  });
 }
 
 main();

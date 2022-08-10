@@ -171,7 +171,7 @@ export class Scalper {
         hedgePrice =
           hedgeDeltaTotal < 0
             ? fairValue * (1 + slippageTolerance * hedgeCount)
-            : fairValue * (1 - slippageTolerance * hedgeCount); // adjust hedgecount change for mainnet
+            : fairValue * (1 - slippageTolerance * hedgeCount); // adjustment for wide order books
       } else {
         hedgePrice =
           hedgeDeltaTotal < 0
@@ -315,6 +315,11 @@ export class Scalper {
           numGammaOrders = numGammaOrders + 1;
         }
       }
+      // Check for lost orders
+      if (numGammaOrders != 2) {
+        console.log("Lost Orders!");
+        break;
+      }
       console.log(
         this.symbol,
         "Periods Elpased:",
@@ -325,11 +330,6 @@ export class Scalper {
         scalperWindow / periods,
         "seconds"
       );
-      // Check for lost orders
-      if (numGammaOrders != 2) {
-        console.log("Lost Orders!");
-        break;
-      }
       await sleepTime(scalperWindow / periods);
       filledBidGamma = Math.abs(
         await fillSize(perpMarket, this.connection, gammaBidID)
@@ -361,6 +361,8 @@ export class Scalper {
       }
       timeWaited += scalperWindow / periods;
     }
+    this.deltaHedge;
+    this.gammaScalp;
   }
 
   async cancelStaleOrders(
@@ -379,6 +381,7 @@ export class Scalper {
             this.owner
           );
           console.log("Canceling", this.symbol, "Orders");
+          break;
         }
       }
     }

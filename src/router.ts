@@ -16,6 +16,6 @@ export class Router {
   // or risk_manager_callback
   route(dip_deposit: DIPDeposit) {
     // TODO: Decide where to send the deposit to.
-    this.mm_callback(dip_deposit);
+    this.risk_manager_callback(dip_deposit);
   }
 }

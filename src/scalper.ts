@@ -22,7 +22,6 @@ import {
   slippageTolerance,
   twapInterval,
   scalperWindow,
-  monthAdj,
   periods,
 } from "./config";
 import { DIPDeposit } from "./common";
@@ -40,6 +39,7 @@ export class Scalper {
   marketIndex: number;
 
   constructor(symbol: string) {
+    console.log('constructor');
     // Setup Client
     this.config = new Config(configFile);
     this.groupConfig = this.config.getGroupWithName(networkName) as GroupConfig;
@@ -66,17 +66,27 @@ export class Scalper {
   }
 
   async scalperMango(dipProduct: DIPDeposit[]): Promise<void> {
+    console.log('Received a deposit');
+
     // Setup for scalping
     const mangoGroup: MangoGroup = await this.client.getMangoGroup(
       this.groupConfig.publicKey
     );
+    //console.log(this.connection);
+    //console.log(mangoGroup);
+    //console.log(this.marketIndex);
+    //console.log(this.perpMarketConfig.baseDecimals);
+    //console.log(this.perpMarketConfig.quoteDecimals);
     const perpMarket: PerpMarket = await mangoGroup.loadPerpMarket(
       this.connection,
       this.marketIndex,
       this.perpMarketConfig.baseDecimals,
       this.perpMarketConfig.quoteDecimals
     );
-    let [mangoCache]: MangoCache[]= await loadPrices(mangoGroup, this.connection);
+    let [mangoCache]: MangoCache[] = await loadPrices(
+      mangoGroup,
+      this.connection
+    );
     let mangoAccount: MangoAccount = (
       await this.client.getMangoAccountsForOwner(
         mangoGroup,
@@ -84,13 +94,33 @@ export class Scalper {
       )
     )[0];
 
-    await this.deltaHedge(dipProduct, mangoGroup, perpMarket, mangoCache, mangoAccount);
-    await this.gammaScalp(dipProduct, mangoGroup, mangoAccount, mangoCache, perpMarket);
+    await this.deltaHedge(
+      dipProduct,
+      mangoGroup,
+      perpMarket,
+      mangoCache,
+      mangoAccount
+    );
+    await this.gammaScalp(
+      dipProduct,
+      mangoGroup,
+      mangoAccount,
+      mangoCache,
+      perpMarket
+    );
   }
 
-  async deltaHedge(dipProduct: DIPDeposit[], mangoGroup: MangoGroup, perpMarket: PerpMarket, mangoCache: MangoCache, mangoAccount: MangoAccount): Promise<void> {
+  async deltaHedge(
+    dipProduct: DIPDeposit[],
+    mangoGroup: MangoGroup,
+    perpMarket: PerpMarket,
+    mangoCache: MangoCache,
+    mangoAccount: MangoAccount
+  ): Promise<void> {
     // Underlying price for option calculation
-    let fairValue = mangoGroup.getPrice(this.marketIndex, mangoCache).toNumber();
+    let fairValue = mangoGroup
+      .getPrice(this.marketIndex, mangoCache)
+      .toNumber();
     // Calc DIP delta for new position
     const dipTotalDelta = getDIPDelta(dipProduct, fairValue);
 
@@ -105,7 +135,8 @@ export class Scalper {
     const hedgeSide = hedgeDeltaTotal < 0 ? "buy" : "sell";
 
     // Fetch proper orderbook
-    const bookSide = hedgeDeltaTotal < 0
+    const bookSide =
+      hedgeDeltaTotal < 0
         ? await perpMarket.loadAsks(this.connection)
         : await perpMarket.loadBids(this.connection);
 
@@ -116,18 +147,32 @@ export class Scalper {
     let hedgePrice: number;
     let hedgeCount = 1;
     let orderId = new Date().getTime();
-    console.log(this.symbol, hedgeSide, "Target Hedge Delta:", hedgeDeltaTotal, "DIP Delta:", dipTotalDelta, "Mango Delta:", mangoDelta);
+    console.log(
+      this.symbol,
+      hedgeSide,
+      "Target Hedge Delta:",
+      hedgeDeltaTotal,
+      "DIP Delta:",
+      dipTotalDelta,
+      "Mango Delta:",
+      mangoDelta
+    );
 
     // Break up order depending on whether the book can support it
     while (Math.abs(hedgeDeltaTotal * fairValue) > 1) {
       console.log(this.symbol, "Fair Value:", fairValue);
-      hedgeDeltaClip = hedgeDeltaTotal /
-        orderSplice(hedgeDeltaTotal, fairValue, maxNotional,
+      hedgeDeltaClip =
+        hedgeDeltaTotal /
+        orderSplice(
+          hedgeDeltaTotal,
+          fairValue,
+          maxNotional,
           slippageTolerance,
           bookSide,
           perpMarket
         );
-      hedgePrice = hedgeDeltaTotal < 0
+      hedgePrice =
+        hedgeDeltaTotal < 0
           ? fairValue * (1 + slippageTolerance * hedgeCount)
           : fairValue * (1 - slippageTolerance * hedgeCount);
 
@@ -145,12 +190,29 @@ export class Scalper {
           clientOrderId: orderId,
         }
       );
-      console.log(this.symbol, hedgeSide, "#", hedgeCount, "-", orderId, "Size:", hedgeDeltaClip, "Price:", hedgePrice);
+      console.log(
+        this.symbol,
+        hedgeSide,
+        "#",
+        hedgeCount,
+        "-",
+        orderId,
+        "Size:",
+        hedgeDeltaClip,
+        "Price:",
+        hedgePrice
+      );
 
       // Reduce hedge by what actually got filled
       let filledSize = await fillSize(perpMarket, this.connection, orderId);
       hedgeDeltaTotal = hedgeDeltaTotal + filledSize;
-      console.log(this.symbol, "Filled Size", filledSize, "Remaining Size ", hedgeDeltaTotal );
+      console.log(
+        this.symbol,
+        "Filled Size",
+        filledSize,
+        "Remaining Size ",
+        hedgeDeltaTotal
+      );
 
       // No need to wait for the twap interval if filled
       if (Math.abs(hedgeDeltaTotal * fairValue) < 1) {
@@ -171,14 +233,22 @@ export class Scalper {
     console.log(this.symbol, "Delta Hedge Complete");
   }
 
-  async gammaScalp(dipProduct, mangoGroup, mangoAccount, mangoCache, perpMarket): Promise<void> {
-    let fairValue = mangoGroup.getPrice(this.marketIndex, mangoCache).toNumber();
+  async gammaScalp(
+    dipProduct: DIPDeposit[],
+    mangoGroup: MangoGroup,
+    mangoAccount: MangoAccount,
+    mangoCache: MangoCache,
+    perpMarket: PerpMarket
+  ): Promise<void> {
+    let fairValue = mangoGroup
+      .getPrice(this.marketIndex, mangoCache)
+      .toNumber();
     let orderId = new Date().getTime();
-    // GAMMA SCALPING //
     const dipTotalGamma = getDIPGamma(dipProduct, fairValue);
 
     // Calc scalperWindow (1 hr) Std dev for gamma levels
-    const hrStdDev = this.impliedVol / Math.sqrt((365 * 24 * 60 * 60) / scalperWindow);
+    const hrStdDev =
+      this.impliedVol / Math.sqrt((365 * 24 * 60 * 60) / scalperWindow);
     const netGamma = dipTotalGamma * hrStdDev * fairValue;
     console.log(this.symbol, "Position Gamma:", netGamma);
 
@@ -215,28 +285,47 @@ export class Scalper {
     let filledBidGamma: number;
     let filledAskGamma: number;
     while (timeWaited < scalperWindow) {
-      // Check this was buggy here updating account orders
-      // Maybe better to Run Websocket from https://docs.mango.markets/api-and-websocket/fills-websocket-feed
-      mangoAccount = (await this.client.getMangoAccountsForOwner(mangoGroup, this.owner.publicKey))[0];
+      mangoAccount = (
+        await this.client.getMangoAccountsForOwner(
+          mangoGroup,
+          this.owner.publicKey
+        )
+      )[0];
       console.log(
-        this.symbol, "Periods Elpased:", timeWaited / (scalperWindow / periods), "OpenOrders:",
-        mangoAccount.getPerpOpenOrders().length, "Wait:", scalperWindow / periods, "seconds"
+        this.symbol,
+        "Periods Elpased:",
+        timeWaited / (scalperWindow / periods),
+        "OpenOrders:",
+        mangoAccount.getPerpOpenOrders().length,
+        "Wait:",
+        scalperWindow / periods,
+        "seconds"
       );
       await sleepTime(scalperWindow / periods);
-      filledBidGamma = Math.abs(await fillSize(perpMarket, this.connection, gammaBidID));
-      filledAskGamma = Math.abs(await fillSize(perpMarket, this.connection, gammaAskID));
+      filledBidGamma = Math.abs(
+        await fillSize(perpMarket, this.connection, gammaBidID)
+      );
+      filledAskGamma = Math.abs(
+        await fillSize(perpMarket, this.connection, gammaAskID)
+      );
       if (filledBidGamma > 0 || filledAskGamma > 0) {
-        console.log(this.symbol, "Bid filled", filledBidGamma, "Ask filled", filledAskGamma);
+        console.log(
+          this.symbol,
+          "Bid filled",
+          filledBidGamma,
+          "Ask filled",
+          filledAskGamma
+        );
         break;
       }
-      timeWaited = timeWaited + scalperWindow / periods;
+      timeWaited += scalperWindow / periods;
     }
   }
 
   async cancelStaleOrders(
     mangoAccount: MangoAccount,
     mangoGroup: MangoGroup,
-    perpMarket: PerpMarket,
+    perpMarket: PerpMarket
   ): Promise<void> {
     let openOrders = mangoAccount.getPerpOpenOrders();
     if (openOrders.length > 0) {
@@ -253,7 +342,6 @@ export class Scalper {
       }
     }
   }
-
 }
 
 async function loadPrices(mangoGroup: MangoGroup, connection: Connection) {
@@ -268,7 +356,8 @@ function getDIPDelta(dipProduct: DIPDeposit[], fairValue: number) {
   let yearsUntilMaturity: number;
   let deltaSum = 0;
   for (const dip of dipProduct) {
-    yearsUntilMaturity = (dip.expiration - Date.now()) / (365 * 60 * 60 * 24 * 1_000);
+    yearsUntilMaturity =
+      (dip.expiration - Date.now()) / (365 * 60 * 60 * 24 * 1_000);
     deltaSum =
       greeks.getDelta(
         fairValue,
@@ -277,7 +366,9 @@ function getDIPDelta(dipProduct: DIPDeposit[], fairValue: number) {
         impliedVol,
         rfRate,
         dip.type
-      ) * dip.qty + deltaSum;
+      ) *
+        dip.qty +
+      deltaSum;
   }
   return deltaSum;
 }
@@ -293,10 +384,21 @@ function orderSplice(
 ) {
   const [_, nativeQty] = market.uiToNativePriceQuantity(0, qty);
   if (qty > 0 && side.getImpactPriceUi(nativeQty) < price * (1 - slippage)) {
-    console.log("Sell Price Impact: ", side.getImpactPriceUi(nativeQty), "High Slippage!");
+    console.log(
+      "Sell Price Impact: ",
+      side.getImpactPriceUi(nativeQty),
+      "High Slippage!"
+    );
     return Math.max((qty * price) / notionalMax, 1);
-  } else if (qty < 0 && side.getImpactPriceUi(nativeQty) > price * (1 + slippage)) {
-    console.log("Buy Price Impact: ", side.getImpactPriceUi(nativeQty), "High Slippage!");
+  } else if (
+    qty < 0 &&
+    side.getImpactPriceUi(nativeQty) > price * (1 + slippage)
+  ) {
+    console.log(
+      "Buy Price Impact: ",
+      side.getImpactPriceUi(nativeQty),
+      "High Slippage!"
+    );
     return Math.max((qty * price) / notionalMax, 1);
   } else {
     console.log("Slippage Tolerable", side.getImpactPriceUi(nativeQty));
@@ -332,7 +434,8 @@ function getDIPGamma(dipProduct: DIPDeposit[], fairValue: number) {
   let yearsUntilMaturity: number;
   let gammaSum = 0;
   for (const dip of dipProduct) {
-    yearsUntilMaturity = (dip.expiration - Date.now()) / (365 * 60 * 60 * 24 * 1_000);
+    yearsUntilMaturity =
+      (dip.expiration - Date.now()) / (365 * 60 * 60 * 24 * 1_000);
     gammaSum =
       greeks.getGamma(
         fairValue,
@@ -348,14 +451,3 @@ function getDIPGamma(dipProduct: DIPDeposit[], fairValue: number) {
   }
   return gammaSum;
 }
-
-const newDIP: DIPDeposit = {
-  splToken: "SOL",
-  premiumAsset: "USD",
-  expiration: new Date(
-    Date.UTC(2022, 12 - monthAdj, 31, 12, 0, 0, 0)
-  ).getTime(),
-  strike: 60,
-  type: "call",
-  qty: 7,
-};

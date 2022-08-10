@@ -22,8 +22,8 @@ export class Poller {
     this.cluster = cluster;
     this.callback = callback;
     this.splToken = "BTC";
-    this.premiumAsset = "USDC";
-    this.expiration = Date.now();
+    this.premiumAsset = "USD";
+    this.expiration = new Date(Date.UTC(2022, 8, 12, 12, 0, 0, 0)).getTime() / 1000;
     this.strike = 25000;
     this.type = "call";
   }
@@ -31,7 +31,7 @@ export class Poller {
   subscribe(address: string): void {
     console.log("Listening at:", address);
     let previous_amount = 0;
-    const connection: Connection = new Connection(clusterApiUrl("devnet"));
+    const connection: Connection = new Connection(clusterApiUrl("mainnet-beta"));
     const callback: AccountChangeCallback = (
       accountInfo: solanaAccountInfo<Buffer>,
       _context: Context

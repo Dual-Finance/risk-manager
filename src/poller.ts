@@ -30,7 +30,6 @@ export class Poller {
 
   subscribe(address: string): void {
     console.log("Listening at:", address);
-    let previous_amount = 0;
     const connection: Connection = new Connection(clusterApiUrl("mainnet-beta"));
     const callback: AccountChangeCallback = (
       accountInfo: solanaAccountInfo<Buffer>,
@@ -38,23 +37,15 @@ export class Poller {
     ) => {
       // @ts-ignore
       let new_amount = parseTokenAccount(accountInfo.data).amount.toNumber();
-
-      const deposit_amount = new_amount - previous_amount;
       const dip_deposit = {
         splToken: this.splToken,
         premiumAsset: this.premiumAsset,
         expiration: this.expiration,
         strike: this.strike,
         type: this.type,
-        qty: deposit_amount,
+        // TODO: Make this work for different number of decimals
+        qty: new_amount / 1_000_000,
       };
-
-      // The amount could reduce because of exercise or withdraw.
-      if (deposit_amount > 0) {
-        this.callback(dip_deposit);
-      }
-
-      previous_amount = new_amount;
     };
 
     // Watch the vault spl token account

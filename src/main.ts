@@ -6,7 +6,7 @@ import { Scalper } from './scalper';
 
 function main() {
     // Create a scalper
-    const scalper: Scalper = new Scalper('BTC');
+    const scalper: Scalper = new Scalper('SOL');
 
     // Create a router
     const router: Router = new Router(
@@ -27,12 +27,12 @@ function main() {
     // Start polling for a specific DIP option token account
     //poller.subscribe('GoBGzcR8kDTLKwPxhKb7NX3kmmt3mZKBgYwsbYf5hDcF');
     router.route({
-        splToken: 'BTC',
+        splToken: 'SOL',
         premiumAsset: 'USD',
         expiration: 1662984000,
-        strike: 25000,
+        strike: 42,
         type: 'call',
-        qty: 132
+        qty: 1
       });
 }
 

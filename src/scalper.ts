@@ -57,31 +57,22 @@ export class Scalper {
 
     this.symbol = symbol;
     this.impliedVol = THEO_VOL_MAP.get(symbol);
-    this.perpMarketConfig = getMarketByBaseSymbolAndKind(
-      this.groupConfig,
-      symbol,
-      "perp"
-    );
-    console.log(this.symbol);
-    console.log("=====================");
-    console.log(this.groupConfig);
-    console.log("=====================");
-    console.log(this.perpMarketConfig);
-    this.marketIndex = this.perpMarketConfig.marketIndex;
   }
 
   async scalperMango(dipProduct: DIPDeposit[]): Promise<void> {
     console.log('Received a deposit');
 
+    this.perpMarketConfig = getMarketByBaseSymbolAndKind(
+      this.groupConfig,
+      this.symbol,
+      "perp"
+    );
+    this.marketIndex = this.perpMarketConfig.marketIndex;
+
     // Setup for scalping
     const mangoGroup: MangoGroup = await this.client.getMangoGroup(
       this.groupConfig.publicKey
     );
-    //console.log(this.connection);
-    //console.log(mangoGroup);
-    //console.log(this.marketIndex);
-    //console.log(this.perpMarketConfig.baseDecimals);
-    //console.log(this.perpMarketConfig.quoteDecimals);
     const perpMarket: PerpMarket = await mangoGroup.loadPerpMarket(
       this.connection,
       this.marketIndex,

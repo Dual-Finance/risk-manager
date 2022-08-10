@@ -106,3 +106,13 @@ export async function getAssociatedTokenAddress(
     owner
   );
 }
+
+export function timeSinceMidDay(){
+  const timeNow = new Date();
+  const year = timeNow.getUTCFullYear();
+  const month = timeNow.getUTCMonth();
+  const day = timeNow.getUTCDate();
+  const timeCheckUTC = Date.UTC(year, month, day, 12, 0 ,0 ,0);
+  const diff = (timeNow.getTime() - timeCheckUTC)/1000;
+  return diff
+}

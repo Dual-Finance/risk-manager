@@ -25,7 +25,7 @@ import {
   periods,
 } from "./config";
 import { DIPDeposit } from "./common";
-import { readKeypair, sleepTime } from "./utils";
+import { readKeypair, sleepTime, timeSinceMidDay } from "./utils";
 
 export class Scalper {
   client: MangoClient;
@@ -59,7 +59,7 @@ export class Scalper {
   }
 
   async scalperMango(dipProduct: DIPDeposit[]): Promise<void> {
-    console.log('Received a deposit', dipProduct);
+    console.log("Received a deposit", dipProduct);
 
     this.perpMarketConfig = getMarketByBaseSymbolAndKind(
       this.groupConfig,
@@ -166,10 +166,17 @@ export class Scalper {
           bookSide,
           perpMarket
         );
-      hedgePrice =
-        hedgeDeltaTotal < 0
-          ? fairValue * (1 + slippageTolerance * hedgeCount)
-          : fairValue * (1 - slippageTolerance * hedgeCount);
+      if (networkName == "devnet.2") {
+        hedgePrice =
+          hedgeDeltaTotal < 0
+            ? fairValue * (1 + slippageTolerance * hedgeCount)
+            : fairValue * (1 - slippageTolerance * hedgeCount); // adjust hedgecount change for mainnet
+      } else {
+        hedgePrice =
+          hedgeDeltaTotal < 0
+            ? fairValue * (1 + slippageTolerance)
+            : fairValue * (1 - slippageTolerance);
+      }
 
       await this.client.placePerpOrder2(
         mangoGroup,
@@ -193,7 +200,7 @@ export class Scalper {
         "-",
         orderId,
         "Size:",
-        hedgeDeltaClip,
+        Math.abs(hedgeDeltaClip),
         "Price:",
         hedgePrice
       );
@@ -203,7 +210,9 @@ export class Scalper {
       hedgeDeltaTotal = hedgeDeltaTotal + filledSize;
       console.log(
         this.symbol,
-        "Filled Size",
+        "Filled",
+        hedgeSide,
+        "Size",
         filledSize,
         "Remaining Size ",
         hedgeDeltaTotal
@@ -214,7 +223,14 @@ export class Scalper {
         break;
       }
       // Wait the twapInterval of time before sending updated hedge price & qty
-      console.log(this.symbol, "Wait:", twapInterval, "seconds");
+      console.log(
+        this.symbol,
+        "Delta Hedge",
+        hedgeCount + 1,
+        "Wait:",
+        twapInterval,
+        "seconds"
+      );
       await sleepTime(twapInterval);
 
       // Update Price
@@ -245,7 +261,13 @@ export class Scalper {
     const hrStdDev =
       this.impliedVol / Math.sqrt((365 * 24 * 60 * 60) / scalperWindow);
     const netGamma = dipTotalGamma * hrStdDev * fairValue;
-    console.log(this.symbol, "Position Gamma:", netGamma);
+    console.log(
+      this.symbol,
+      "Position Gamma:",
+      netGamma,
+      "Fair Value",
+      fairValue
+    );
 
     // Place Gamma scalp bid & offer
     const gammaBid = fairValue * (1 - hrStdDev);
@@ -286,16 +308,28 @@ export class Scalper {
           this.owner.publicKey
         )
       )[0];
+      const gammaOrders = mangoAccount.getPerpOpenOrders();
+      let numGammaOrders = 0;
+      for (const order of gammaOrders) {
+        if (order.marketIndex == this.marketIndex) {
+          numGammaOrders = numGammaOrders + 1;
+        }
+      }
       console.log(
         this.symbol,
         "Periods Elpased:",
         timeWaited / (scalperWindow / periods),
-        "OpenOrders:",
-        mangoAccount.getPerpOpenOrders().length,
+        "GammaOrders:",
+        numGammaOrders,
         "Wait:",
         scalperWindow / periods,
         "seconds"
       );
+      // Check for lost orders
+      if (numGammaOrders != 2) {
+        console.log("Lost Orders!");
+        break;
+      }
       await sleepTime(scalperWindow / periods);
       filledBidGamma = Math.abs(
         await fillSize(perpMarket, this.connection, gammaBidID)
@@ -310,6 +344,18 @@ export class Scalper {
           filledBidGamma,
           "Ask filled",
           filledAskGamma
+        );
+        break;
+      }
+      // Check if near just pasted 12UTC to reset in case of DIP exiry
+      if (
+        timeSinceMidDay() < scalperWindow / periods &&
+        timeSinceMidDay() >= 0
+      ) {
+        console.log(
+          "MidDay Reset during Gamma Scalp",
+          timeSinceMidDay(),
+          "seconds past 12:00 UTC"
         );
         break;
       }

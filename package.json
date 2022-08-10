@@ -1,6 +1,6 @@
 {
   "dependencies": {
-    "@blockworks-foundation/mango-client": "^3.6.9",
+    "@blockworks-foundation/mango-client": "^3.6.11",
     "@solana/spl-token": "^0.1.8",
     "@solana/web3.js": "^1.50.1",
     "greeks": "^1.0.0",

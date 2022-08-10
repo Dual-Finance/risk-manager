@@ -25,15 +25,16 @@ export class Poller {
     this.premiumAsset = "USDC";
     this.expiration = Date.now();
     this.strike = 25000;
-    this.type = "UPSIDE";
+    this.type = "call";
   }
 
   subscribe(address: string): void {
+    console.log("Listening at:", address);
     let previous_amount = 0;
     const connection: Connection = new Connection(clusterApiUrl("devnet"));
     const callback: AccountChangeCallback = (
       accountInfo: solanaAccountInfo<Buffer>,
-      context: Context
+      _context: Context
     ) => {
       // @ts-ignore
       let new_amount = parseTokenAccount(accountInfo.data).amount.toNumber();

@@ -10,3 +10,4 @@ export const slippageTolerance = 0.003; // Allow 30bps above/below FMV on limit 
 export const twapInterval = 15; // Number of seconds to space spliced orders across
 export const scalperWindow = 3600; // Number of seconds for each gamma scalping window
 export const monthAdj = 1; // Adjustment since Date.UTC is zero based
+export const periods = 180;

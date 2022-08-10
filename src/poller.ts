@@ -18,19 +18,27 @@ export class Poller {
   strike: number;
   type: string;
 
-  constructor(cluster: string, callback: (deposit: DIPDeposit) => void) {
+  constructor(
+    cluster: string,
+    splToken: string,
+    premiumAsset: string,
+    expiration: number,
+    strike: number,
+    type: string,
+    callback: (deposit: DIPDeposit) => void
+  ) {
     this.cluster = cluster;
     this.callback = callback;
-    this.splToken = "BTC";
-    this.premiumAsset = "USD";
-    this.expiration = new Date(Date.UTC(2022, 8, 12, 12, 0, 0, 0)).getTime() / 1000;
-    this.strike = 25000;
-    this.type = "call";
+    this.splToken = splToken;
+    this.premiumAsset = premiumAsset;
+    this.expiration = expiration;
+    this.strike = strike;
+    this.type = type;
   }
 
   subscribe(address: string): void {
     console.log("Listening at:", address);
-    const connection: Connection = new Connection(clusterApiUrl("mainnet-beta"));
+    const connection: Connection = new Connection(clusterApiUrl(this.cluster));
     const callback: AccountChangeCallback = (
       accountInfo: solanaAccountInfo<Buffer>,
       _context: Context
@@ -40,12 +48,13 @@ export class Poller {
       const dip_deposit = {
         splToken: this.splToken,
         premiumAsset: this.premiumAsset,
-        expiration: this.expiration,
+        expiration: this.expiration * 1_000,
         strike: this.strike,
         type: this.type,
         // TODO: Make this work for different number of decimals
         qty: new_amount / 1_000_000,
       };
+      this.callback(dip_deposit);
     };
 
     // Watch the vault spl token account

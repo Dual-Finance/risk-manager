@@ -8,14 +8,14 @@ import {
   getAssociatedTokenAddress,
   parseDipState,
 } from "./utils";
+import { cluster } from "./config";
 
 function main() {
-  const cluster = "devnet";
   const dualMarketProgramID = new PublicKey(
     "DiPbvUUJkDhV9jFtQsDFnMEMRJyjW5iS6NMwoySiW8ki"
   );
   const usdcMintPk = new PublicKey(
-    "HJiQv33nKujRmZQ3sJBSosXgCEmiHs3mG1yd9VcLawPM"
+    "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
   );
   const mmWalletPk = new PublicKey(
     "9SgZKdeTMaNuEZnhccK2crHxi1grXRmZKQCvNSKgVrCQ"

@@ -168,17 +168,11 @@ export class Scalper {
           bookSide,
           perpMarket
         );
-      if (networkName == "devnet.2") {
-        hedgePrice =
-          hedgeDeltaTotal < 0
-            ? fairValue * (1 + slippageTolerance * hedgeCount)
-            : fairValue * (1 - slippageTolerance * hedgeCount); // adjustment for wide order books
-      } else {
-        hedgePrice =
-          hedgeDeltaTotal < 0
-            ? fairValue * (1 + slippageTolerance)
-            : fairValue * (1 - slippageTolerance);
-      }
+
+      hedgePrice =
+        hedgeDeltaTotal < 0
+          ? fairValue * (1 + slippageTolerance)
+          : fairValue * (1 - slippageTolerance);
 
       await this.client.placePerpOrder2(
         mangoGroup,
@@ -220,7 +214,7 @@ export class Scalper {
       );
 
       // No need to wait for the twap interval if filled
-      if (Math.abs(hedgeDeltaTotal * fairValue) < 1) {
+      if (Math.abs(hedgeDeltaTotal * fairValue) < 0.5) { // TODO tick size logic
         break;
       }
       // Wait the twapInterval of time before sending updated hedge price & qty
@@ -262,6 +256,7 @@ export class Scalper {
     const stdDevSpread =
       this.impliedVol / Math.sqrt((365 * 24 * 60 * 60) / scalperWindow) * zScore;
     const netGamma = dipTotalGamma * stdDevSpread * fairValue;
+
     console.log(
       this.symbol,
       "Position Gamma:",
@@ -269,6 +264,11 @@ export class Scalper {
       "Fair Value",
       fairValue
     );
+
+    if (netGamma * fairValue < 0.5){
+      console.log('Gamma Hedge too small')
+      return
+    }
 
     // Place Gamma scalp bid & offer
     const gammaBid = fairValue * (1 - stdDevSpread);

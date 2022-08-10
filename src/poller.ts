@@ -45,15 +45,34 @@ export class Poller {
       _context: Context
     ) => {
       // @ts-ignore
-      let new_amount = parseTokenAccount(accountInfo.data).amount.toNumber();
+      const new_amount = parseTokenAccount(accountInfo.data).amount.toNumber();
+      let decimals = 6;
+      switch(this.splToken) {
+        // BTC
+        case 'JDXktC6gbDXq4zuW3BT6ToSE7timShHQBL449ULDdoMv':
+        case '9n4nbM75f5Ui33ZbPYXn59EwSgE8CGsHtAeTH5YFeJ9E':
+          decimals = 6;
+          break;
+        // ETH
+        case 'Hccuen6RkUgEvyL9oSXW8ai9QiQaAiL8ESaqjp9oymBf':
+        case '7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs':
+          decimals = 7;
+          break;
+        // SOL
+        case 'So11111111111111111111111111111111111111112':
+          decimals = 8;
+          break;
+        default:
+          break;
+      }
+
       const dip_deposit = {
         splToken: this.splToken,
         premiumAsset: this.premiumAsset,
         expiration: this.expiration * 1_000,
         strike: this.strike,
         type: this.type,
-        // TODO: Make this work for different number of decimals
-        qty: new_amount / 1_000_000,
+        qty: new_amount / Math.pow(10, decimals),
       };
       this.callback(dip_deposit);
     };

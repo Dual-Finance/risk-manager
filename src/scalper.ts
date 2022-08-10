@@ -24,6 +24,7 @@ import {
   twapInterval,
   scalperWindow,
   periods,
+  zScore,
 } from "./config";
 import { DIPDeposit } from "./common";
 import { readKeypair, sleepTime, timeSinceMidDay } from "./utils";
@@ -257,10 +258,10 @@ export class Scalper {
     let orderId = new Date().getTime();
     const dipTotalGamma = getDIPGamma(dipProduct, fairValue);
 
-    // Calc scalperWindow (1 hr) Std dev for gamma levels
-    const hrStdDev =
-      this.impliedVol / Math.sqrt((365 * 24 * 60 * 60) / scalperWindow);
-    const netGamma = dipTotalGamma * hrStdDev * fairValue;
+    // Calc scalperWindow std deviation spread from zScore & IV for gamma levels
+    const stdDevSpread =
+      this.impliedVol / Math.sqrt((365 * 24 * 60 * 60) / scalperWindow) * zScore;
+    const netGamma = dipTotalGamma * stdDevSpread * fairValue;
     console.log(
       this.symbol,
       "Position Gamma:",
@@ -270,9 +271,9 @@ export class Scalper {
     );
 
     // Place Gamma scalp bid & offer
-    const gammaBid = fairValue * (1 - hrStdDev);
+    const gammaBid = fairValue * (1 - stdDevSpread);
     const gammaBidID = orderId + 1;
-    const gammaAsk = fairValue * (1 + hrStdDev);
+    const gammaAsk = fairValue * (1 + stdDevSpread);
     const gammaAskID = orderId + 2;
     await this.client.placePerpOrder2(
       mangoGroup,
@@ -290,7 +291,7 @@ export class Scalper {
       perpMarket,
       this.owner,
       "sell",
-      fairValue * (1 + hrStdDev),
+      gammaAsk,
       netGamma,
       { orderType: "postOnly", clientOrderId: gammaAskID }
     );
@@ -361,8 +362,6 @@ export class Scalper {
       }
       timeWaited += scalperWindow / periods;
     }
-    this.deltaHedge;
-    this.gammaScalp;
   }
 
   async cancelStaleOrders(

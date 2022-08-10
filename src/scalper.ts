@@ -1,5 +1,6 @@
 // @ts-ignore
 import * as greeks from "greeks";
+
 import {
   Config,
   getMarketByBaseSymbolAndKind,
@@ -204,7 +205,6 @@ export class Scalper {
         "Price:",
         hedgePrice
       );
-
       // Reduce hedge by what actually got filled
       let filledSize = await fillSize(perpMarket, this.connection, orderId);
       hedgeDeltaTotal = hedgeDeltaTotal + filledSize;

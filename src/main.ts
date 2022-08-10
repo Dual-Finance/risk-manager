@@ -13,7 +13,7 @@ function main() {
         (deposit: DIPDeposit) => { console.log('Route to MM'); },
 
         // TODO: Make this handle multiple DIPs for the same asset
-        (deposit: DIPDeposit) => { console.log(deposit); }//scalper.scalperMango([deposit]) },
+        (deposit: DIPDeposit) => { console.log(deposit); scalper.scalperMango([deposit]) },
     );
 
     // Create a poller

@@ -32,8 +32,8 @@ interface DIP {splToken: string; premiumAsset: string; expiration: Date; strike:
   type: string; qty: number
 }
 // Example for Hedging and Scalping current + new DIP Position
-const oldDIP: DIP = {splToken:'SOL', premiumAsset:'USD', expiration:new Date(Date.UTC(2022,8-monthAdj,9,12,0,0,0)), 
-strike:44, type:'call', qty:6};
+const oldDIP: DIP = {splToken:'SOL', premiumAsset:'USD', expiration:new Date(Date.UTC(2022,8-monthAdj,10,12,0,0,0)), 
+strike:42, type:'call', qty:6};
 const otherDIP: DIP = {splToken:'BTC', premiumAsset:'USD', expiration:new Date(Date.UTC(2022,8-monthAdj,6,12,0,0,0)), 
 strike:25000, type:'call', qty:0.01};
 const lastDIP: DIP = {splToken:'ETH', premiumAsset:'USD', expiration:new Date(Date.UTC(2022,8-monthAdj,8,12,0,0,0)), 
@@ -169,8 +169,11 @@ async function scalperMango(dipProduct: DIP[]) {
       console.log(symbol, 'Fair Value:', fairValue)
       hedgeDeltaClip = hedgeDeltaTotal / orderSplice(hedgeDeltaTotal, fairValue, 
         maxNotional, slippageTolerance, bookSide, perpMarket)
+      if (networkName == 'devnet.2'){
       hedgePrice = hedgeDeltaTotal < 0 ? fairValue * (1+slippageTolerance*hedgeCount) : fairValue * (1-slippageTolerance*hedgeCount); // adjust hedgecount change for mainnet 
-      
+      } else {
+        hedgePrice = hedgeDeltaTotal < 0 ? fairValue * (1+slippageTolerance) : fairValue * (1-slippageTolerance); 
+      }
       await client.placePerpOrder2(
         mangoGroup,
         mangoAccount,
@@ -181,19 +184,19 @@ async function scalperMango(dipProduct: DIP[]) {
         Math.abs(hedgeDeltaClip),
         { orderType: 'limit', expiryTimestamp: getUnixTs() + twapInterval-1, clientOrderId: orderId},
       );
-      console.log(symbol, hedgeSide,'#', hedgeCount,"-", orderId, 'Size:', hedgeDeltaClip,'Price:', hedgePrice)
+      console.log(symbol, hedgeSide,'#', hedgeCount,"-", orderId, 'Size:', Math.abs(hedgeDeltaClip),'Price:', hedgePrice)
       
       // Reduce hedge by what actually got filled
       let filledSize = await fillSize(perpMarket, connection, orderId)
       hedgeDeltaTotal = hedgeDeltaTotal + filledSize;
-      console.log(symbol,'Filled Size', filledSize, 'Remaining Size ', hedgeDeltaTotal)
+      console.log(symbol,'Filled', hedgeSide, 'Size', filledSize, 'Remaining Size ', hedgeDeltaTotal)
 
       // No need to wait for the twap interval if filled
       if (Math.abs(hedgeDeltaTotal*fairValue) < 1){
         break
       }
       // Wait the twapInterval of time before sending updated hedge price & qty
-      console.log(symbol, 'Wait:', twapInterval, 'seconds');
+      console.log(symbol, 'Delta Hedge', hedgeCount+1, 'Wait:', twapInterval, 'seconds');
       await sleepTime(twapInterval);
 
       //Update Price
@@ -218,7 +221,7 @@ async function scalperMango(dipProduct: DIP[]) {
   // Calc scalperWindow (1 hr) Std dev for gamma levels
   const hrStdDev = impliedVol / Math.sqrt(365 * 24 * 60 * 60 / scalperWindow);
   const netGamma = dipTotalGamma * hrStdDev * fairValue;
-  console.log(symbol, 'Position Gamma:', netGamma)
+  console.log(symbol, 'Position Gamma:', netGamma, 'Fair Value', fairValue)
 
   // Place Gamma scalp bid & offer
   const gammaBid = fairValue * (1 - hrStdDev);
@@ -266,12 +269,12 @@ async function scalperMango(dipProduct: DIP[]) {
         numGammaOrders = numGammaOrders + 1;
       }
     }
-    console.log(symbol, 'Periods Elpased:', timeWaited/(scalperWindow/periods),'GammaOrders:', numGammaOrders, 'Wait:', scalperWindow/periods, 'seconds')
     // Check for lost orders
     if (numGammaOrders != 2){
       console.log('Lost Orders!')
       break
     }
+    console.log(symbol, 'Periods Elpased:', timeWaited/(scalperWindow/periods),'GammaOrders:', numGammaOrders, 'Wait:', scalperWindow/periods, 'seconds')
     await sleepTime(scalperWindow/periods);
     filledBidGamma = Math.abs(await fillSize(perpMarket, connection, gammaBidID));
     filledAskGamma = Math.abs(await fillSize(perpMarket, connection, gammaAskID));
@@ -286,7 +289,7 @@ async function scalperMango(dipProduct: DIP[]) {
     }
     timeWaited = timeWaited + scalperWindow/periods;
   }
-  console.log(symbol, 'Event Trigger Rerun')
+  console.log(symbol, 'Event Trigger Rerun', new Date())
   updateDIP(allDIP)
   scalperMango(dipProduct);
 }

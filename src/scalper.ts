@@ -62,6 +62,10 @@ export class Scalper {
       symbol,
       "perp"
     );
+    console.log(this.symbol);
+    console.log("=====================");
+    console.log(this.groupConfig);
+    console.log("=====================");
     console.log(this.perpMarketConfig);
     this.marketIndex = this.perpMarketConfig.marketIndex;
   }

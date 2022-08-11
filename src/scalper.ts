@@ -406,7 +406,7 @@ async function loadPrices(mangoGroup: MangoGroup, connection: Connection) {
 }
 
 function getDIPDelta(dipProduct: DIPDeposit[], fairValue: number) {
-  const impliedVol = THEO_VOL_MAP.get(dipProduct[0].splToken);  
+  const impliedVol = THEO_VOL_MAP.get(dipProduct[0].splToken);
   let yearsUntilMaturity: number;
   let deltaSum = 0;
   for (const dip of dipProduct) {

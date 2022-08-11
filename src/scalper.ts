@@ -369,7 +369,6 @@ export class Scalper {
       }
       timeWaited += scalperWindow / periods;
     }
-    this.scalperMango(dipProduct); // recursion on for testing, remove when we have 10 min re-runs
   }
 
   async cancelStaleOrders(

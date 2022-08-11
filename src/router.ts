@@ -19,11 +19,15 @@ export class Router {
 
   // Accepts a DIP Deposit and decides whether to send it to the mm_callback
   // or risk_manager_callback
-  route(dip_deposit: DIPDeposit) {
+  route(dip_deposit: DIPDeposit): void {
     // TODO: Check how much there was before to figure out the amount for routing decision
     // Update the dips
     this.dips[this.dip_to_string(dip_deposit.expiration, dip_deposit.strike)] = dip_deposit;
 
+    this.run_risk_manager();
+  }
+
+  run_risk_manager(): void {
     this.risk_manager_callback(Object.values(this.dips));
   }
 

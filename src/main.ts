@@ -90,6 +90,11 @@ function main() {
       }
     }
   });
+  setInterval(() => {
+      console.log('Running risk manager on 10 minute interval');
+      solRouter.run_risk_manager();
+    }, 1_000 * 60 * 10
+  );
 }
 
 main();

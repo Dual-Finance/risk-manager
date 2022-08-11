@@ -61,7 +61,7 @@ export class Scalper {
   }
 
   async scalperMango(dipProduct: DIPDeposit[]): Promise<void> {
-    console.log("Received a deposit", dipProduct);
+    console.log("Handling current deposits:", dipProduct);
 
     this.perpMarketConfig = getMarketByBaseSymbolAndKind(
       this.groupConfig,

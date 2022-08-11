@@ -80,29 +80,15 @@ export class Scalper {
       this.perpMarketConfig.baseDecimals,
       this.perpMarketConfig.quoteDecimals
     );
-    let [mangoCache]: MangoCache[] = await loadPrices(
-      mangoGroup,
-      this.connection
-    );
-    let mangoAccount: MangoAccount = (
-      await this.client.getMangoAccountsForOwner(
-        mangoGroup,
-        this.owner.publicKey
-      )
-    )[0];
 
     await this.deltaHedge(
       dipProduct,
       mangoGroup,
-      perpMarket,
-      mangoCache,
-      mangoAccount
+      perpMarket
     );
     await this.gammaScalp(
       dipProduct,
       mangoGroup,
-      mangoAccount,
-      mangoCache,
       perpMarket
     );
   }
@@ -110,11 +96,21 @@ export class Scalper {
   async deltaHedge(
     dipProduct: DIPDeposit[],
     mangoGroup: MangoGroup,
-    perpMarket: PerpMarket,
-    mangoCache: MangoCache,
-    mangoAccount: MangoAccount
+    perpMarket: PerpMarket
   ): Promise<void> {
-    // Underlying price for option calculation
+    // Underlying price for delta calculation
+    let [mangoCache]: MangoCache[] = await loadPrices(
+      mangoGroup,
+      this.connection
+    );
+
+    let mangoAccount: MangoAccount = (
+      await this.client.getMangoAccountsForOwner(
+        mangoGroup,
+        this.owner.publicKey
+      )
+    )[0];
+
     let fairValue = mangoGroup
       .getPrice(this.marketIndex, mangoCache)
       .toNumber();
@@ -242,10 +238,21 @@ export class Scalper {
   async gammaScalp(
     dipProduct: DIPDeposit[],
     mangoGroup: MangoGroup,
-    mangoAccount: MangoAccount,
-    mangoCache: MangoCache,
     perpMarket: PerpMarket
   ): Promise<void> {
+    // Underlying price for gamma calculation
+    let [mangoCache]: MangoCache[] = await loadPrices(
+      mangoGroup,
+      this.connection
+    );
+
+    let mangoAccount: MangoAccount = (
+      await this.client.getMangoAccountsForOwner(
+        mangoGroup,
+        this.owner.publicKey
+      )
+    )[0];
+
     let fairValue = mangoGroup
       .getPrice(this.marketIndex, mangoCache)
       .toNumber();
@@ -362,6 +369,7 @@ export class Scalper {
       }
       timeWaited += scalperWindow / periods;
     }
+    this.scalperMango(dipProduct); // recursion on for testing, remove when we have 10 min re-runs
   }
 
   async cancelStaleOrders(

@@ -66,7 +66,7 @@ export class Router {
     this.dips[this.dip_to_string(expiration, strike)] = {
       splToken: this.token,
       premiumAsset: "USD",
-      expiration: expiration,
+      expiration: expiration * 1_000,
       strike: strike,
       type: "call",
       qty: Number(balance.value.uiAmount),

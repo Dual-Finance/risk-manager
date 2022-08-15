@@ -55,7 +55,7 @@ function main() {
       }
 
       if (splMint.toBase58() == wsolPk.toBase58()) {
-        solRouter.add_dip(expiration, strike);
+        await solRouter.add_dip(expiration, strike);
 
         const [optionMint] =
           await findProgramAddressWithMintAndStrikeAndExpiration(

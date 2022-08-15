@@ -31,7 +31,9 @@ export class Router {
     this.risk_manager_callback(Object.values(this.dips));
   }
 
-  add_dip(expiration: number, strike: number): void {
+  async add_dip(expiration: number, strike: number): Promise<void> {
+    // TODO: Make this work with a cold start
+
     this.dips[this.dip_to_string(expiration, strike)] = {
       splToken: this.token,
       premiumAsset: 'USD',

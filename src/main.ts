@@ -8,7 +8,7 @@ import {
   getAssociatedTokenAddress,
   parseDipState,
 } from "./utils";
-import { cluster } from "./config";
+import { cluster, scalperWindow } from "./config";
 
 function main() {
   const dualMarketProgramID = new PublicKey(
@@ -31,7 +31,6 @@ function main() {
       console.log("Route to MM");
     },
     (deposits: DIPDeposit[]) => {
-      console.log(deposits);
       solScalper.scalperMango(deposits);
     },
     'SOL'
@@ -90,10 +89,11 @@ function main() {
       }
     }
   });
+  solRouter.run_risk_manager();
   setInterval(() => {
-      console.log('Running risk manager on 10 minute interval');
+      console.log('Rerun Risk Manager', new Date().toUTCString());
       solRouter.run_risk_manager();
-    }, 1_000 * 60 * 10
+    }, 1_000 * scalperWindow
   );
 }
 

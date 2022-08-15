@@ -115,7 +115,7 @@ export class Scalper {
       .getPrice(this.marketIndex, mangoCache)
       .toNumber();
     // Calc DIP delta for new position
-    const dipTotalDelta = getDIPDelta(dipProduct, fairValue);
+    const dipTotalDelta = getDIPDelta(dipProduct, fairValue, this.symbol);
 
     // Get Mango delta position
     const perpAccount = mangoAccount.perpAccounts[this.marketIndex];
@@ -257,7 +257,7 @@ export class Scalper {
       .getPrice(this.marketIndex, mangoCache)
       .toNumber();
     let orderId = new Date().getTime();
-    const dipTotalGamma = getDIPGamma(dipProduct, fairValue);
+    const dipTotalGamma = getDIPGamma(dipProduct, fairValue, this.symbol);
 
     // Calc scalperWindow std deviation spread from zScore & IV for gamma levels
     const stdDevSpread =
@@ -401,8 +401,8 @@ async function loadPrices(mangoGroup: MangoGroup, connection: Connection) {
   return [mangoCache];
 }
 
-function getDIPDelta(dipProduct: DIPDeposit[], fairValue: number) {
-  const impliedVol = THEO_VOL_MAP.get(dipProduct[0].splToken);
+function getDIPDelta(dipProduct: DIPDeposit[], fairValue: number, symbol: string) {
+  const impliedVol = THEO_VOL_MAP.get(symbol);
   let yearsUntilMaturity: number;
   let deltaSum = 0;
   for (const dip of dipProduct) {
@@ -479,8 +479,8 @@ async function fillSize(
   return filledQty;
 }
 
-function getDIPGamma(dipProduct: DIPDeposit[], fairValue: number) {
-  const impliedVol = THEO_VOL_MAP.get(dipProduct[0].splToken);
+function getDIPGamma(dipProduct: DIPDeposit[], fairValue: number, symbol: string) {
+  const impliedVol = THEO_VOL_MAP.get(symbol);
   let yearsUntilMaturity: number;
   let gammaSum = 0;
   for (const dip of dipProduct) {

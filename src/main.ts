@@ -1,5 +1,5 @@
 import { clusterApiUrl, Connection, PublicKey } from "@solana/web3.js";
-import { DIPDeposit } from "./common";
+import { DIPDeposit, dualMarketProgramID, mmWalletPk, OPTION_MINT_ADDRESS_SEED, usdcMintPk, wsolPk } from "./common";
 import { Poller } from "./poller";
 import { Router } from "./router";
 import { Scalper } from "./scalper";
@@ -8,20 +8,9 @@ import {
   getAssociatedTokenAddress,
   parseDipState,
 } from "./utils";
-import { cluster } from "./config";
+import { cluster, scalperWindow } from "./config";
 
-function main() {
-  const dualMarketProgramID = new PublicKey(
-    "DiPbvUUJkDhV9jFtQsDFnMEMRJyjW5iS6NMwoySiW8ki"
-  );
-  const usdcMintPk = new PublicKey(
-    "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
-  );
-  const mmWalletPk = new PublicKey(
-    "9SgZKdeTMaNuEZnhccK2crHxi1grXRmZKQCvNSKgVrCQ"
-  );
-  const OPTION_MINT_ADDRESS_SEED = "option-mint";
-  const wsolPk = new PublicKey("So11111111111111111111111111111111111111112");
+async function main() {
   const connection: Connection = new Connection(clusterApiUrl(cluster));
   // Create a scalper
   const solScalper: Scalper = new Scalper("SOL");
@@ -31,7 +20,6 @@ function main() {
       console.log("Route to MM");
     },
     (deposits: DIPDeposit[]) => {
-      console.log(deposits);
       solScalper.scalperMango(deposits);
     },
     'SOL'
@@ -39,7 +27,7 @@ function main() {
 
   const programAccountsPromise =
     connection.getProgramAccounts(dualMarketProgramID);
-  programAccountsPromise.then(async (data) => {
+  await programAccountsPromise.then(async (data) => {
     for (const programAccount of data) {
       if (programAccount.account.data.length !== 260) {
         continue;
@@ -56,7 +44,7 @@ function main() {
       }
 
       if (splMint.toBase58() == wsolPk.toBase58()) {
-        solRouter.add_dip(expiration, strike);
+        await solRouter.add_dip(expiration, strike, splMint, connection);
 
         const [optionMint] =
           await findProgramAddressWithMintAndStrikeAndExpiration(
@@ -90,6 +78,12 @@ function main() {
       }
     }
   });
+  solRouter.run_risk_manager();
+  setInterval(() => {
+      console.log('Rerun Risk Manager', new Date().toUTCString());
+      solRouter.run_risk_manager();
+    }, 1_000 * scalperWindow
+  );
 }
 
 main();

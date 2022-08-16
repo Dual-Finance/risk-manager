@@ -3,7 +3,7 @@ Risk management for Dual Finance protocol DIP positions
 
 The risk manager triggers trades from the following events:
 
-1. Recieve DIP token balance change
+1. Receive DIP token balance change
 2. Receive order fill from gamma levels 
 3. Scalper Window Timer Expires
 4. DIP Expires

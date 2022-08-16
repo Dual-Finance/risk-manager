@@ -6,9 +6,13 @@ import {
   usdcMintPk,
   OPTION_MINT_ADDRESS_SEED,
 } from "./common";
+import { API_URL, cluster } from "./config";
+import { Poller } from "./poller";
 import {
   findProgramAddressWithMintAndStrikeAndExpiration,
   getAssociatedTokenAddress,
+  parseDipState,
+  splMintToToken,
 } from "./utils";
 
 export class Router {
@@ -20,7 +24,7 @@ export class Router {
   constructor(
     mm_callback: (d: DIPDeposit[]) => void,
     risk_manager_callback: (d: DIPDeposit[]) => void,
-    token: string
+    token: string,
   ) {
     this.mm_callback = mm_callback;
     this.risk_manager_callback = risk_manager_callback;
@@ -64,7 +68,7 @@ export class Router {
     const balance = await connection.getTokenAccountBalance(mmOptionAccount);
 
     this.dips[this.dip_to_string(expiration, strike)] = {
-      splToken: this.token,
+      splToken: splMintToToken(splMint),
       premiumAsset: "USD",
       expiration: expiration * 1_000,
       strike: strike,
@@ -75,5 +79,67 @@ export class Router {
 
   dip_to_string(expiration: number, strike: number): string {
     return `${expiration}${strike}`;
+  }
+
+  async refresh_dips() {
+    const connection: Connection = new Connection(API_URL);
+    const programAccountsPromise =
+      connection.getProgramAccounts(dualMarketProgramID);
+
+    await programAccountsPromise.then(async (data) => {
+      for (const programAccount of data) {
+        if (programAccount.account.data.length !== 260) {
+          continue;
+        }
+        const dipState = parseDipState(programAccount.account.data);
+
+        const strike: number = dipState.strike / 1_000_000;
+        const { expiration } = dipState;
+        const { splMint } = dipState;
+
+        const durationMs = expiration * 1_000 - Date.now();
+        if (durationMs < 0) {
+          continue;
+        }
+
+        if (splMintToToken(splMint) == this.token) {
+          if (this.dip_to_string(expiration, strike) in this.dips) {
+            continue;
+          }
+
+          await this.add_dip(expiration, strike, splMint, connection);
+
+          const [optionMint] =
+            await findProgramAddressWithMintAndStrikeAndExpiration(
+              OPTION_MINT_ADDRESS_SEED,
+              strike * 1_000_000,
+              expiration,
+              splMint,
+              usdcMintPk,
+              dualMarketProgramID
+            );
+          const mmOptionAccount = await getAssociatedTokenAddress(
+            optionMint,
+            mmWalletPk
+          );
+
+          // Create a poller
+          const poller: Poller = new Poller(
+            cluster,
+            this.token,
+            "USD",
+            expiration,
+            strike,
+            "call",
+            (deposit: DIPDeposit) => {
+              this.route(deposit);
+            }
+          );
+
+          // Start polling for a specific DIP option token account
+          poller.subscribe(mmOptionAccount.toBase58());
+        }
+      }
+    });
   }
 }

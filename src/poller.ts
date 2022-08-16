@@ -8,6 +8,7 @@ import {
   clusterApiUrl,
 } from "@solana/web3.js";
 import { AccountInfo, AccountLayout, u64 } from "@solana/spl-token";
+import { API_URL } from "./config";
 
 export class Poller {
   cluster: string;
@@ -39,7 +40,7 @@ export class Poller {
   subscribe(address: string): void {
     console.log("Listening at:", address);
     // @ts-ignore
-    const connection: Connection = new Connection(clusterApiUrl(this.cluster));
+    const connection: Connection = new Connection(API_URL);
     const callback: AccountChangeCallback = (
       accountInfo: solanaAccountInfo<Buffer>,
       _context: Context

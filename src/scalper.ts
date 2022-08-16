@@ -61,7 +61,7 @@ export class Scalper {
   }
 
   async scalperMango(dipProduct: DIPDeposit[]): Promise<void> {
-    console.log("Handling current deposits:", dipProduct);
+    console.log(this.symbol, "Risk Managing DIPs", dipProduct);
 
     this.perpMarketConfig = getMarketByBaseSymbolAndKind(
       this.groupConfig,
@@ -273,7 +273,7 @@ export class Scalper {
     );
 
     if (netGamma * fairValue < 0.5){
-      console.log('Gamma Hedge too small')
+      console.log(this.symbol, 'Gamma Hedge too small')
       return
     }
 

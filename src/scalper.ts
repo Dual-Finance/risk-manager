@@ -25,6 +25,7 @@ import {
   scalperWindow,
   periods,
   zScore,
+  TickSize
 } from "./config";
 import { DIPDeposit } from "./common";
 import { readKeypair, sleepTime, timeSinceMidDay } from "./utils";
@@ -37,6 +38,7 @@ export class Scalper {
   owner: Keypair;
   symbol: string;
   impliedVol: number;
+  tickSize: number;
   perpMarketConfig;
   marketIndex: number;
 
@@ -58,6 +60,7 @@ export class Scalper {
 
     this.symbol = symbol;
     this.impliedVol = THEO_VOL_MAP.get(symbol);
+    this.tickSize = TickSize.get(symbol)
   }
 
   async scalperMango(dipProduct: DIPDeposit[]): Promise<void> {
@@ -152,7 +155,7 @@ export class Scalper {
     );
 
     // Break up order depending on whether the book can support it
-    while (Math.abs(hedgeDeltaTotal * fairValue) > 1) {
+    while (Math.abs(hedgeDeltaTotal * fairValue) > (this.tickSize * fairValue)) {
       console.log(this.symbol, "Fair Value:", fairValue);
       hedgeDeltaClip =
         hedgeDeltaTotal /
@@ -210,7 +213,7 @@ export class Scalper {
       );
 
       // No need to wait for the twap interval if filled
-      if (Math.abs(hedgeDeltaTotal * fairValue) < 0.5) { // TODO tick size logic
+      if (Math.abs(hedgeDeltaTotal * fairValue) < (this.tickSize * fairValue)) {
         break;
       }
       // Wait the twapInterval of time before sending updated hedge price & qty
@@ -272,7 +275,7 @@ export class Scalper {
       fairValue
     );
 
-    if (netGamma * fairValue < 0.5){
+    if ((netGamma * fairValue) < (this.tickSize * fairValue)){
       console.log(this.symbol, 'Gamma Hedge too small')
       return
     }

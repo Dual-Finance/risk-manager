@@ -44,6 +44,7 @@ export class Router {
   }
 
   run_risk_manager(): void {
+    console.log('Running risk manager:', this.dips);
     this.risk_manager_callback(Object.values(this.dips));
   }
 
@@ -78,7 +79,7 @@ export class Router {
   }
 
   dip_to_string(expiration: number, strike: number): string {
-    return `${expiration}${strike}`;
+    return `Expiration:${expiration}_Strike:${strike}`;
   }
 
   async refresh_dips() {

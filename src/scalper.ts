@@ -410,7 +410,7 @@ function getDIPDelta(dipProduct: DIPDeposit[], fairValue: number, symbol: string
   let deltaSum = 0;
   for (const dip of dipProduct) {
     yearsUntilMaturity =
-      (dip.expiration - Date.now()) / (365 * 60 * 60 * 24 * 1_000);
+      (dip.expirationMs - Date.now()) / (365 * 60 * 60 * 24 * 1_000);
     deltaSum =
       greeks.getDelta(
         fairValue,
@@ -488,7 +488,7 @@ function getDIPGamma(dipProduct: DIPDeposit[], fairValue: number, symbol: string
   let gammaSum = 0;
   for (const dip of dipProduct) {
     yearsUntilMaturity =
-      (dip.expiration - Date.now()) / (365 * 60 * 60 * 24 * 1_000);
+      (dip.expirationMs - Date.now()) / (365 * 60 * 60 * 24 * 1_000);
     gammaSum =
       greeks.getGamma(
         fairValue,

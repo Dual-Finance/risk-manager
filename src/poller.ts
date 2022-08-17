@@ -14,7 +14,7 @@ export class Poller {
   callback: (deposit: DIPDeposit) => void;
   splToken: string;
   premiumAsset: string;
-  expiration: number;
+  expirationSec: number;
   strike: number;
   type: string;
 
@@ -22,7 +22,7 @@ export class Poller {
     cluster: string,
     splToken: string,
     premiumAsset: string,
-    expiration: number,
+    expirationSec: number,
     strike: number,
     type: string,
     callback: (deposit: DIPDeposit) => void
@@ -31,7 +31,7 @@ export class Poller {
     this.callback = callback;
     this.splToken = splToken;
     this.premiumAsset = premiumAsset;
-    this.expiration = expiration;
+    this.expirationSec = expirationSec;
     this.strike = strike;
     this.type = type;
   }
@@ -69,7 +69,7 @@ export class Poller {
       const dip_deposit = {
         splToken: this.splToken,
         premiumAsset: this.premiumAsset,
-        expiration: this.expiration * 1_000,
+        expirationMs: this.expirationSec * 1_000,
         strike: this.strike,
         type: this.type,
         qty: new_amount / Math.pow(10, decimals),

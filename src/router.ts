@@ -107,7 +107,12 @@ export class Router {
             continue;
           }
 
-          await this.add_dip(expiration, strike, splMint, connection);
+          // Can fail in devnet because some incorrectly defined DIPs.
+          try {
+            await this.add_dip(expiration, strike, splMint, connection);
+          } catch (err) {
+            continue;
+          }
 
           const [optionMint] =
             await findProgramAddressWithMintAndStrikeAndExpiration(

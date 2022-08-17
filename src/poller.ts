@@ -5,7 +5,6 @@ import {
   PublicKey,
   AccountInfo as solanaAccountInfo,
   Context,
-  clusterApiUrl,
 } from "@solana/web3.js";
 import { AccountInfo, AccountLayout, u64 } from "@solana/spl-token";
 import { API_URL } from "./config";

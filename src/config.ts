@@ -1,6 +1,7 @@
 export const networkName = 'mainnet.1';
 export const cluster = 'mainnet-beta';
 export const API_URL = 'https://dual-rpc.com/mainnet';
+export const WEBSOCKET_URL = 'https://api.mainnet-beta.solana.com';
 
 export const THEO_VOL_MAP = new Map<string, number> ([
   ['BTC', 0.60], ['ETH', 0.70], ['SOL', 0.80]

@@ -103,14 +103,17 @@ export class Router {
         }
 
         if (splMintToToken(splMint) == this.token) {
-          if (this.dip_to_string(expiration, strike) in this.dips) {
-            continue;
-          }
+          const alreadyPolled: boolean = this.dip_to_string(expiration, strike) in this.dips;
 
-          // Can fail in devnet because some incorrectly defined DIPs.
+          // Always run add_dip since it refreshes the values if the subscribe
+          // fails. Can fail in devnet because some incorrectly defined DIPs.
           try {
             await this.add_dip(expiration, strike, splMint, connection);
           } catch (err) {
+            continue;
+          }
+
+          if (alreadyPolled) {
             continue;
           }
 

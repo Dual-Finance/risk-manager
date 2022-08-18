@@ -47,7 +47,7 @@ async function main() {
   ethRouter.run_risk_manager();
 
   setInterval(async () => {
-      console.log('Rerun Risk Manager', new Date().toUTCString());
+      console.log('Rerun All Risk Managers', new Date().toUTCString());
       await solRouter.refresh_dips();
       solRouter.run_risk_manager();
       await btcRouter.refresh_dips();

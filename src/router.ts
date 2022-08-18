@@ -44,7 +44,7 @@ export class Router {
   }
 
   run_risk_manager(): void {
-    console.log('Running risk manager:', this.dips);
+    console.log(this.token, 'Run Risk Manager:', this.dips);
     this.risk_manager_callback(Object.values(this.dips));
   }
 

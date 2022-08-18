@@ -64,8 +64,6 @@ export class Scalper {
   }
 
   async scalperMango(dipProduct: DIPDeposit[]): Promise<void> {
-    console.log(this.symbol, "Risk Managing DIPs", dipProduct);
-
     this.perpMarketConfig = getMarketByBaseSymbolAndKind(
       this.groupConfig,
       this.symbol,
@@ -319,24 +317,21 @@ export class Scalper {
           this.owner.publicKey
         )
       )[0];
-      const gammaOrders = mangoAccount.getPerpOpenOrders();
-      let numGammaOrders = 0;
-      for (const order of gammaOrders) {
-        if (order.marketIndex == this.marketIndex) {
-          numGammaOrders = numGammaOrders + 1;
-        }
-      }
+
       // Check for lost orders
-      if (numGammaOrders != 2) {
-        console.log("Lost Orders!");
+      if (!await matchOpenOrders(perpMarket, mangoAccount, this.connection, gammaBidID)) {
+        console.log("Lost Bid!", gammaBidID)
         break;
       }
+      if (!await matchOpenOrders(perpMarket, mangoAccount, this.connection, gammaAskID)){
+        console.log("Lost Ask!", gammaAskID);
+        break;
+      }
+
       console.log(
         this.symbol,
         "Periods Elpased:",
         timeWaited / (scalperWindow / periods),
-        "GammaOrders:",
-        numGammaOrders,
         "Wait:",
         scalperWindow / periods,
         "seconds"
@@ -372,6 +367,8 @@ export class Scalper {
       }
       timeWaited += scalperWindow / periods;
     }
+    console.log(this.symbol, "Gamma Scalp Complete", new Date().toUTCString())
+    // await this.scalperMango(dipProduct);
   }
 
   async cancelStaleOrders(
@@ -480,6 +477,16 @@ async function fillSize(
     }
   }
   return filledQty;
+}
+
+async function matchOpenOrders(perpMarket: PerpMarket, mangoAccount: MangoAccount, connection: Connection, orderID: number){
+  let isOpen = false;
+  for (const order of await perpMarket.loadOrdersForAccount(connection, mangoAccount)){
+    if (order.clientId.toString() == orderID.toString()) {
+      isOpen = true;
+    }
+  }
+  return isOpen;
 }
 
 function getDIPGamma(dipProduct: DIPDeposit[], fairValue: number, symbol: string) {

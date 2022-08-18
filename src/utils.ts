@@ -2,7 +2,12 @@ import * as os from "os";
 import * as fs from "fs";
 import { PublicKey } from "@solana/web3.js";
 import { utils } from "@project-serum/anchor";
-import { ASSOCIATED_TOKEN_PROGRAM_ID, Token, TOKEN_PROGRAM_ID } from "@solana/spl-token";
+import {
+  ASSOCIATED_TOKEN_PROGRAM_ID,
+  Token,
+  TOKEN_PROGRAM_ID,
+} from "@solana/spl-token";
+import { wbtcPk, wethPk, wsolPk } from "./common";
 
 export function readKeypair() {
   return JSON.parse(
@@ -107,12 +112,25 @@ export async function getAssociatedTokenAddress(
   );
 }
 
-export function timeSinceMidDay(){
+export function timeSinceMidDay() {
   const timeNow = new Date();
   const year = timeNow.getUTCFullYear();
   const month = timeNow.getUTCMonth();
   const day = timeNow.getUTCDate();
-  const timeCheckUTC = Date.UTC(year, month, day, 12, 0 ,0 ,0);
-  const diff = (timeNow.getTime() - timeCheckUTC)/1000;
-  return diff
+  const timeCheckUTC = Date.UTC(year, month, day, 12, 0, 0, 0);
+  const diff = (timeNow.getTime() - timeCheckUTC) / 1000;
+  return diff;
+}
+
+export function splMintToToken(splMint: PublicKey) {
+  if (splMint.toBase58() == wsolPk.toBase58()) {
+    return "SOL";
+  }
+  if (splMint.toBase58() == wbtcPk.toBase58()) {
+    return "BTC";
+  }
+  if (splMint.toBase58() == wethPk.toBase58()) {
+    return "ETH";
+  }
+  return "UNKNOWN_TOKEN";
 }

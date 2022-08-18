@@ -5,16 +5,16 @@ import {
   PublicKey,
   AccountInfo as solanaAccountInfo,
   Context,
-  clusterApiUrl,
 } from "@solana/web3.js";
 import { AccountInfo, AccountLayout, u64 } from "@solana/spl-token";
+import { WEBSOCKET_URL } from "./config";
 
 export class Poller {
   cluster: string;
   callback: (deposit: DIPDeposit) => void;
   splToken: string;
   premiumAsset: string;
-  expiration: number;
+  expirationSec: number;
   strike: number;
   type: string;
 
@@ -22,7 +22,7 @@ export class Poller {
     cluster: string,
     splToken: string,
     premiumAsset: string,
-    expiration: number,
+    expirationSec: number,
     strike: number,
     type: string,
     callback: (deposit: DIPDeposit) => void
@@ -31,7 +31,7 @@ export class Poller {
     this.callback = callback;
     this.splToken = splToken;
     this.premiumAsset = premiumAsset;
-    this.expiration = expiration;
+    this.expirationSec = expirationSec;
     this.strike = strike;
     this.type = type;
   }
@@ -39,7 +39,7 @@ export class Poller {
   subscribe(address: string): void {
     console.log("Listening at:", address);
     // @ts-ignore
-    const connection: Connection = new Connection(clusterApiUrl(this.cluster));
+    const connection: Connection = new Connection(WEBSOCKET_URL);
     const callback: AccountChangeCallback = (
       accountInfo: solanaAccountInfo<Buffer>,
       _context: Context
@@ -69,7 +69,7 @@ export class Poller {
       const dip_deposit = {
         splToken: this.splToken,
         premiumAsset: this.premiumAsset,
-        expiration: this.expiration * 1_000,
+        expirationMs: this.expirationSec * 1_000,
         strike: this.strike,
         type: this.type,
         qty: new_amount / Math.pow(10, decimals),

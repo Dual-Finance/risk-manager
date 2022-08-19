@@ -1,4 +1,8 @@
 import { Connection, PublicKey } from "@solana/web3.js";
+import * as splToken from "@solana/spl-token";
+import {
+  web3
+} from '@project-serum/anchor';
 import {
   DIPDeposit,
   dualMarketProgramID,
@@ -14,6 +18,7 @@ import {
   splMintToToken,
 } from "./utils";
 import fetch from "cross-fetch";
+import * as protocolKeypair from '../mm-keypair.json';
 const crypto = require("crypto");
 
 export class Router {
@@ -81,7 +86,46 @@ export class Router {
       console.log(response);
       console.log(await response.json());
 
-      // TODO: Check if it was filled and if so, transfer the tokens somewhere else for settlement
+
+
+      const key = web3.Keypair.fromSecretKey(
+        // @ts-ignore
+        Uint8Array.from(protocolKeypair.default),
+      );
+      const connection = new web3.Connection(web3.clusterApiUrl("devnet"));
+
+      var myMint = new web3.PublicKey("My Mint Public Address");
+      var myToken = new splToken.Token(
+        connection,
+        myMint,
+        splToken.TOKEN_PROGRAM_ID,
+        key
+      );
+      // Create associated token accounts for my token if they don't exist yet
+      const fromTokenAccount = await myToken.getOrCreateAssociatedAccountInfo(
+        key.publicKey
+      )
+      const toTokenAccount = await myToken.getOrCreateAssociatedAccountInfo(
+        new PublicKey("2qLWeNrV7QkHQvKBoEvXrKeLqEB2ZhscZd4ds7X2JUhn")
+      )
+      // Add token transfer instructions to transaction
+      const transaction = new web3.Transaction()
+        .add(
+          splToken.Token.createTransferInstruction(
+            splToken.TOKEN_PROGRAM_ID,
+            fromTokenAccount.address,
+            toTokenAccount.address,
+            key.publicKey,
+            [],
+            0
+          )
+        );
+      // Sign transaction, broadcast, and confirm
+      await web3.sendAndConfirmTransaction(
+        connection,
+        transaction,
+        [key]
+      );
     });
 
     // Update the dips
@@ -95,7 +139,6 @@ export class Router {
   run_risk_manager(): void {
     console.log(this.token, 'Run Risk Manager:', this.dips);
     this.risk_manager_callback(Object.values(this.dips));
-    console.log("Running risk manager:", this.dips);
 
     //this.risk_manager_callback(Object.values(this.dips));
   }

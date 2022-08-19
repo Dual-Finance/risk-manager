@@ -19,3 +19,6 @@ test-ledger
 .DS_Store
 
 lib
+
+**/*keypair.json
+*keypair.json

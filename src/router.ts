@@ -56,6 +56,7 @@ export class Router {
     this.fetchMMOrder(symbol).then(async (order) => {
       // Run the risk manager if there is no MM order
       if (!order || Number(order["remainingQuantity"]) < dip_deposit.qty) {
+        this.dips[this.dip_to_string(dip_deposit.expirationMs / 1_000, dip_deposit.strike)] = dip_deposit;
         this.run_risk_manager();
         return;
       }
@@ -85,8 +86,7 @@ export class Router {
       )
       console.log(response);
       console.log(await response.json());
-
-
+      // TODO: do not assume the API request succeeded
 
       const key = web3.Keypair.fromSecretKey(
         // @ts-ignore
@@ -94,21 +94,23 @@ export class Router {
       );
       const connection = new web3.Connection(web3.clusterApiUrl("devnet"));
 
-      var myMint = new web3.PublicKey("My Mint Public Address");
-      var myToken = new splToken.Token(
+      const [optionMint] = await findProgramAddressWithMintAndStrikeAndExpiration(
+        OPTION_MINT_ADDRESS_SEED,
+        dip_deposit.strike * 1_000_000,
+        dip_deposit.expirationMs / 1_000,
+        new PublicKey('So11111111111111111111111111111111111111112'),
+        usdcMintPk,
+        dualMarketProgramID
+      );
+      const myToken = new splToken.Token(
         connection,
-        myMint,
+        optionMint,
         splToken.TOKEN_PROGRAM_ID,
         key
       );
-      // Create associated token accounts for my token if they don't exist yet
-      const fromTokenAccount = await myToken.getOrCreateAssociatedAccountInfo(
-        key.publicKey
-      )
-      const toTokenAccount = await myToken.getOrCreateAssociatedAccountInfo(
-        new PublicKey("2qLWeNrV7QkHQvKBoEvXrKeLqEB2ZhscZd4ds7X2JUhn")
-      )
-      // Add token transfer instructions to transaction
+      const fromTokenAccount = await myToken.getOrCreateAssociatedAccountInfo(key.publicKey);
+      // TODO: just for testing
+      const toTokenAccount = await myToken.getOrCreateAssociatedAccountInfo(new PublicKey("2qLWeNrV7QkHQvKBoEvXrKeLqEB2ZhscZd4ds7X2JUhn"));
       const transaction = new web3.Transaction()
         .add(
           splToken.Token.createTransferInstruction(
@@ -117,23 +119,16 @@ export class Router {
             toTokenAccount.address,
             key.publicKey,
             [],
-            0
+            // TODO: Just for SOL testing
+            dip_deposit.qty * 100_000_000
           )
         );
-      // Sign transaction, broadcast, and confirm
       await web3.sendAndConfirmTransaction(
         connection,
         transaction,
         [key]
       );
     });
-
-    // Update the dips
-    this.dips[
-      this.dip_to_string(dip_deposit.expirationMs / 1_000, dip_deposit.strike)
-    ] = dip_deposit;
-
-    this.run_risk_manager();
   }
 
   run_risk_manager(): void {

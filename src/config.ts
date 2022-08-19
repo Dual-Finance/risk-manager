@@ -1,7 +1,19 @@
+import { PublicKey } from "@solana/web3.js";
+
+export const networkName = 'devnet.2';
+export const cluster = 'devnet';
+export const API_URL = 'https://dual-rpc.com/devnet';
+export const DUAL_API = 'https://api.dual.finance';
+export const WEBSOCKET_URL = 'https://api.devnet.solana.com';
+export const usdcMintPk = new PublicKey("HJiQv33nKujRmZQ3sJBSosXgCEmiHs3mG1yd9VcLawPM");
+/*
 export const networkName = 'mainnet.1';
 export const cluster = 'mainnet-beta';
 export const API_URL = 'https://dual-rpc.com/mainnet';
+export const DUAL_API = 'https://api.dual.finance';
 export const WEBSOCKET_URL = 'https://api.mainnet-beta.solana.com';
+export const usdcMintPk = new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
+*/
 
 export const THEO_VOL_MAP = new Map<string, number> ([
   ['BTC', 0.60], ['ETH', 0.70], ['SOL', 0.80]

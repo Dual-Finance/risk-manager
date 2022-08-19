@@ -3,10 +3,9 @@ import {
   DIPDeposit,
   dualMarketProgramID,
   mmWalletPk,
-  usdcMintPk,
   OPTION_MINT_ADDRESS_SEED,
 } from "./common";
-import { API_URL, cluster } from "./config";
+import { API_URL, cluster, DUAL_API, usdcMintPk } from "./config";
 import { Poller } from "./poller";
 import {
   findProgramAddressWithMintAndStrikeAndExpiration,
@@ -14,6 +13,8 @@ import {
   parseDipState,
   splMintToToken,
 } from "./utils";
+import fetch from "cross-fetch";
+const crypto = require("crypto");
 
 export class Router {
   mm_callback: (d: DIPDeposit[]) => void;
@@ -24,7 +25,7 @@ export class Router {
   constructor(
     mm_callback: (d: DIPDeposit[]) => void,
     risk_manager_callback: (d: DIPDeposit[]) => void,
-    token: string,
+    token: string
   ) {
     this.mm_callback = mm_callback;
     this.risk_manager_callback = risk_manager_callback;
@@ -35,10 +36,58 @@ export class Router {
   // Accepts a DIP Deposit and decides whether to send it to the mm_callback
   // or risk_manager_callback
   route(dip_deposit: DIPDeposit): void {
-    // TODO: Check how much there was before to figure out the amount for routing decision
+    const date = new Date(dip_deposit.expirationMs);
+    const symbol = `${dip_deposit.splToken}.USDC.${date.getUTCFullYear()}-${date.getUTCMonth() + 1}-${date.getUTCDate()}.${dip_deposit.strike}.UPSIDE.A.P`;
+    console.log("Routing for", symbol, "Deposit:", dip_deposit);
+
+    // This happens after sending tokens to a MM. Exit early.
+    if (dip_deposit.qty == 0) {
+      this.dips[
+        this.dip_to_string(dip_deposit.expirationMs / 1_000, dip_deposit.strike)
+      ] = dip_deposit;
+      this.run_risk_manager();
+      return;
+    }
+    this.fetchMMOrder(symbol).then(async (order) => {
+      // Run the risk manager if there is no MM order
+      if (!order || Number(order["remainingQuantity"]) < dip_deposit.qty) {
+        this.run_risk_manager();
+        return;
+      }
+
+      const client_order_id = 'clientOrderId' + Date.now();
+      const side = 'SELL';
+      const price = order["price"];
+      const quantity = dip_deposit.qty;
+      const secret = '1a3f755fed50136aab574fd2a51242fe04c09a53388af92cd4b4137031af5a36';
+  
+      const request = `clientOrderId=${client_order_id}&symbol=${symbol}&price=${price}&quantity=${quantity}&side=${side}`
+      const calculated_hash = crypto
+        .createHmac("SHA256", secret)
+        .update(Buffer.from(request))
+        .digest("hex");
+  
+      const data = {'symbol': symbol, 'price': price, 'quantity': quantity,
+                    'side': side, 'clientOrderId': client_order_id, 'signature': calculated_hash}
+
+      const response = await fetch(
+        `${DUAL_API}/orders/createorder`,
+        {
+          method: "post",
+          headers: { "Content-Type": "application/json", "X-MBX-APIKEY": "033000e0a1c3a87a4ec58c9ecbc0e41da02fd517e313ec602422a46f5de5dac7" },
+          body: JSON.stringify(data),
+        }
+      )
+      console.log(response);
+      console.log(await response.json());
+
+      // TODO: Check if it was filled and if so, transfer the tokens somewhere else for settlement
+    });
+
     // Update the dips
-    this.dips[this.dip_to_string(dip_deposit.expirationMs / 1_000, dip_deposit.strike)] =
-      dip_deposit;
+    this.dips[
+      this.dip_to_string(dip_deposit.expirationMs / 1_000, dip_deposit.strike)
+    ] = dip_deposit;
 
     this.run_risk_manager();
   }
@@ -46,6 +95,28 @@ export class Router {
   run_risk_manager(): void {
     console.log(this.token, 'Run Risk Manager:', this.dips);
     this.risk_manager_callback(Object.values(this.dips));
+    console.log("Running risk manager:", this.dips);
+
+    //this.risk_manager_callback(Object.values(this.dips));
+  }
+
+  async fetchMMOrder(symbol: string): Promise<number> {
+    try {
+      const order = (
+        await (
+          await fetch(
+            `${DUAL_API}/symbols/getprice?symbol=${symbol}`,
+            {
+              method: "get",
+              headers: { "Content-Type": "application/json" },
+            }
+          )
+        ).json()
+      )[0];
+      return order;
+    } catch (err) {
+      return undefined;
+    }
   }
 
   async add_dip(
@@ -105,7 +176,8 @@ export class Router {
         }
 
         if (splMintToToken(splMint) == this.token) {
-          const alreadyPolled: boolean = this.dip_to_string(expirationSec, strike) in this.dips;
+          const alreadyPolled: boolean =
+            this.dip_to_string(expirationSec, strike) in this.dips;
 
           // Always run add_dip since it refreshes the values if the subscribe
           // fails. Can fail in devnet because some incorrectly defined DIPs.

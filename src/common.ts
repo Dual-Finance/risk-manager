@@ -11,9 +11,6 @@ export interface DIPDeposit {
 export const dualMarketProgramID = new PublicKey(
   "DiPbvUUJkDhV9jFtQsDFnMEMRJyjW5iS6NMwoySiW8ki"
 );
-export const usdcMintPk = new PublicKey(
-  "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
-);
 export const mmWalletPk = new PublicKey(
   "9SgZKdeTMaNuEZnhccK2crHxi1grXRmZKQCvNSKgVrCQ"
 );

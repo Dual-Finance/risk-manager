@@ -10,6 +10,7 @@ export const DUAL_API = IS_DEV ? 'https://dev.api.dual.finance' : 'https://api.d
 export const WEBSOCKET_URL = IS_DEV ? 'https://api.devnet.solana.com' : 'https://api.mainnet-beta.solana.com';
 export const usdcMintPk = IS_DEV ? new PublicKey("HJiQv33nKujRmZQ3sJBSosXgCEmiHs3mG1yd9VcLawPM") : new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v");
 export const settlementWallet = new PublicKey("2qLWeNrV7QkHQvKBoEvXrKeLqEB2ZhscZd4ds7X2JUhn");
+export const PROTCOL_API_KEY = "033000e0a1c3a87a4ec58c9ecbc0e41da02fd517e313ec602422a46f5de5dac7";
 export const wsolPk = new PublicKey(
   "So11111111111111111111111111111111111111112"
 );

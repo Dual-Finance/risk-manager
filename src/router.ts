@@ -13,6 +13,7 @@ import {
   dualMarketProgramID,
   mmWalletPk,
   OPTION_MINT_ADDRESS_SEED,
+  PROTCOL_API_KEY,
 } from "./config";
 import { Poller } from "./poller";
 import {
@@ -149,8 +150,7 @@ export class Router {
         method: "post",
         headers: {
           "Content-Type": "application/json",
-          "X-MBX-APIKEY":
-            "033000e0a1c3a87a4ec58c9ecbc0e41da02fd517e313ec602422a46f5de5dac7",
+          "X-MBX-APIKEY": PROTCOL_API_KEY,
         },
         body: JSON.stringify(data),
       });

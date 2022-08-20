@@ -22,3 +22,5 @@ lib
 
 **/*keypair.json
 *keypair.json
+**/*Secret.json
+*Secret.json

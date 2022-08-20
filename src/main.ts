@@ -1,7 +1,7 @@
 import { DIPDeposit } from "./common";
 import { Router } from "./router";
 import { Scalper } from "./scalper";
-import { scalperWindow } from "./config";
+import { IS_DEV, scalperWindow } from "./config";
 
 async function main() {
   // Create scalpers
@@ -41,19 +41,23 @@ async function main() {
 
   await solRouter.refresh_dips();
   solRouter.run_risk_manager();
-  await btcRouter.refresh_dips();
-  btcRouter.run_risk_manager();
-  await ethRouter.refresh_dips();
-  ethRouter.run_risk_manager();
+  if (!IS_DEV) {
+    await btcRouter.refresh_dips();
+    btcRouter.run_risk_manager();
+    await ethRouter.refresh_dips();
+    ethRouter.run_risk_manager();
+  }
 
   setInterval(async () => {
       console.log('Rerun All Risk Managers', new Date().toUTCString());
       await solRouter.refresh_dips();
       solRouter.run_risk_manager();
-      await btcRouter.refresh_dips();
-      btcRouter.run_risk_manager();
-      await ethRouter.refresh_dips();
-      ethRouter.run_risk_manager();
+      if (!IS_DEV) {
+        await btcRouter.refresh_dips();
+        btcRouter.run_risk_manager();
+        await ethRouter.refresh_dips();
+        ethRouter.run_risk_manager();
+      }
     }, 1_000 * scalperWindow
   );
 }

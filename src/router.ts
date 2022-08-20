@@ -1,24 +1,30 @@
 import { Connection, PublicKey } from "@solana/web3.js";
 import * as splToken from "@solana/spl-token";
-import {
-  web3
-} from '@project-serum/anchor';
+import { web3 } from "@project-serum/anchor";
 import {
   DIPDeposit,
+} from "./common";
+import {
+  API_URL,
+  cluster,
+  DUAL_API,
+  settlementWallet,
+  usdcMintPk,
   dualMarketProgramID,
   mmWalletPk,
   OPTION_MINT_ADDRESS_SEED,
-} from "./common";
-import { API_URL, cluster, DUAL_API, usdcMintPk } from "./config";
+} from "./config";
 import { Poller } from "./poller";
 import {
   findProgramAddressWithMintAndStrikeAndExpiration,
   getAssociatedTokenAddress,
   parseDipState,
   splMintToToken,
+  tokenToSplMint,
 } from "./utils";
 import fetch from "cross-fetch";
-import * as protocolKeypair from '../mm-keypair.json';
+import * as protocolKeypair from "../mm-keypair.json";
+import * as apiSecret from "../apiSecret.json";
 const crypto = require("crypto");
 
 export class Router {
@@ -42,7 +48,9 @@ export class Router {
   // or risk_manager_callback
   route(dip_deposit: DIPDeposit): void {
     const date = new Date(dip_deposit.expirationMs);
-    const symbol = `${dip_deposit.splToken}.USDC.${date.getUTCFullYear()}-${date.getUTCMonth() + 1}-${date.getUTCDate()}.${dip_deposit.strike}.UPSIDE.A.P`;
+    const symbol = `${dip_deposit.splToken}.USDC.${date.getUTCFullYear()}-${
+      date.getUTCMonth() + 1
+    }-${date.getUTCDate()}.${dip_deposit.strike}.UPSIDE.A.P`;
     console.log("Routing for", symbol, "Deposit:", dip_deposit);
 
     // This happens after sending tokens to a MM. Exit early.
@@ -56,99 +64,113 @@ export class Router {
     this.fetchMMOrder(symbol).then(async (order) => {
       // Run the risk manager if there is no MM order
       if (!order || Number(order["remainingQuantity"]) < dip_deposit.qty) {
-        this.dips[this.dip_to_string(dip_deposit.expirationMs / 1_000, dip_deposit.strike)] = dip_deposit;
+        this.dips[
+          this.dip_to_string(
+            dip_deposit.expirationMs / 1_000,
+            dip_deposit.strike
+          )
+        ] = dip_deposit;
         this.run_risk_manager();
         return;
       }
 
-      const client_order_id = 'clientOrderId' + Date.now();
-      const side = 'SELL';
+      const client_order_id = "clientOrderId" + Date.now();
+      const side = "SELL";
       const price = order["price"];
       const quantity = dip_deposit.qty;
-      const secret = '1a3f755fed50136aab574fd2a51242fe04c09a53388af92cd4b4137031af5a36';
-  
-      const request = `clientOrderId=${client_order_id}&symbol=${symbol}&price=${price}&quantity=${quantity}&side=${side}`
+      const secret = apiSecret;
+
+      const request = `clientOrderId=${client_order_id}&symbol=${symbol}&price=${price}&quantity=${quantity}&side=${side}`;
       const calculated_hash = crypto
         .createHmac("SHA256", secret)
         .update(Buffer.from(request))
         .digest("hex");
-  
-      const data = {'symbol': symbol, 'price': price, 'quantity': quantity,
-                    'side': side, 'clientOrderId': client_order_id, 'signature': calculated_hash}
 
-      const response = await fetch(
-        `${DUAL_API}/orders/createorder`,
-        {
-          method: "post",
-          headers: { "Content-Type": "application/json", "X-MBX-APIKEY": "033000e0a1c3a87a4ec58c9ecbc0e41da02fd517e313ec602422a46f5de5dac7" },
-          body: JSON.stringify(data),
-        }
-      )
-      console.log(response);
-      console.log(await response.json());
-      // TODO: do not assume the API request succeeded
+      const data = {
+        symbol: symbol,
+        price: price,
+        quantity: quantity,
+        side: side,
+        clientOrderId: client_order_id,
+        signature: calculated_hash,
+      };
 
       const key = web3.Keypair.fromSecretKey(
         // @ts-ignore
-        Uint8Array.from(protocolKeypair.default),
+        Uint8Array.from(protocolKeypair.default)
       );
       const connection = new web3.Connection(web3.clusterApiUrl("devnet"));
 
-      const [optionMint] = await findProgramAddressWithMintAndStrikeAndExpiration(
-        OPTION_MINT_ADDRESS_SEED,
-        dip_deposit.strike * 1_000_000,
-        dip_deposit.expirationMs / 1_000,
-        new PublicKey('So11111111111111111111111111111111111111112'),
-        usdcMintPk,
-        dualMarketProgramID
-      );
+      const [optionMint] =
+        await findProgramAddressWithMintAndStrikeAndExpiration(
+          OPTION_MINT_ADDRESS_SEED,
+          dip_deposit.strike * 1_000_000,
+          dip_deposit.expirationMs / 1_000,
+          tokenToSplMint(dip_deposit.splToken),
+          usdcMintPk,
+          dualMarketProgramID
+        );
       const myToken = new splToken.Token(
         connection,
         optionMint,
         splToken.TOKEN_PROGRAM_ID,
         key
       );
-      const fromTokenAccount = await myToken.getOrCreateAssociatedAccountInfo(key.publicKey);
-      // TODO: just for testing
-      const toTokenAccount = await myToken.getOrCreateAssociatedAccountInfo(new PublicKey("2qLWeNrV7QkHQvKBoEvXrKeLqEB2ZhscZd4ds7X2JUhn"));
-      const transaction = new web3.Transaction()
-        .add(
-          splToken.Token.createTransferInstruction(
-            splToken.TOKEN_PROGRAM_ID,
-            fromTokenAccount.address,
-            toTokenAccount.address,
-            key.publicKey,
-            [],
-            // TODO: Just for SOL testing
-            dip_deposit.qty * 100_000_000
-          )
-        );
-      await web3.sendAndConfirmTransaction(
-        connection,
-        transaction,
-        [key]
+      const fromTokenAccount = await myToken.getOrCreateAssociatedAccountInfo(
+        key.publicKey
       );
+      const toTokenAccount = await myToken.getOrCreateAssociatedAccountInfo(
+        settlementWallet
+      );
+
+      const transaction = new web3.Transaction().add(
+        splToken.Token.createTransferInstruction(
+          splToken.TOKEN_PROGRAM_ID,
+          fromTokenAccount.address,
+          toTokenAccount.address,
+          key.publicKey,
+          [],
+          Math.floor(dip_deposit.qty * 1_000_000)
+        )
+      );
+      try {
+        await web3.sendAndConfirmTransaction(
+          connection,
+          transaction,
+          [key]
+        );
+      } catch (err) {
+        // Do not send the order to the API if the token move fails.
+        console.log(err);
+        return;
+      }
+
+      const response = await fetch(`${DUAL_API}/orders/createorder`, {
+        method: "post",
+        headers: {
+          "Content-Type": "application/json",
+          "X-MBX-APIKEY":
+            "033000e0a1c3a87a4ec58c9ecbc0e41da02fd517e313ec602422a46f5de5dac7",
+        },
+        body: JSON.stringify(data),
+      });
+      console.log("API response", await response.json());
     });
   }
 
   run_risk_manager(): void {
-    console.log(this.token, 'Run Risk Manager:', this.dips);
+    console.log(this.token, "Run Risk Manager:", this.dips);
     this.risk_manager_callback(Object.values(this.dips));
-
-    //this.risk_manager_callback(Object.values(this.dips));
   }
 
   async fetchMMOrder(symbol: string): Promise<number> {
     try {
       const order = (
         await (
-          await fetch(
-            `${DUAL_API}/symbols/getprice?symbol=${symbol}`,
-            {
-              method: "get",
-              headers: { "Content-Type": "application/json" },
-            }
-          )
+          await fetch(`${DUAL_API}/symbols/getprice?symbol=${symbol}`, {
+            method: "get",
+            headers: { "Content-Type": "application/json" },
+          })
         ).json()
       )[0];
       return order;

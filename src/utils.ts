@@ -7,7 +7,7 @@ import {
   Token,
   TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
-import { wbtcPk, wethPk, wsolPk } from "./common";
+import { wbtcPk, wethPk, wsolPk } from "./config";
 
 export function readKeypair() {
   return JSON.parse(
@@ -133,4 +133,17 @@ export function splMintToToken(splMint: PublicKey) {
     return "ETH";
   }
   return "UNKNOWN_TOKEN";
+}
+
+export function tokenToSplMint(token: string) {
+  if (token == "SOL") {
+    return wsolPk;
+  }
+  if (token == "BTC") {
+    return wbtcPk;
+  }
+  if (token == "ETH") {
+    return wethPk;
+  }
+  return undefined;
 }

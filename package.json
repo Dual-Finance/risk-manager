@@ -9,5 +9,8 @@
   "scripts": {
     "scalper": "npx ts-node src/scalper.ts",
     "main": "npx ts-node src/main.ts"
+  },
+  "compilerOptions": {
+    "lib": ["es2021", "dom"]
   }
 }

@@ -31,8 +31,9 @@ export const mmWalletPk = new PublicKey(
 export const OPTION_MINT_ADDRESS_SEED = "option-mint";
 
 export const THEO_VOL_MAP = new Map<string, number> ([
-  ['BTC', 0.60], ['ETH', 0.70], ['SOL', 0.80]
+  ['BTC', 0.50], ['ETH', 0.60], ['SOL', 0.70]
 ]);
+export const theoVolAdj = 1.2;
 
 export const TickSize = new Map<string, number> ([
   ['BTC', 0.0001], ['ETH', 0.001], ['SOL', 0.01]

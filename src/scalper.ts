@@ -19,6 +19,7 @@ import {
   rfRate,
   networkName,
   THEO_VOL_MAP,
+  theoVolAdj,
   maxNotional,
   slippageTolerance,
   twapInterval,
@@ -59,7 +60,7 @@ export class Scalper {
     this.owner = Keypair.fromSecretKey(Uint8Array.from(readKeypair()));
 
     this.symbol = symbol;
-    this.impliedVol = THEO_VOL_MAP.get(symbol);
+    this.impliedVol = THEO_VOL_MAP.get(symbol) * theoVolAdj;
     this.tickSize = TickSize.get(symbol)
   }
 
@@ -402,7 +403,7 @@ async function loadPrices(mangoGroup: MangoGroup, connection: Connection) {
 }
 
 function getDIPDelta(dipProduct: DIPDeposit[], fairValue: number, symbol: string) {
-  const impliedVol = THEO_VOL_MAP.get(symbol);
+  const impliedVol = THEO_VOL_MAP.get(symbol) * theoVolAdj;
   let yearsUntilMaturity: number;
   let deltaSum = 0;
   for (const dip of dipProduct) {
@@ -490,7 +491,7 @@ async function matchOpenOrders(perpMarket: PerpMarket, mangoAccount: MangoAccoun
 }
 
 function getDIPGamma(dipProduct: DIPDeposit[], fairValue: number, symbol: string) {
-  const impliedVol = THEO_VOL_MAP.get(symbol);
+  const impliedVol = THEO_VOL_MAP.get(symbol) * theoVolAdj;
   let yearsUntilMaturity: number;
   let gammaSum = 0;
   for (const dip of dipProduct) {

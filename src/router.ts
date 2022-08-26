@@ -51,7 +51,7 @@ export class Router {
     const date = new Date(dip_deposit.expirationMs);
     const symbol = `${dip_deposit.splToken}.USDC.${date.getUTCFullYear()}-${
       date.getUTCMonth() + 1
-    }-${date.getUTCDate()}.${dip_deposit.strike}.UPSIDE.A.P`;
+    }-${date.getUTCDate()}.${dip_deposit.strike * 1_000_000}.UPSIDE.A.P`;
     console.log("Routing for", symbol, "Deposit:", dip_deposit);
 
     // This happens after sending tokens to a MM. Exit early.
@@ -79,7 +79,7 @@ export class Router {
       const side = "SELL";
       const price = order["price"];
       const quantity = dip_deposit.qty;
-      const secret = apiSecret;
+      const secret = apiSecret['default'];
 
       const request = `clientOrderId=${client_order_id}&symbol=${symbol}&price=${price}&quantity=${quantity}&side=${side}`;
       const calculated_hash = crypto
@@ -135,6 +135,7 @@ export class Router {
         )
       );
       try {
+        console.log("Sending on chain move of options");
         await web3.sendAndConfirmTransaction(
           connection,
           transaction,
@@ -146,6 +147,7 @@ export class Router {
         return;
       }
 
+      console.log("Creating api order for buy", data);
       const response = await fetch(`${DUAL_API}/orders/createorder`, {
         method: "post",
         headers: {

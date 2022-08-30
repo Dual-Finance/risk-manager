@@ -1,6 +1,6 @@
 // @ts-ignore
 import * as greeks from "greeks";
-
+import WebSocket from 'ws';
 import {
   Config,
   getMarketByBaseSymbolAndKind,
@@ -12,6 +12,7 @@ import {
   PerpMarket,
   MangoGroup,
   getUnixTs,
+  PerpEventLayout
 } from "@blockworks-foundation/mango-client";
 import { Keypair, Commitment, Connection } from "@solana/web3.js";
 import configFile from "./ids.json";
@@ -25,7 +26,8 @@ import {
   scalperWindow,
   periods,
   zScore,
-  TickSize
+  TickSize,
+  FILLS_URL
 } from "./config";
 import { DIPDeposit } from "./common";
 import { readKeypair, sleepTime, timeSinceMidDay } from "./utils";
@@ -81,6 +83,19 @@ export class Scalper {
       this.perpMarketConfig.baseDecimals,
       this.perpMarketConfig.quoteDecimals
     );
+
+    // Start listening for any fills on a specific market
+    const fillFeed = new WebSocket(FILLS_URL!);
+    fillFeed.on
+    console.log('Websocket', fillFeed)
+    fillFeed.addEventListener('message', )
+    // Usage of json not clear https://docs.mango.markets/api-and-websocket/fills-websocket-feed
+    const json: string = '{"market":"SOL-PERP","queue":"31cKs646dt1YkA3zPyxZ7rUAkxTBz279w4XEobFXcAKP","events":[]}'
+    const perpEventSnapshot = JSON.parse(json);
+    const fills = perpEventSnapshot.events.map((event) => {
+      const fillBytes = Buffer.from(event, 'base64');
+      return PerpEventLayout.decode(fillBytes); // This is a Mango fill object.
+    });
 
     await this.deltaHedge(
       dipProduct,

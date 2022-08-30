@@ -12,7 +12,8 @@ import {
   PerpMarket,
   MangoGroup,
   getUnixTs,
-  PerpEventLayout
+  PerpEventLayout,
+  FillEvent
 } from "@blockworks-foundation/mango-client";
 import { Keypair, Commitment, Connection } from "@solana/web3.js";
 import configFile from "./ids.json";
@@ -86,16 +87,39 @@ export class Scalper {
 
     // Start listening for any fills on a specific market
     const fillFeed = new WebSocket(FILLS_URL!);
-    fillFeed.on
-    console.log('Websocket', fillFeed)
-    fillFeed.addEventListener('message', )
+    fillFeed.onopen = function(e) {
+      console.log('Connected to Mango Websocket', fillFeed.readyState)
+    };
+
     // Usage of json not clear https://docs.mango.markets/api-and-websocket/fills-websocket-feed
-    const json: string = '{"market":"SOL-PERP","queue":"31cKs646dt1YkA3zPyxZ7rUAkxTBz279w4XEobFXcAKP","events":[]}'
-    const perpEventSnapshot = JSON.parse(json);
-    const fills = perpEventSnapshot.events.map((event) => {
-      const fillBytes = Buffer.from(event, 'base64');
-      return PerpEventLayout.decode(fillBytes); // This is a Mango fill object.
-    });
+    let fillTs: number | undefined;
+    let fill: FillEvent | undefined;
+    const fillListener = (event) => {
+      const parsedEvent = JSON.parse(event.data);
+      if (
+        parsedEvent['status'] === 'New' &&
+        parsedEvent['market'] === 'SOL-PERP'
+      ) {
+        const fillBytes = Buffer.from(parsedEvent['event'], 'base64');
+        const fillEvent: FillEvent = PerpEventLayout.decode(fillBytes).fill;
+        console.log(
+          'Fill',
+          parsedEvent.market,
+          'Taker',
+          fillEvent.takerSide,
+          fillEvent.price.toNumber()/100,
+          fillEvent.quantity.toNumber()/100,
+          fillEvent.takerClientOrderId.toNumber(),
+          fillEvent.makerClientOrderId.toNumber(),
+          fillEvent.timestamp.toNumber()
+        );
+      }
+    };
+    fillFeed.addEventListener('message', fillListener);
+
+    fillFeed.onerror = function(error) {
+      alert(`[error] ${error.message}`);
+    };
 
     await this.deltaHedge(
       dipProduct,

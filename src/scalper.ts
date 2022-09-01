@@ -306,6 +306,7 @@ export class Scalper {
       )
     )[0];
 
+    // Makes the recursive gamma scalps safer. Rerun will clear any stale orders. Allows only 2 gamma orders at any time
     await this.cancelStaleOrders(mangoAccount, mangoGroup, perpMarket);
 
     let fairValue = mangoGroup
@@ -346,6 +347,7 @@ export class Scalper {
         ) {
           console.log(this.symbol, 'Gamma Bid Filled', gammaBidID, new Date().toUTCString());
           fillFeed.removeEventListener('message', gammaFillListener);
+          // TODO remove recursion or add explicit termination that corresponds to the rerun timer
           this.gammaScalp(
             dipProduct,
             mangoGroup,

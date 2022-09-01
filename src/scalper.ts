@@ -28,7 +28,8 @@ import {
   zScore,
   TickSize,
   FILLS_URL,
-  IS_DEV
+  IS_DEV,
+  fillScan
 } from "./config";
 import { DIPDeposit } from "./common";
 import { readKeypair, sleepTime } from "./utils";
@@ -90,7 +91,6 @@ export class Scalper {
     fillFeed.onopen = function(e) {
       console.log('Connected to Mango Websocket', new Date().toUTCString())
     };
-    //TODO error handling
     fillFeed.onerror = function(error) {
       console.log(`Websocket Error ${error.message}`);
     };
@@ -275,7 +275,7 @@ export class Scalper {
           console.log(this.symbol, "Delta Hedge Complete");
           return;
         }
-        await sleepTime(1);
+        await sleepTime(fillScan);
       }
       fillFeed.removeEventListener('message', deltaFillListener);
       await this.deltaHedge(

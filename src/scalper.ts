@@ -147,6 +147,20 @@ export class Scalper {
 
     // Determine if hedge needs to buy or sell delta
     const hedgeSide = hedgeDeltaTotal < 0 ? "buy" : "sell";
+    console.log(
+      this.symbol,
+      "Target Delta Hedge:",
+      hedgeSide,
+      hedgeDeltaTotal*-1,
+      "DIP Delta:",
+      dipTotalDelta,
+      "Mango Delta:",
+      mangoDelta,
+      "Fair Value:", 
+      fairValue
+    );
+
+    await this.cancelStaleOrders(mangoAccount, mangoGroup, perpMarket);
     
     // Check if Delta Hedge is greater than min tick size
     if (Math.abs(hedgeDeltaTotal * fairValue) < (this.tickSize * fairValue)) {
@@ -160,24 +174,10 @@ export class Scalper {
         ? await perpMarket.loadAsks(this.connection)
         : await perpMarket.loadBids(this.connection);
 
-    await this.cancelStaleOrders(mangoAccount, mangoGroup, perpMarket);
-
     // Delta Hedging Orders, send limit orders through book that should fill
     let hedgeDeltaClip: number;
     let hedgePrice: number;
     let deltaOrderId = (new Date().getTime())*2;
-    console.log(
-      this.symbol,
-      "Target Delta Hedge:",
-      hedgeSide,
-      hedgeDeltaTotal*-1,
-      "DIP Delta:",
-      dipTotalDelta,
-      "Mango Delta:",
-      mangoDelta,
-      "Fair Value:", 
-      fairValue
-    );
 
     // Break up order depending on whether the book can support it
       hedgeDeltaClip =

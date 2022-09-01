@@ -246,20 +246,24 @@ export class Scalper {
         "Limit:",
         hedgePrice
       );
-      await this.client.placePerpOrder2(
-        mangoGroup,
-        mangoAccount,
-        perpMarket,
-        this.owner,
-        hedgeSide,
-        hedgePrice,
-        Math.abs(hedgeDeltaClip),
-        {
-          orderType: "limit",
-          expiryTimestamp: getUnixTs() + twapInterval - 1,
-          clientOrderId: deltaOrderId,
-        }
-      );
+      try {
+        await this.client.placePerpOrder2(
+          mangoGroup,
+          mangoAccount,
+          perpMarket,
+          this.owner,
+          hedgeSide,
+          hedgePrice,
+          Math.abs(hedgeDeltaClip),
+          {
+            orderType: "limit",
+            expiryTimestamp: getUnixTs() + twapInterval - 1,
+            clientOrderId: deltaOrderId,
+          }
+        );
+      } catch (err) {
+        console.log(err);
+      }
       hedgeCount++;
       // Wait the twapInterval of time to see if WS gets any fill message
       console.log(
@@ -378,26 +382,34 @@ export class Scalper {
     const gammaBidID = orderIdGamma + 1;
     const gammaAsk = fairValue * (1 + stdDevSpread);
     const gammaAskID = orderIdGamma + 2;
-    await this.client.placePerpOrder2(
-      mangoGroup,
-      mangoAccount,
-      perpMarket,
-      this.owner,
-      "buy",
-      gammaBid,
-      netGamma,
-      { orderType: "postOnly", clientOrderId: gammaBidID }
-    );
-    await this.client.placePerpOrder2(
-      mangoGroup,
-      mangoAccount,
-      perpMarket,
-      this.owner,
-      "sell",
-      gammaAsk,
-      netGamma,
-      { orderType: "postOnly", clientOrderId: gammaAskID }
-    );
+    try{
+      await this.client.placePerpOrder2(
+        mangoGroup,
+        mangoAccount,
+        perpMarket,
+        this.owner,
+        "buy",
+        gammaBid,
+        netGamma,
+        { orderType: "postOnly", clientOrderId: gammaBidID }
+      );
+    } catch (err) {
+      console.log(err);
+    }
+    try{
+      await this.client.placePerpOrder2(
+        mangoGroup,
+        mangoAccount,
+        perpMarket,
+        this.owner,
+        "sell",
+        gammaAsk,
+        netGamma,
+        { orderType: "postOnly", clientOrderId: gammaAskID }
+      );
+    } catch (err) {
+      console.log(err);
+    }
     console.log(this.symbol, "Gamma Bid", gammaBid, "ID", gammaBidID);
     console.log(this.symbol, "Gamma Ask", gammaAsk, "ID", gammaAskID);
   }

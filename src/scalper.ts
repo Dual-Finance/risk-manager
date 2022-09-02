@@ -147,6 +147,20 @@ export class Scalper {
 
     // Determine if hedge needs to buy or sell delta
     const hedgeSide = hedgeDeltaTotal < 0 ? "buy" : "sell";
+    console.log(
+      this.symbol,
+      "Target Delta Hedge:",
+      hedgeSide,
+      hedgeDeltaTotal*-1,
+      "DIP Delta:",
+      dipTotalDelta,
+      "Mango Delta:",
+      mangoDelta,
+      "Fair Value:", 
+      fairValue
+    );
+
+    await this.cancelStaleOrders(mangoAccount, mangoGroup, perpMarket);
     
     // Check if Delta Hedge is greater than min tick size
     if (Math.abs(hedgeDeltaTotal * fairValue) < (this.tickSize * fairValue)) {
@@ -160,24 +174,10 @@ export class Scalper {
         ? await perpMarket.loadAsks(this.connection)
         : await perpMarket.loadBids(this.connection);
 
-    await this.cancelStaleOrders(mangoAccount, mangoGroup, perpMarket);
-
     // Delta Hedging Orders, send limit orders through book that should fill
     let hedgeDeltaClip: number;
     let hedgePrice: number;
     let deltaOrderId = (new Date().getTime())*2;
-    console.log(
-      this.symbol,
-      "Target Delta Hedge:",
-      hedgeSide,
-      hedgeDeltaTotal*-1,
-      "DIP Delta:",
-      dipTotalDelta,
-      "Mango Delta:",
-      mangoDelta,
-      "Fair Value:", 
-      fairValue
-    );
 
     // Break up order depending on whether the book can support it
       hedgeDeltaClip =
@@ -263,6 +263,7 @@ export class Scalper {
         );
       } catch (err) {
         console.log(err);
+        console.log(err.stack);
       }
       hedgeCount++;
       // Wait the twapInterval of time to see if WS gets any fill message
@@ -395,6 +396,7 @@ export class Scalper {
       );
     } catch (err) {
       console.log(err);
+      console.log(err.stack);
     }
     try{
       await this.client.placePerpOrder2(
@@ -409,6 +411,7 @@ export class Scalper {
       );
     } catch (err) {
       console.log(err);
+      console.log(err.stack);
     }
     console.log(this.symbol, "Gamma Bid", gammaBid, "ID", gammaBidID);
     console.log(this.symbol, "Gamma Ask", gammaAsk, "ID", gammaAskID);
@@ -423,12 +426,17 @@ export class Scalper {
     if (openOrders.length > 0) {
       for (const order of openOrders) {
         if (order.marketIndex == this.marketIndex) {
-          await this.client.cancelAllPerpOrders(
-            mangoGroup,
-            [perpMarket],
-            mangoAccount,
-            this.owner
-          );
+          try{
+            await this.client.cancelAllPerpOrders(
+              mangoGroup,
+              [perpMarket],
+              mangoAccount,
+              this.owner
+            );
+          } catch (err) {
+            console.log(err);
+            console.log(err.stack);
+          }
           console.log(this.symbol,"Canceling Orders");
           break;
         }

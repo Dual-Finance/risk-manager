@@ -423,12 +423,16 @@ export class Scalper {
     if (openOrders.length > 0) {
       for (const order of openOrders) {
         if (order.marketIndex == this.marketIndex) {
-          await this.client.cancelAllPerpOrders(
-            mangoGroup,
-            [perpMarket],
-            mangoAccount,
-            this.owner
-          );
+          try{
+            await this.client.cancelAllPerpOrders(
+              mangoGroup,
+              [perpMarket],
+              mangoAccount,
+              this.owner
+            );
+          } catch (err) {
+            console.log(err);
+          }
           console.log(this.symbol,"Canceling Orders");
           break;
         }

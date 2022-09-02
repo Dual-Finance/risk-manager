@@ -263,6 +263,7 @@ export class Scalper {
         );
       } catch (err) {
         console.log(err);
+        console.log(err.stack);
       }
       hedgeCount++;
       // Wait the twapInterval of time to see if WS gets any fill message
@@ -395,6 +396,7 @@ export class Scalper {
       );
     } catch (err) {
       console.log(err);
+      console.log(err.stack);
     }
     try{
       await this.client.placePerpOrder2(
@@ -409,6 +411,7 @@ export class Scalper {
       );
     } catch (err) {
       console.log(err);
+      console.log(err.stack);
     }
     console.log(this.symbol, "Gamma Bid", gammaBid, "ID", gammaBidID);
     console.log(this.symbol, "Gamma Ask", gammaAsk, "ID", gammaAskID);
@@ -432,6 +435,7 @@ export class Scalper {
             );
           } catch (err) {
             console.log(err);
+            console.log(err.stack);
           }
           console.log(this.symbol,"Canceling Orders");
           break;

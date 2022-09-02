@@ -232,8 +232,11 @@ export class Scalper {
         }
       };
       fillFeed.addEventListener('message', deltaFillListener);
-      console.log(this.symbol, "Listening For Delta Hedges")
-
+      if (fillFeed.readyState == 1) {
+        console.log(this.symbol, "Listening For Delta Hedges")
+      } else {
+        console.log(this.symbol, "Websocket State", fillFeed.readyState)
+      }
       console.log(
         this.symbol,
         hedgeSide,
@@ -376,7 +379,11 @@ export class Scalper {
       }
     };
     fillFeed.addEventListener('message', gammaFillListener);
-    console.log(this.symbol, "Listening For Gamma Scalps");
+    if (fillFeed.readyState == 1) {
+      console.log(this.symbol, "Listening For Gamma Scalps");
+    } else {
+      console.log(this.symbol, "Websocket State", fillFeed.readyState)
+    }
 
     // Place Gamma scalp bid & offer
     const gammaBid = fairValue * (1 - stdDevSpread);

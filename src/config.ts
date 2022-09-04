@@ -35,8 +35,12 @@ export const THEO_VOL_MAP = new Map<string, number> ([
   ['BTC', 0.60], ['ETH', 0.72], ['SOL', 0.84]
 ]);
 
-export const TickSize = new Map<string, number> ([
+export const MinContractSize = new Map<string, number> ([
   ['BTC', 0.0001], ['ETH', 0.001], ['SOL', 0.01]
+]);
+
+export const TickSize = new Map<string, number> ([
+  ['BTC', 0.1], ['ETH', 0.1], ['SOL', 0.01]
 ]);
 
 export const rfRate = 0.03; // Risk Free Rate of Return ~ T-Bill Rate

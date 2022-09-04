@@ -26,6 +26,7 @@ import {
   twapInterval,
   scalperWindow,
   zScore,
+  MinContractSize,
   TickSize,
   FILLS_URL,
   IS_DEV,
@@ -42,6 +43,7 @@ export class Scalper {
   owner: Keypair;
   symbol: string;
   impliedVol: number;
+  minSize: number;
   tickSize: number;
   perpMarketConfig;
   marketIndex: number;
@@ -64,7 +66,8 @@ export class Scalper {
 
     this.symbol = symbol;
     this.impliedVol = THEO_VOL_MAP.get(symbol);
-    this.tickSize = TickSize.get(symbol)
+    this.minSize = MinContractSize.get(symbol);
+    this.tickSize = TickSize.get(symbol);
   }
 
   async scalperMango(dipProduct: DIPDeposit[]): Promise<void> {
@@ -162,8 +165,8 @@ export class Scalper {
 
     await this.cancelStaleOrders(mangoAccount, mangoGroup, perpMarket);
     
-    // Check if Delta Hedge is greater than min tick size
-    if (Math.abs(hedgeDeltaTotal * fairValue) < (this.tickSize * fairValue)) {
+    // Check if Delta Hedge is greater than min contract size
+    if (Math.abs(hedgeDeltaTotal * fairValue) < (this.minSize * fairValue)) {
       console.log(this.symbol, "is Delta Netural");
       return;
     }
@@ -210,8 +213,8 @@ export class Scalper {
             (fillEvent.takerClientOrderId.toString() == deltaOrderId.toString())
           ) {
             let fillQty:number;
-            fillQty = hedgeSide == 'buy' ? fillEvent.quantity.toNumber()/100 : -1 * fillEvent.quantity.toNumber()/100;
-            let fillPrice = fillEvent.price.toNumber()/100;
+            fillQty = hedgeSide == 'buy' ? fillEvent.quantity.toNumber() * this.minSize : -1 * fillEvent.quantity.toNumber() * this.minSize;
+            let fillPrice = fillEvent.price.toNumber() * this.tickSize;
             hedgeDeltaTotal = hedgeDeltaTotal + fillQty;
             console.log(
               this.symbol,
@@ -278,7 +281,7 @@ export class Scalper {
       );
       for (let i=0; i<twapInterval; i++){
         // Check every second if further Delta Hedging required
-        if (Math.abs(hedgeDeltaTotal * fairValue) < (this.tickSize * fairValue)) {
+        if (Math.abs(hedgeDeltaTotal * fairValue) < (this.minSize * fairValue)) {
           fillFeed.removeEventListener('message', deltaFillListener);
           console.log(this.symbol, "Delta Hedge Complete");
           return;
@@ -336,7 +339,7 @@ export class Scalper {
       fairValue
     );
 
-    if ((netGamma * fairValue) < (this.tickSize * fairValue)){
+    if ((netGamma * fairValue) < (this.minSize * fairValue)){
       console.log(this.symbol, 'Gamma Hedge Too Small')
       return
     }

@@ -51,3 +51,4 @@ export const scalperWindow = 600; // Number of seconds for each gamma scalping w
 export const monthAdj = 1; // Adjustment since Date.UTC is zero based
 export const zScore = 1.282; // Corresponds to 80% CI
 export const fillScan = 1; // Number of seconds during twap intervals to check for websocket fills
+export const percentDrift = 0.05; // Percentage of time to allow drift of the timed actions

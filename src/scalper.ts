@@ -33,7 +33,7 @@ import {
   fillScan
 } from "./config";
 import { DIPDeposit } from "./common";
-import { readKeypair, sleepTime } from "./utils";
+import { readKeypair, sleepRandom } from "./utils";
 
 export class Scalper {
   client: MangoClient;
@@ -275,7 +275,7 @@ export class Scalper {
       // Wait the twapInterval of time to see if WS gets any fill message
       console.log(
         this.symbol,
-        "Scan Delta Fills for",
+        "Scan Delta Fills for ~",
         twapInterval,
         "seconds"
       );
@@ -286,7 +286,7 @@ export class Scalper {
           console.log(this.symbol, "Delta Hedge Complete");
           return;
         }
-        await sleepTime(fillScan);
+        await sleepRandom(fillScan);
       }
       fillFeed.removeEventListener('message', deltaFillListener);
       await this.deltaHedge(

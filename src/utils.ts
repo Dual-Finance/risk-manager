@@ -7,7 +7,7 @@ import {
   Token,
   TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
-import { wbtcPk, wethPk, wsolPk } from "./config";
+import { wbtcPk, wethPk, wsolPk, percentDrift } from "./config";
 
 export function readKeypair() {
   return JSON.parse(
@@ -16,10 +16,11 @@ export function readKeypair() {
   );
 }
 
-// Sleep Time Required
-export function sleepTime(period: number) {
+// Sleep Time with some slight randomness to the time
+export function sleepRandom(period: number) {
+  let randomDrift = (Math.random()* 2 -1) * period * percentDrift;
   return new Promise(function (resolve) {
-    setTimeout(resolve, period * 1_000);
+    setTimeout(resolve, (period + randomDrift) * 1_000);
   });
 }
 

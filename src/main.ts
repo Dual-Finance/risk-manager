@@ -1,9 +1,10 @@
 import { DIPDeposit } from "./common";
 import { Router } from "./router";
 import { Scalper } from "./scalper";
-import { IS_DEV, scalperWindow } from "./config";
+import { IS_DEV, percentDrift, scalperWindow, cluster } from "./config";
 
 async function main() {
+  console.log ('Risk Manager Running on', cluster, new Date().toUTCString())
   // Create scalpers
   const solScalper: Scalper = new Scalper("SOL");
   const btcScalper: Scalper = new Scalper("BTC");
@@ -63,7 +64,7 @@ async function main() {
         console.log(err);
         console.log(err.stack);
       }
-    }, 1_000 * scalperWindow
+    }, 1_000 * (scalperWindow + (((Math.random()*2) - 1) * scalperWindow * percentDrift))
   );
 }
 

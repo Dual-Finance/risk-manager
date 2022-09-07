@@ -5,7 +5,7 @@ export const ENVIRONMENT: string = IS_DEV ? "DEVNET" : "MAINNET";
 
 export const networkName = IS_DEV ? 'devnet.2' : 'mainnet.1';
 export const cluster = IS_DEV ? 'devnet' : 'mainnet-beta';
-export const API_URL = IS_DEV ? 'https://dual-rpc.com/devnet' : 'https://mango.rpcpool.com/6f7b66c979597f87cca334b8228b';
+export const API_URL = IS_DEV ? 'https://dual-rpc.com/devnet' : 'https://dual-rpc.com/mainnet';
 export const DUAL_API = IS_DEV ? 'https://dev.api.dual.finance' : 'https://api.dual.finance';
 export const WEBSOCKET_URL = IS_DEV ? 'https://api.devnet.solana.com' : 'https://api.mainnet-beta.solana.com';
 export const FILLS_URL = IS_DEV ? 'ws://api.mngo.cloud:2082' : 'ws://api.mngo.cloud:8080';

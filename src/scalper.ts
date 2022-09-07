@@ -145,6 +145,8 @@ export class Scalper {
     let perpAccount = mangoAccount.perpAccounts[this.marketIndex];
     let mangoDelta = perpAccount.getBasePositionUi(perpMarket);
 
+    // TODO get option vault spot position
+
     // Get Total Delta Position to hedge
     let hedgeDeltaTotal = mangoDelta + dipTotalDelta;
 
@@ -272,6 +274,16 @@ export class Scalper {
         console.log(err.stack);
       }
       hedgeCount++;
+
+      // Use loadFills() as a backup to websocket
+      let filledSize = await fillSize(perpMarket, this.connection, deltaOrderId);
+      let fillDeltaTotal = mangoDelta + dipTotalDelta + filledSize;
+      if (Math.abs(fillDeltaTotal * fairValue) < (this.minSize * fairValue)) {
+        fillFeed.removeEventListener('message', deltaFillListener);
+        console.log(this.symbol, "Delta Hedge Complete: Loaded Fills");
+        return;
+      }     
+
       // Wait the twapInterval of time to see if WS gets any fill message
       console.log(
         this.symbol,
@@ -283,7 +295,7 @@ export class Scalper {
         // Check every second if further Delta Hedging required
         if (Math.abs(hedgeDeltaTotal * fairValue) < (this.minSize * fairValue)) {
           fillFeed.removeEventListener('message', deltaFillListener);
-          console.log(this.symbol, "Delta Hedge Complete");
+          console.log(this.symbol, "Delta Hedge Complete: Websocket Fill");
           return;
         }
         await sleepRandom(fillScan);
@@ -542,4 +554,27 @@ function getDIPGamma(dipProduct: DIPDeposit[], fairValue: number, symbol: string
     gammaSum = gammaSum;
   }
   return gammaSum;
+}
+
+// Fill Size from any orders
+async function fillSize(
+  perpMarket: PerpMarket,
+  connection: Connection,
+  orderID: number
+) {
+  let filledQty = 0;
+  // Possible issue using loadFills instead of Websocket?
+  for (const fill of await perpMarket.loadFills(connection)) {
+    if (
+      fill.makerClientOrderId.toString() == orderID.toString() ||
+      fill.takerClientOrderId.toString() == orderID.toString()
+    ) {
+      if (fill.takerSide == "buy") {
+        filledQty = filledQty + fill.quantity;
+      } else if (fill.takerSide == "sell") {
+        filledQty = filledQty - fill.quantity;
+      }
+    }
+  }
+  return filledQty;
 }

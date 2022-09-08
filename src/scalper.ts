@@ -122,19 +122,19 @@ export class Scalper {
     hedgeCount: number
   ): Promise<void> {
     // Underlying price for delta calculation
-    let [mangoCache]: MangoCache[] = await loadPrices(
+    const [mangoCache]: MangoCache[] = await loadPrices(
       mangoGroup,
       this.connection
     );
 
-    let mangoAccount: MangoAccount = (
+    const mangoAccount: MangoAccount = (
       await this.client.getMangoAccountsForOwner(
         mangoGroup,
         this.owner.publicKey
       )
     )[0];
 
-    let fairValue = mangoGroup
+    const fairValue = mangoGroup
       .getPrice(this.marketIndex, mangoCache)
       .toNumber();
 
@@ -142,8 +142,8 @@ export class Scalper {
     const dipTotalDelta = getDIPDelta(dipProduct, fairValue, this.symbol);
 
     // Get Mango delta position
-    let perpAccount = mangoAccount.perpAccounts[this.marketIndex];
-    let mangoDelta = perpAccount.getBasePositionUi(perpMarket);
+    const perpAccount = mangoAccount.perpAccounts[this.marketIndex];
+    const mangoDelta = perpAccount.getBasePositionUi(perpMarket);
 
     // TODO get option vault spot position
 
@@ -180,12 +180,10 @@ export class Scalper {
         : await perpMarket.loadBids(this.connection);
 
     // Delta Hedging Orders, send limit orders through book that should fill
-    let hedgeDeltaClip: number;
-    let hedgePrice: number;
-    let deltaOrderId = (new Date().getTime())*2;
+    const deltaOrderId = (new Date().getTime())*2;
 
     // Break up order depending on whether the book can support it
-      hedgeDeltaClip =
+      const hedgeDeltaClip =
         hedgeDeltaTotal /
         orderSplice(
           hedgeDeltaTotal,
@@ -196,7 +194,7 @@ export class Scalper {
           perpMarket
         );
 
-      hedgePrice =
+      const hedgePrice =
         hedgeDeltaTotal < 0
           ? IS_DEV ? fairValue * (1 + slippageTolerance*hedgeCount) : fairValue * (1 + slippageTolerance)
           : IS_DEV ? fairValue * (1 - slippageTolerance*hedgeCount) : fairValue * (1 - slippageTolerance);
@@ -214,9 +212,8 @@ export class Scalper {
             (fillEvent.makerClientOrderId.toString() == deltaOrderId.toString()) ||
             (fillEvent.takerClientOrderId.toString() == deltaOrderId.toString())
           ) {
-            let fillQty:number;
-            fillQty = hedgeSide == 'buy' ? fillEvent.quantity.toNumber() * this.minSize : -1 * fillEvent.quantity.toNumber() * this.minSize;
-            let fillPrice = fillEvent.price.toNumber() * this.tickSize;
+            const fillQty = hedgeSide == 'buy' ? fillEvent.quantity.toNumber() * this.minSize : -1 * fillEvent.quantity.toNumber() * this.minSize;
+            const fillPrice = fillEvent.price.toNumber() * this.tickSize;
             hedgeDeltaTotal = hedgeDeltaTotal + fillQty;
             console.log(
               this.symbol,
@@ -276,8 +273,8 @@ export class Scalper {
       hedgeCount++;
 
       // Use loadFills() as a backup to websocket
-      let filledSize = await fillSize(perpMarket, this.connection, deltaOrderId);
-      let fillDeltaTotal = mangoDelta + dipTotalDelta + filledSize;
+      const filledSize = await fillSize(perpMarket, this.connection, deltaOrderId);
+      const fillDeltaTotal = mangoDelta + dipTotalDelta + filledSize;
       if (Math.abs(fillDeltaTotal * fairValue) < (this.minSize * fairValue)) {
         fillFeed.removeEventListener('message', deltaFillListener);
         console.log(this.symbol, "Delta Hedge Complete: Loaded Fills");
@@ -317,12 +314,12 @@ export class Scalper {
     fillFeed: WebSocket
   ): Promise<void> {
     // Underlying price for gamma calculation
-    let [mangoCache]: MangoCache[] = await loadPrices(
+    const [mangoCache]: MangoCache[] = await loadPrices(
       mangoGroup,
       this.connection
     );
 
-    let mangoAccount: MangoAccount = (
+    const mangoAccount: MangoAccount = (
       await this.client.getMangoAccountsForOwner(
         mangoGroup,
         this.owner.publicKey
@@ -332,10 +329,10 @@ export class Scalper {
     // Makes the recursive gamma scalps safer. Rerun will clear any stale orders. Allows only 2 gamma orders at any time
     await this.cancelStaleOrders(mangoAccount, mangoGroup, perpMarket);
 
-    let fairValue = mangoGroup
+    const fairValue = mangoGroup
       .getPrice(this.marketIndex, mangoCache)
       .toNumber();
-    let orderIdGamma = (new Date().getTime())*2;
+    const orderIdGamma = (new Date().getTime())*2;
     const dipTotalGamma = getDIPGamma(dipProduct, fairValue, this.symbol);
 
     // Calc scalperWindow std deviation spread from zScore & IV for gamma levels
@@ -444,7 +441,7 @@ export class Scalper {
     mangoGroup: MangoGroup,
     perpMarket: PerpMarket
   ): Promise<void> {
-    let openOrders = mangoAccount.getPerpOpenOrders();
+    const openOrders = mangoAccount.getPerpOpenOrders();
     if (openOrders.length > 0) {
       for (const order of openOrders) {
         if (order.marketIndex == this.marketIndex) {
@@ -468,7 +465,7 @@ export class Scalper {
 }
 
 async function loadPrices(mangoGroup: MangoGroup, connection: Connection) {
-  let [mangoCache]: [MangoCache] = await Promise.all([
+  const [mangoCache]: [MangoCache] = await Promise.all([
     mangoGroup.loadCache(connection),
   ]);
   return [mangoCache];

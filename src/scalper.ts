@@ -30,7 +30,9 @@ import {
   TickSize,
   FILLS_URL,
   IS_DEV,
-  fillScan
+  fillScan,
+  gammaThreshold,
+  maxHedges
 } from "./config";
 import { DIPDeposit } from "./common";
 import { readKeypair, sleepRandom } from "./utils";
@@ -167,9 +169,19 @@ export class Scalper {
 
     await this.cancelStaleOrders(mangoAccount, mangoGroup, perpMarket);
     
-    // Check if Delta Hedge is greater than min contract size
-    if (Math.abs(hedgeDeltaTotal * fairValue) < (this.minSize * fairValue)) {
-      console.log(this.symbol, "is Delta Netural");
+    // Check if Delta Hedge is greater than min gamma threshold
+    const dipTotalGamma = getDIPGamma(dipProduct, fairValue, this.symbol);
+    const stdDevSpread =
+      this.impliedVol / Math.sqrt((365 * 24 * 60 * 60) / scalperWindow) * zScore;
+    const deltaThreshold = Math.max(dipTotalGamma * stdDevSpread * fairValue * gammaThreshold, this.minSize);
+    console.log(this.symbol, "Delta Thershold", deltaThreshold);
+    if (Math.abs(hedgeDeltaTotal * fairValue) < (deltaThreshold * fairValue)) {
+      console.log(this.symbol, "is Delta Netural <", deltaThreshold);
+      return;
+    }
+
+    if (hedgeCount > maxHedges) {
+      console.log(this.symbol, "Max Hedges Execeeded");
       return;
     }
 
@@ -185,14 +197,14 @@ export class Scalper {
     // Break up order depending on whether the book can support it
       const hedgeDeltaClip =
         hedgeDeltaTotal /
-        orderSplice(
+        Math.min(orderSplice(
           hedgeDeltaTotal,
           fairValue,
           maxNotional,
           slippageTolerance,
           bookSide,
           perpMarket
-        );
+        ), maxHedges);
 
       const hedgePrice =
         hedgeDeltaTotal < 0
@@ -233,8 +245,8 @@ export class Scalper {
           }
         }
       };
-      fillFeed.addEventListener('message', deltaFillListener);
       if (fillFeed.readyState == 1) {
+        fillFeed.addEventListener('message', deltaFillListener);
         console.log(this.symbol, "Listening For Delta Hedges")
       } else {
         console.log(this.symbol, "Websocket State", fillFeed.readyState)
@@ -270,16 +282,7 @@ export class Scalper {
         console.log(err);
         console.log(err.stack);
       }
-      hedgeCount++;
-
-      // Use loadFills() as a backup to websocket
-      const filledSize = await fillSize(perpMarket, this.connection, deltaOrderId);
-      const fillDeltaTotal = mangoDelta + dipTotalDelta + filledSize;
-      if (Math.abs(fillDeltaTotal * fairValue) < (this.minSize * fairValue)) {
-        fillFeed.removeEventListener('message', deltaFillListener);
-        console.log(this.symbol, "Delta Hedge Complete: Loaded Fills");
-        return;
-      }     
+      hedgeCount++; 
 
       // Wait the twapInterval of time to see if WS gets any fill message
       console.log(
@@ -289,6 +292,14 @@ export class Scalper {
         "seconds"
       );
       for (let i=0; i<twapInterval; i++){
+        // Use loadFills() as a backup to websocket
+        const filledSize = await fillSize(perpMarket, this.connection, deltaOrderId);
+        const fillDeltaTotal = mangoDelta + dipTotalDelta + filledSize;
+        if (Math.abs(fillDeltaTotal * fairValue) < (this.minSize * fairValue)) {
+          fillFeed.removeEventListener('message', deltaFillListener);
+          console.log(this.symbol, "Delta Hedge Complete: Loaded Fills");
+          return;
+        }    
         // Check every second if further Delta Hedging required
         if (Math.abs(hedgeDeltaTotal * fairValue) < (this.minSize * fairValue)) {
           fillFeed.removeEventListener('message', deltaFillListener);

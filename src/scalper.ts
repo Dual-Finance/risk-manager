@@ -191,9 +191,6 @@ export class Scalper {
         ? await perpMarket.loadAsks(this.connection)
         : await perpMarket.loadBids(this.connection);
 
-    // Delta Hedging Orders, send limit orders through book that should fill
-    const deltaOrderId = (new Date().getTime())*2;
-
     // Break up order depending on whether the book can support it
       const hedgeDeltaClip =
         hedgeDeltaTotal /
@@ -211,6 +208,9 @@ export class Scalper {
           ? IS_DEV ? fairValue * (1 + slippageTolerance*hedgeCount) : fairValue * (1 + slippageTolerance)
           : IS_DEV ? fairValue * (1 - slippageTolerance*hedgeCount) : fairValue * (1 - slippageTolerance);
 
+      // Delta Hedging Orders, send limit orders through book that should fill
+      const deltaOrderId = (new Date().getTime())*2;
+      
       // Start listening for Delta Hedge Fills
       const deltaFillListener = async (event) => {
         const parsedEvent = JSON.parse(event.data);
@@ -292,6 +292,12 @@ export class Scalper {
         "seconds"
       );
       for (let i=0; i<twapInterval; i++){
+        // Check every second if further Delta Hedging required
+        if (Math.abs(hedgeDeltaTotal * fairValue) < (this.minSize * fairValue)) {
+          fillFeed.removeEventListener('message', deltaFillListener);
+          console.log(this.symbol, "Delta Hedge Complete: Websocket Fill");
+          return;
+        }
         // Use loadFills() as a backup to websocket
         const filledSize = await fillSize(perpMarket, this.connection, deltaOrderId);
         const fillDeltaTotal = mangoDelta + dipTotalDelta + filledSize;
@@ -300,12 +306,6 @@ export class Scalper {
           console.log(this.symbol, "Delta Hedge Complete: Loaded Fills");
           return;
         }    
-        // Check every second if further Delta Hedging required
-        if (Math.abs(hedgeDeltaTotal * fairValue) < (this.minSize * fairValue)) {
-          fillFeed.removeEventListener('message', deltaFillListener);
-          console.log(this.symbol, "Delta Hedge Complete: Websocket Fill");
-          return;
-        }
         await sleepRandom(fillScan);
       }
       fillFeed.removeEventListener('message', deltaFillListener);
@@ -343,7 +343,6 @@ export class Scalper {
     const fairValue = mangoGroup
       .getPrice(this.marketIndex, mangoCache)
       .toNumber();
-    const orderIdGamma = (new Date().getTime())*2;
     const dipTotalGamma = getDIPGamma(dipProduct, fairValue, this.symbol);
 
     // Calc scalperWindow std deviation spread from zScore & IV for gamma levels
@@ -363,6 +362,12 @@ export class Scalper {
       console.log(this.symbol, 'Gamma Hedge Too Small')
       return
     }
+
+    const orderIdGamma = (new Date().getTime())*2;
+    const gammaBid = fairValue * (1 - stdDevSpread);
+    const gammaBidID = orderIdGamma + 1;
+    const gammaAsk = fairValue * (1 + stdDevSpread);
+    const gammaAskID = orderIdGamma + 2;
 
     const gammaFillListener = (event) => {
       const parsedEvent = JSON.parse(event.data);
@@ -401,18 +406,14 @@ export class Scalper {
         }
       }
     };
-    fillFeed.addEventListener('message', gammaFillListener);
     if (fillFeed.readyState == 1) {
+      fillFeed.addEventListener('message', gammaFillListener);
       console.log(this.symbol, "Listening For Gamma Scalps");
     } else {
       console.log(this.symbol, "Websocket State", fillFeed.readyState)
     }
 
     // Place Gamma scalp bid & offer
-    const gammaBid = fairValue * (1 - stdDevSpread);
-    const gammaBidID = orderIdGamma + 1;
-    const gammaAsk = fairValue * (1 + stdDevSpread);
-    const gammaAskID = orderIdGamma + 2;
     try{
       await this.client.placePerpOrder2(
         mangoGroup,

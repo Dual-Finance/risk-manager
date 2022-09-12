@@ -15,7 +15,7 @@ import {
   PerpEventLayout,
   FillEvent,
 } from "@blockworks-foundation/mango-client";
-import { Keypair, Commitment, Connection } from "@solana/web3.js";
+import { Keypair, Commitment, Connection, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import configFile from "./ids.json";
 import {
   rfRate,
@@ -32,10 +32,13 @@ import {
   IS_DEV,
   fillScan,
   gammaThreshold,
-  maxHedges
+  maxHedges,
+  optionVaultPk,
+  riskManagerPk,
+  mangoTesterPk
 } from "./config";
 import { DIPDeposit } from "./common";
-import { readKeypair, sleepRandom } from "./utils";
+import { getAssociatedTokenAddress, readKeypair, sleepRandom, tokenToSplMint } from "./utils";
 
 export class Scalper {
   client: MangoClient;
@@ -145,12 +148,13 @@ export class Scalper {
 
     // Get Mango delta position
     const perpAccount = mangoAccount.perpAccounts[this.marketIndex];
-    const mangoDelta = perpAccount.getBasePositionUi(perpMarket);
+    const mangoPerpDelta = perpAccount.getBasePositionUi(perpMarket);
 
-    // TODO get option vault spot position
+    // Get all spot positions Option Vault, Risk Manager, Mango Tester
+    const spotDelta = await getSpotDelta(this.connection, this.symbol);
 
     // Get Total Delta Position to hedge
-    let hedgeDeltaTotal = mangoDelta + dipTotalDelta;
+    let hedgeDeltaTotal = mangoPerpDelta + dipTotalDelta + spotDelta;
 
     // Determine if hedge needs to buy or sell delta
     const hedgeSide = hedgeDeltaTotal < 0 ? "buy" : "sell";
@@ -159,10 +163,12 @@ export class Scalper {
       "Target Delta Hedge:",
       hedgeSide,
       hedgeDeltaTotal*-1,
-      "DIP Delta:",
+      "DIP Δ:",
       dipTotalDelta,
-      "Mango Delta:",
-      mangoDelta,
+      "Mango Perp Δ:",
+      mangoPerpDelta,
+      "Spot Δ:",
+      spotDelta,
       "Fair Value:", 
       fairValue
     );
@@ -174,7 +180,7 @@ export class Scalper {
     const stdDevSpread =
       this.impliedVol / Math.sqrt((365 * 24 * 60 * 60) / scalperWindow) * zScore;
     const deltaThreshold = Math.max(dipTotalGamma * stdDevSpread * fairValue * gammaThreshold, this.minSize);
-    console.log(this.symbol, "Delta Thershold", deltaThreshold);
+    console.log(this.symbol, "Δ Threshold", deltaThreshold);
     if (Math.abs(hedgeDeltaTotal * fairValue) < (deltaThreshold * fairValue)) {
       console.log(this.symbol, "is Delta Netural <", deltaThreshold);
       return;
@@ -210,7 +216,7 @@ export class Scalper {
 
       // Delta Hedging Orders, send limit orders through book that should fill
       const deltaOrderId = (new Date().getTime())*2;
-      
+
       // Start listening for Delta Hedge Fills
       const deltaFillListener = async (event) => {
         const parsedEvent = JSON.parse(event.data);
@@ -263,25 +269,25 @@ export class Scalper {
         "Limit:",
         hedgePrice
       );
-      try {
-        await this.client.placePerpOrder2(
-          mangoGroup,
-          mangoAccount,
-          perpMarket,
-          this.owner,
-          hedgeSide,
-          hedgePrice,
-          Math.abs(hedgeDeltaClip),
-          {
-            orderType: "limit",
-            expiryTimestamp: getUnixTs() + twapInterval - 1,
-            clientOrderId: deltaOrderId,
-          }
-        );
-      } catch (err) {
-        console.log(err);
-        console.log(err.stack);
-      }
+      // try {
+      //   await this.client.placePerpOrder2(
+      //     mangoGroup,
+      //     mangoAccount,
+      //     perpMarket,
+      //     this.owner,
+      //     hedgeSide,
+      //     hedgePrice,
+      //     Math.abs(hedgeDeltaClip),
+      //     {
+      //       orderType: "limit",
+      //       expiryTimestamp: getUnixTs() + twapInterval - 1,
+      //       clientOrderId: deltaOrderId,
+      //     }
+      //   );
+      // } catch (err) {
+      //   console.log(err);
+      //   console.log(err.stack);
+      // }
       hedgeCount++; 
 
       // Wait the twapInterval of time to see if WS gets any fill message
@@ -300,7 +306,7 @@ export class Scalper {
         }
         // Use loadFills() as a backup to websocket
         const filledSize = await fillSize(perpMarket, this.connection, deltaOrderId);
-        const fillDeltaTotal = mangoDelta + dipTotalDelta + filledSize;
+        const fillDeltaTotal = mangoPerpDelta + dipTotalDelta + spotDelta + filledSize;
         if (Math.abs(fillDeltaTotal * fairValue) < (this.minSize * fairValue)) {
           fillFeed.removeEventListener('message', deltaFillListener);
           console.log(this.symbol, "Delta Hedge Complete: Loaded Fills");
@@ -352,7 +358,7 @@ export class Scalper {
 
     console.log(
       this.symbol,
-      "Position Gamma:",
+      "Position Gamma Γ:",
       netGamma,
       "Fair Value",
       fairValue
@@ -586,4 +592,30 @@ async function fillSize(
     }
   }
   return filledQty;
+}
+
+// Get Spot Balance
+async function getSpotDelta(connection: Connection, symbol: string) {
+  let mainDelta = 0;
+  let tokenDelta = 0;
+  let spotDelta = 0;
+  let tokenDecimals = 1;
+  let accountList = [mangoTesterPk, optionVaultPk, riskManagerPk];
+  for (const account of accountList){
+    if (symbol == 'SOL'){
+      mainDelta = await connection.getBalance(account)/LAMPORTS_PER_SOL;
+    }
+    try{
+        const tokenAccount = await getAssociatedTokenAddress(tokenToSplMint(symbol), account);
+        const balance = await connection.getTokenAccountBalance(tokenAccount);
+        const tokenBalance = Number(balance.value.amount);
+        tokenDecimals = balance.value.decimals;
+        tokenDelta = tokenBalance/Math.pow(10,tokenDecimals);
+    } catch (err) {
+        tokenDelta = 0;
+    }
+    console.log(symbol, "Spot Δ", account.toString(), mainDelta, tokenDelta, spotDelta)
+    spotDelta = mainDelta + tokenDelta + spotDelta;
+  }
+  return spotDelta
 }

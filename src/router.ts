@@ -11,7 +11,7 @@ import {
   settlementWallet,
   usdcMintPk,
   dualMarketProgramID,
-  mmWalletPk,
+  optionVaultPk,
   OPTION_MINT_ADDRESS_SEED,
   PROTCOL_API_KEY,
 } from "./config";
@@ -197,7 +197,7 @@ export class Router {
     );
     const mmOptionAccount = await getAssociatedTokenAddress(
       optionMint,
-      mmWalletPk
+      optionVaultPk
     );
     const balance = await connection.getTokenAccountBalance(mmOptionAccount);
 
@@ -264,7 +264,7 @@ export class Router {
             );
           const mmOptionAccount = await getAssociatedTokenAddress(
             optionMint,
-            mmWalletPk
+            optionVaultPk
           );
 
           // Create a poller

@@ -78,7 +78,12 @@ export class Poller {
     };
 
     // Watch the vault spl token account
-    connection.onAccountChange(new PublicKey(address), callback);
+    try{
+      connection.onAccountChange(new PublicKey(address), callback);
+    } catch (err){
+      console.log(err);
+      console.log(err.stack);
+    }
   }
 }
 

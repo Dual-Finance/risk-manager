@@ -143,6 +143,8 @@ export class Scalper {
       .getPrice(this.marketIndex, mangoCache)
       .toNumber();
 
+    await this.cancelStaleOrders(mangoAccount, mangoGroup, perpMarket);
+
     // Calc DIP delta for new position
     const dipTotalDelta = getDIPDelta(dipProduct, fairValue, this.symbol);
 
@@ -177,8 +179,6 @@ export class Scalper {
       "Fair Value:", 
       fairValue
     );
-
-    await this.cancelStaleOrders(mangoAccount, mangoGroup, perpMarket);
     
     // Check if Delta Hedge is greater than min gamma threshold
     const dipTotalGamma = getDIPGamma(dipProduct, fairValue, this.symbol);
@@ -285,7 +285,6 @@ export class Scalper {
           Math.abs(hedgeDeltaClip),
           {
             orderType: "limit",
-            expiryTimestamp: getUnixTs() + twapInterval - 1,
             clientOrderId: deltaOrderId,
           }
         );

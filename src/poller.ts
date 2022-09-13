@@ -82,6 +82,7 @@ export class Poller {
       connection.onAccountChange(new PublicKey(address), callback);
     } catch (err){
       console.log(err);
+      console.log(err.stack);
     }
   }
 }

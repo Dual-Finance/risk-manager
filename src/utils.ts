@@ -7,7 +7,7 @@ import {
   Token,
   TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
-import { wbtcPk, wethPk, wsolPk, percentDrift } from "./config";
+import { soBTCPk, weETHPk, wSOLPk, percentDrift } from "./config";
 
 export function readKeypair() {
   return JSON.parse(
@@ -124,13 +124,13 @@ export function timeSinceMidDay() {
 }
 
 export function splMintToToken(splMint: PublicKey) {
-  if (splMint.toBase58() == wsolPk.toBase58()) {
+  if (splMint.toBase58() == wSOLPk.toBase58()) {
     return "SOL";
   }
-  if (splMint.toBase58() == wbtcPk.toBase58()) {
+  if (splMint.toBase58() == soBTCPk.toBase58()) {
     return "BTC";
   }
-  if (splMint.toBase58() == wethPk.toBase58()) {
+  if (splMint.toBase58() == weETHPk.toBase58()) {
     return "ETH";
   }
   return "UNKNOWN_TOKEN";
@@ -138,13 +138,13 @@ export function splMintToToken(splMint: PublicKey) {
 
 export function tokenToSplMint(token: string) {
   if (token == "SOL") {
-    return wsolPk;
+    return wSOLPk;
   }
   if (token == "BTC") {
-    return wbtcPk;
+    return soBTCPk;
   }
   if (token == "ETH") {
-    return wethPk;
+    return weETHPk;
   }
   return undefined;
 }

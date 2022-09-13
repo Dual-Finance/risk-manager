@@ -303,14 +303,6 @@ export class Scalper {
         "seconds"
       );
       for (let i=0; i<twapInterval; i++){
-        // Use loadFills() as a backup to websocket
-        const filledSize = await fillSize(perpMarket, this.connection, deltaOrderId);
-        const fillDeltaTotal = mangoDelta + dipTotalDelta + filledSize;
-        if (Math.abs(fillDeltaTotal * fairValue) < (this.minSize * fairValue)) {
-          fillFeed.removeEventListener('message', deltaFillListener);
-          console.log(this.symbol, "Delta Hedge Complete: Loaded Fills");
-          return;
-        }    
         // Check every second if further Delta Hedging required
         if (Math.abs(hedgeDeltaTotal * fairValue) < (this.minSize * fairValue)) {
           fillFeed.removeEventListener('message', deltaFillListener);

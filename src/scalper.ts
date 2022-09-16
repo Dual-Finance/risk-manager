@@ -105,19 +105,25 @@ export class Scalper {
     };
 
     let hedgeCount = 1;
-    await this.deltaHedge(
-      dipProduct,
-      mangoGroup,
-      perpMarket,
-      fillFeed, 
-      hedgeCount
-    );
-    await this.gammaScalp(
-      dipProduct,
-      mangoGroup,
-      perpMarket,
-      fillFeed
-    );
+    try {
+      await this.deltaHedge(
+        dipProduct,
+        mangoGroup,
+        perpMarket,
+        fillFeed, 
+        hedgeCount
+      );
+      await this.gammaScalp(
+        dipProduct,
+        mangoGroup,
+        perpMarket,
+        fillFeed
+      );
+    }
+    catch (err){
+      console.log(this.symbol, "Main Error", err)
+      console.log(this.symbol, "Main Error Detail", err.stack)  
+    }
   }
 
   async deltaHedge(
@@ -635,3 +641,7 @@ async function getSpotDelta(connection: Connection, symbol: string) {
   }
   return spotDelta
 }
+
+// process.on('unhandledRejection', (err: any, p: any) => {
+//   console.error(`Unhandled rejection: ${err} promise: ${p})`);
+// });

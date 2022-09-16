@@ -641,7 +641,3 @@ async function getSpotDelta(connection: Connection, symbol: string) {
   }
   return spotDelta
 }
-
-// process.on('unhandledRejection', (err: any, p: any) => {
-//   console.error(`Unhandled rejection: ${err} promise: ${p})`);
-// });

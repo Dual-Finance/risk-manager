@@ -272,14 +272,14 @@ export class Scalper {
       console.log(
         this.symbol,
         hedgeSide,
-        "#",
-        hedgeCount,
-        "-",
-        deltaOrderId,
         "Size:",
         Math.abs(hedgeDeltaClip),
         "Limit:",
-        hedgePrice
+        hedgePrice,
+        "#",
+        hedgeCount,
+        "ID",
+        deltaOrderId,
       );
       try {
         await this.client.placePerpOrder2(

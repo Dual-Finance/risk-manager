@@ -35,7 +35,8 @@ import {
   maxHedges,
   optionVaultPk,
   riskManagerPk,
-  mangoTesterPk
+  mangoTesterPk,
+  API_URL
 } from "./config";
 import { DIPDeposit } from "./common";
 import { getAssociatedTokenAddress, readKeypair, sleepRandom, tokenToSplMint } from "./utils";
@@ -58,7 +59,7 @@ export class Scalper {
     this.config = new Config(configFile);
     this.groupConfig = this.config.getGroupWithName(networkName) as GroupConfig;
     this.connection = new Connection(
-      this.config.cluster_urls[this.groupConfig.cluster],
+      API_URL,
       "processed" as Commitment
     );
     this.client = new MangoClient(
@@ -104,19 +105,25 @@ export class Scalper {
     };
 
     let hedgeCount = 1;
-    await this.deltaHedge(
-      dipProduct,
-      mangoGroup,
-      perpMarket,
-      fillFeed, 
-      hedgeCount
-    );
-    await this.gammaScalp(
-      dipProduct,
-      mangoGroup,
-      perpMarket,
-      fillFeed
-    );
+    try {
+      await this.deltaHedge(
+        dipProduct,
+        mangoGroup,
+        perpMarket,
+        fillFeed, 
+        hedgeCount
+      );
+      await this.gammaScalp(
+        dipProduct,
+        mangoGroup,
+        perpMarket,
+        fillFeed
+      );
+    }
+    catch (err){
+      console.log(this.symbol, "Main Error", err)
+      console.log(this.symbol, "Main Error Detail", err.stack)  
+    }
   }
 
   async deltaHedge(
@@ -160,6 +167,22 @@ export class Scalper {
 
     // Get Total Delta Position to hedge
     let hedgeDeltaTotal = mangoPerpDelta + dipTotalDelta + spotDelta + mangoSpotDelta;
+    
+    // Check if Delta Hedge is greater than min gamma threshold
+    const dipTotalGamma = getDIPGamma(dipProduct, fairValue, this.symbol);
+    const stdDevSpread =
+      this.impliedVol / Math.sqrt((365 * 24 * 60 * 60) / scalperWindow) * zScore;
+    const deltaThreshold = Math.max(dipTotalGamma * stdDevSpread * fairValue * gammaThreshold, this.minSize);
+    // console.log(this.symbol, "Δ Threshold", deltaThreshold);
+    if (Math.abs(hedgeDeltaTotal * fairValue) < (deltaThreshold * fairValue)) {
+      console.log(this.symbol, "is Delta Netural <", deltaThreshold);
+      return;
+    }
+
+    if (hedgeCount > maxHedges) {
+      console.log(this.symbol, "Max Hedges Execeeded");
+      return;
+    }
 
     // Determine if hedge needs to buy or sell delta
     const hedgeSide = hedgeDeltaTotal < 0 ? "buy" : "sell";
@@ -179,22 +202,6 @@ export class Scalper {
       "Fair Value:", 
       fairValue
     );
-    
-    // Check if Delta Hedge is greater than min gamma threshold
-    const dipTotalGamma = getDIPGamma(dipProduct, fairValue, this.symbol);
-    const stdDevSpread =
-      this.impliedVol / Math.sqrt((365 * 24 * 60 * 60) / scalperWindow) * zScore;
-    const deltaThreshold = Math.max(dipTotalGamma * stdDevSpread * fairValue * gammaThreshold, this.minSize);
-    // console.log(this.symbol, "Δ Threshold", deltaThreshold);
-    if (Math.abs(hedgeDeltaTotal * fairValue) < (deltaThreshold * fairValue)) {
-      console.log(this.symbol, "is Delta Netural <", deltaThreshold);
-      return;
-    }
-
-    if (hedgeCount > maxHedges) {
-      console.log(this.symbol, "Max Hedges Execeeded");
-      return;
-    }
 
     // Fetch proper orderbook
     const bookSide =
@@ -265,14 +272,13 @@ export class Scalper {
       console.log(
         this.symbol,
         hedgeSide,
-        "#",
-        hedgeCount,
-        "-",
-        deltaOrderId,
-        "Size:",
         Math.abs(hedgeDeltaClip),
         "Limit:",
-        hedgePrice
+        hedgePrice,
+        "#",
+        hedgeCount,
+        "ID",
+        deltaOrderId,
       );
       try {
         await this.client.placePerpOrder2(
@@ -379,6 +385,7 @@ export class Scalper {
     const gammaAsk = fairValue * (1 + stdDevSpread);
     const gammaAskID = orderIdGamma + 2;
 
+    fillFeed.removeAllListeners('message');
     const gammaFillListener = (event) => {
       const parsedEvent = JSON.parse(event.data);
       if (
@@ -424,6 +431,9 @@ export class Scalper {
     }
 
     // Place Gamma scalp bid & offer
+    // TODO monitor error and decide if retry immediately
+    let bidAttempts = 0;
+    while (bidAttempts < 3) {
     try{
       await this.client.placePerpOrder2(
         mangoGroup,
@@ -435,10 +445,15 @@ export class Scalper {
         netGamma,
         { orderType: "postOnly", clientOrderId: gammaBidID }
       );
+        break;
     } catch (err) {
-      console.log(err);
-      console.log(err.stack);
+        console.log(this.symbol, "Gamma Bid", bidAttempts, err);
+        console.log(this.symbol, "Gamma Bid Details", err.stack);
+        bidAttempts++
     }
+    }
+    let askAttempts = 0;
+    while (askAttempts < 3) { 
     try{
       await this.client.placePerpOrder2(
         mangoGroup,
@@ -450,9 +465,12 @@ export class Scalper {
         netGamma,
         { orderType: "postOnly", clientOrderId: gammaAskID }
       );
+        break;
     } catch (err) {
-      console.log(err);
-      console.log(err.stack);
+        console.log(this.symbol, "Gamma Ask", askAttempts, err);
+        console.log(this.symbol, "Gamma Ask Details",err.stack);
+        askAttempts++
+      }
     }
     console.log(this.symbol, "Gamma Bid", gammaBid, "ID", gammaBidID);
     console.log(this.symbol, "Gamma Ask", gammaAsk, "ID", gammaAskID);
@@ -468,6 +486,7 @@ export class Scalper {
       for (const order of openOrders) {
         if (order.marketIndex == this.marketIndex) {
           try{
+            console.log(this.symbol,"Canceling Orders");
             await this.client.cancelAllPerpOrders(
               mangoGroup,
               [perpMarket],
@@ -478,7 +497,6 @@ export class Scalper {
             console.log(err);
             console.log(err.stack);
           }
-          console.log(this.symbol,"Canceling Orders");
           break;
         }
       }

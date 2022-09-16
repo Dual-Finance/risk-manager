@@ -272,7 +272,6 @@ export class Scalper {
       console.log(
         this.symbol,
         hedgeSide,
-        "Size:",
         Math.abs(hedgeDeltaClip),
         "Limit:",
         hedgePrice,
@@ -432,6 +431,7 @@ export class Scalper {
     }
 
     // Place Gamma scalp bid & offer
+    // TODO monitor error and decide if retry immediately
     let bidAttempts = 0;
     while (bidAttempts < 3) {
     try{

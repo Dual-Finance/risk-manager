@@ -96,57 +96,6 @@ export class Router {
         signature: calculated_hash,
       };
 
-      const key = web3.Keypair.fromSecretKey(
-        // @ts-ignore
-        Uint8Array.from(protocolKeypair.default)
-      );
-      const connection = new web3.Connection(web3.clusterApiUrl("devnet"));
-
-      const [optionMint] =
-        await findProgramAddressWithMintAndStrikeAndExpiration(
-          OPTION_MINT_ADDRESS_SEED,
-          dip_deposit.strike * 1_000_000,
-          dip_deposit.expirationMs / 1_000,
-          tokenToSplMint(dip_deposit.splToken),
-          usdcMintPk,
-          dualMarketProgramID
-        );
-      const myToken = new splToken.Token(
-        connection,
-        optionMint,
-        splToken.TOKEN_PROGRAM_ID,
-        key
-      );
-      const fromTokenAccount = await myToken.getOrCreateAssociatedAccountInfo(
-        key.publicKey
-      );
-      const toTokenAccount = await myToken.getOrCreateAssociatedAccountInfo(
-        settlementWallet
-      );
-
-      const transaction = new web3.Transaction().add(
-        splToken.Token.createTransferInstruction(
-          splToken.TOKEN_PROGRAM_ID,
-          fromTokenAccount.address,
-          toTokenAccount.address,
-          key.publicKey,
-          [],
-          Math.floor(dip_deposit.qty * 1_000_000)
-        )
-      );
-      try {
-        console.log("Sending on chain move of options");
-        await web3.sendAndConfirmTransaction(
-          connection,
-          transaction,
-          [key]
-        );
-      } catch (err) {
-        // Do not send the order to the API if the token move fails.
-        console.log(err);
-        return;
-      }
-
       console.log("Creating api order for buy", data);
       const response = await fetch(`${DUAL_API}/orders/createorder`, {
         method: "post",

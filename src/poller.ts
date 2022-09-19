@@ -56,7 +56,7 @@ export class Poller {
         // ETH
         case 'Hccuen6RkUgEvyL9oSXW8ai9QiQaAiL8ESaqjp9oymBf':
         case '2FPyTwcZLUg1MDrwsyoP4D6s1tM7hAkHYRjkNb5w6Pxk':
-          decimals = 7;
+          decimals = 6;
           break;
         // SOL
         case 'So11111111111111111111111111111111111111112':

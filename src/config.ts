@@ -20,8 +20,8 @@ export const soBTCPk = new PublicKey(
   "9n4nbM75f5Ui33ZbPYXn59EwSgE8CGsHtAeTH5YFeJ9E"
 );
 
-export const weETHPk = new PublicKey(
-  "7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs"
+export const soETHPk = new PublicKey(
+  "2FPyTwcZLUg1MDrwsyoP4D6s1tM7hAkHYRjkNb5w6Pxk"
 );
 
 export const dualMarketProgramID = new PublicKey(

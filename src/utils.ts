@@ -7,7 +7,7 @@ import {
   Token,
   TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
-import { soBTCPk, weETHPk, wSOLPk, percentDrift } from "./config";
+import { soBTCPk, soETHPk, wSOLPk, percentDrift } from "./config";
 
 export function readKeypair() {
   return JSON.parse(
@@ -130,7 +130,7 @@ export function splMintToToken(splMint: PublicKey) {
   if (splMint.toBase58() == soBTCPk.toBase58()) {
     return "BTC";
   }
-  if (splMint.toBase58() == weETHPk.toBase58()) {
+  if (splMint.toBase58() == soETHPk.toBase58()) {
     return "ETH";
   }
   return "UNKNOWN_TOKEN";
@@ -144,7 +144,7 @@ export function tokenToSplMint(token: string) {
     return soBTCPk;
   }
   if (token == "ETH") {
-    return weETHPk;
+    return soETHPk;
   }
   return undefined;
 }

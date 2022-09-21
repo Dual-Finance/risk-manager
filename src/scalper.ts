@@ -440,7 +440,7 @@ export class Scalper {
         "buy",
         gammaBid,
         netGamma,
-        { orderType: "postOnlySlide", clientOrderId: gammaBidID }
+        { orderType: "postOnly", clientOrderId: gammaBidID }
       );
       console.log(this.symbol, "Gamma Bid", gammaBid, "ID", gammaBidID);
     } catch (err) {
@@ -456,7 +456,7 @@ export class Scalper {
         "sell",
         gammaAsk,
         netGamma,
-        { orderType: "postOnlySlide", clientOrderId: gammaAskID }
+        { orderType: "postOnly", clientOrderId: gammaAskID }
       );
       console.log(this.symbol, "Gamma Ask", gammaAsk, "ID", gammaAskID);
     } catch (err) {

@@ -431,9 +431,6 @@ export class Scalper {
     }
 
     // Place Gamma scalp bid & offer
-    // TODO monitor error and decide if retry immediately
-    let bidAttempts = 0;
-    while (bidAttempts < 3) {
     try{
       await this.client.placePerpOrder2(
         mangoGroup,
@@ -445,15 +442,11 @@ export class Scalper {
         netGamma,
         { orderType: "postOnly", clientOrderId: gammaBidID }
       );
-        break;
+      console.log(this.symbol, "Gamma Bid", gammaBid, "ID", gammaBidID);
     } catch (err) {
-        console.log(this.symbol, "Gamma Bid", bidAttempts, err);
-        console.log(this.symbol, "Gamma Bid Details", err.stack);
-        bidAttempts++
+        console.log(this.symbol, "Gamma Bid Error", err);
+        console.log(this.symbol, "Gamma Bid Error Details", err.stack);
     }
-    }
-    let askAttempts = 0;
-    while (askAttempts < 3) { 
     try{
       await this.client.placePerpOrder2(
         mangoGroup,
@@ -465,15 +458,11 @@ export class Scalper {
         netGamma,
         { orderType: "postOnly", clientOrderId: gammaAskID }
       );
-        break;
+      console.log(this.symbol, "Gamma Ask", gammaAsk, "ID", gammaAskID);
     } catch (err) {
-        console.log(this.symbol, "Gamma Ask", askAttempts, err);
-        console.log(this.symbol, "Gamma Ask Details",err.stack);
-        askAttempts++
+        console.log(this.symbol, "Gamma Ask Error", err);
+        console.log(this.symbol, "Gamma Ask Error Details",err.stack);
       }
-    }
-    console.log(this.symbol, "Gamma Bid", gammaBid, "ID", gammaBidID);
-    console.log(this.symbol, "Gamma Ask", gammaAsk, "ID", gammaAskID);
   }
 
   async cancelStaleOrders(

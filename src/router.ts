@@ -1,6 +1,4 @@
 import { Connection, PublicKey } from "@solana/web3.js";
-import * as splToken from "@solana/spl-token";
-import { web3 } from "@project-serum/anchor";
 import {
   DIPDeposit,
 } from "./common";
@@ -8,25 +6,25 @@ import {
   API_URL,
   cluster,
   DUAL_API,
-  settlementWallet,
   usdcMintPk,
   dualMarketProgramID,
   optionVaultPk,
   OPTION_MINT_ADDRESS_SEED,
   PROTCOL_API_KEY,
+  THEO_VOL_MAP,
 } from "./config";
 import { Poller } from "./poller";
 import {
   findProgramAddressWithMintAndStrikeAndExpiration,
   getAssociatedTokenAddress,
+  getPythPrice,
   parseDipState,
   splMintToToken,
-  tokenToSplMint,
 } from "./utils";
 import fetch from "cross-fetch";
-import * as protocolKeypair from "../mm-keypair.json";
 import * as apiSecret from "../apiSecret.json";
 const crypto = require("crypto");
+import { blackScholes } from 'black-scholes';
 
 export class Router {
   mm_callback: (d: DIPDeposit[]) => void;
@@ -75,9 +73,29 @@ export class Router {
         return;
       }
 
+      const currentPrice = getPythPrice(new PublicKey(dip_deposit.splToken));
+      const fractionOfYear = (Date.now() - dip_deposit.expirationMs) / 365 * 24 * 60 * 60 * 1_000;
+      const vol = THEO_VOL_MAP[dip_deposit.splToken] * 1.2;
+      const bvePrice = blackScholes(currentPrice, dip_deposit.strike / 1_000_000, fractionOfYear, vol, 0.01, 'call');
+
+      const price = order["price"];
+
+      if (bvePrice > price) {
+        // If the price is worse than the BVE, then do not use the MM, treat it
+        // like there is no MM bid.
+        console.log("Not routing to MM due to price:", bvePrice, price);
+        this.dips[
+          this.dip_to_string(
+            dip_deposit.expirationMs / 1_000,
+            dip_deposit.strike
+          )
+        ] = dip_deposit;
+        this.run_risk_manager();
+        return;
+      }
+
       const client_order_id = "clientOrderId" + Date.now();
       const side = "SELL";
-      const price = order["price"];
       const quantity = dip_deposit.qty;
       const secret = apiSecret['default'];
 

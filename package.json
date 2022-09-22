@@ -1,8 +1,10 @@
 {
   "dependencies": {
     "@blockworks-foundation/mango-client": "^3.6.11",
+    "@pythnetwork/client": "^2.8.0",
     "@solana/spl-token": "^0.1.8",
     "@solana/web3.js": "^1.50.1",
+    "black-scholes": "^1.1.0",
     "greeks": "^1.0.0",
     "websocket-ts": "^1.1.1"
   },
@@ -11,6 +13,9 @@
     "main": "npx ts-node src/main.ts"
   },
   "compilerOptions": {
-    "lib": ["es2021", "dom"]
+    "lib": [
+      "es2021",
+      "dom"
+    ]
   }
 }

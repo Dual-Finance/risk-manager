@@ -1,13 +1,14 @@
 import * as os from "os";
 import * as fs from "fs";
-import { PublicKey } from "@solana/web3.js";
+import { Connection, PublicKey } from "@solana/web3.js";
 import { utils } from "@project-serum/anchor";
 import {
   ASSOCIATED_TOKEN_PROGRAM_ID,
   Token,
   TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
-import { soBTCPk, soETHPk, wSOLPk, percentDrift } from "./config";
+import { soBTCPk, soETHPk, wSOLPk, percentDrift, API_URL, IS_DEV } from "./config";
+import { PythHttpClient, getPythProgramKeyForCluster } from "@pythnetwork/client";
 
 export function readKeypair() {
   return JSON.parse(
@@ -147,4 +148,32 @@ export function tokenToSplMint(token: string) {
     return soETHPk;
   }
   return undefined;
+}
+
+export function tokenToPythSymbol(token: string) {
+  if (token == "SOL") {
+    return 'Crypto.SOL/USD';
+  }
+  if (token == "BTC") {
+    return 'Crypto.BTC/USD';
+  }
+  if (token == "ETH") {
+    return 'Crypto.ETH/USD';
+  }
+  return undefined;
+}
+
+export async function getPythPrice(splMint: PublicKey) {
+  const connection: Connection = new Connection(API_URL);
+  const pythPublicKey = getPythProgramKeyForCluster(IS_DEV ? 'devnet': 'mainnet-beta');
+  const pythClient = new PythHttpClient(connection, pythPublicKey);
+  const data = await pythClient.getData();
+
+  for (let symbol of data.symbols) {
+    const price = data.productPrice.get(symbol)!;
+    if (tokenToPythSymbol(splMintToToken(splMint)) == symbol) {
+      return price.price;
+    }
+  }
+  return 0.0;
 }

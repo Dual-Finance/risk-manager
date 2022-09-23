@@ -75,15 +75,15 @@ export class Router {
 
       const currentPrice = getPythPrice(new PublicKey(dip_deposit.splToken));
       const fractionOfYear = (Date.now() - dip_deposit.expirationMs) / 365 * 24 * 60 * 60 * 1_000;
-      const vol = THEO_VOL_MAP[dip_deposit.splToken] * 1.2;
-      const bvePrice = blackScholes(currentPrice, dip_deposit.strike / 1_000_000, fractionOfYear, vol, 0.01, 'call');
+      const vol = THEO_VOL_MAP[dip_deposit.splToken] * (1.15 + Math.random() / 10);
+      const thresholdPrice = blackScholes(currentPrice, dip_deposit.strike / 1_000_000, fractionOfYear, vol, 0.01, 'call');
 
       const price = order["price"];
 
-      if (bvePrice > price) {
+      if (thresholdPrice > price) {
         // If the price is worse than the BVE, then do not use the MM, treat it
         // like there is no MM bid.
-        console.log("Not routing to MM due to price:", bvePrice, price);
+        console.log("Not routing to MM due to price:", thresholdPrice, price);
         this.dips[
           this.dip_to_string(
             dip_deposit.expirationMs / 1_000,

@@ -20,6 +20,7 @@ import {
   getPythPrice,
   parseDipState,
   splMintToToken,
+  tokenToSplMint,
 } from "./utils";
 import fetch from "cross-fetch";
 import * as apiSecret from "../apiSecret.json";
@@ -73,7 +74,7 @@ export class Router {
         return;
       }
 
-      const currentPrice = getPythPrice(new PublicKey(dip_deposit.splToken));
+      const currentPrice = getPythPrice(new PublicKey(tokenToSplMint(dip_deposit.splToken)));
       const fractionOfYear = (Date.now() - dip_deposit.expirationMs) / 365 * 24 * 60 * 60 * 1_000;
       const vol = THEO_VOL_MAP[dip_deposit.splToken] * (1.15 + Math.random() / 10);
       const thresholdPrice = blackScholes(currentPrice, dip_deposit.strike / 1_000_000, fractionOfYear, vol, 0.01, 'call');

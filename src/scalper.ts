@@ -490,17 +490,22 @@ export class Scalper {
   ): Promise<void> {
     const openOrders = mangoAccount.getPerpOpenOrders();
     if (openOrders.length > 0) {
-      try{
-        console.log(this.symbol,"Canceling Orders");
-        await this.client.cancelAllPerpOrders(
-          mangoGroup,
-          [perpMarket],
-          mangoAccount,
-          this.owner
-        );
-      } catch (err) {
-        console.log(err);
-        console.log(err.stack);
+      for (const order of openOrders) {
+        if (order.marketIndex == this.marketIndex) {
+          try{
+            console.log(this.symbol,"Canceling Orders");
+            await this.client.cancelAllPerpOrders(
+              mangoGroup,
+              [perpMarket],
+              mangoAccount,
+              this.owner
+            );
+          } catch (err) {
+            console.log(err);
+            console.log(err.stack);
+          }
+          break;
+        }
       }
     }
   }

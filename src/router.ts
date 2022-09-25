@@ -6,7 +6,6 @@ import {
   API_URL,
   cluster,
   DUAL_API,
-  usdcMintPk,
   dualMarketProgramID,
   optionVaultPk,
   OPTION_MINT_ADDRESS_SEED,
@@ -21,6 +20,7 @@ import {
   parseDipState,
   splMintToToken,
   tokenToSplMint,
+  tokenType,
 } from "./utils";
 import fetch from "cross-fetch";
 import * as apiSecret from "../apiSecret.json";
@@ -48,15 +48,16 @@ export class Router {
   // or risk_manager_callback
   route(dip_deposit: DIPDeposit): void {
     const date = new Date(dip_deposit.expirationMs);
-    const symbol = `${dip_deposit.splToken}.USDC.${date.getUTCFullYear()}-${
+    const symbol = `${dip_deposit.splToken}.${dip_deposit.premiumAsset}.${date.getUTCFullYear()}-${
       date.getUTCMonth() + 1
-    }-${date.getUTCDate()}.${dip_deposit.strike * 1_000_000}.UPSIDE.A.P`;
+    }-${date.getUTCDate()}.${dip_deposit.strike * 1_000_000}.${dip_deposit.type}.E.P`;
+    const type = dip_deposit.type;
     console.log("Routing for", symbol, "Deposit:", dip_deposit);
 
     // This happens after sending tokens to a MM. Exit early.
     if (dip_deposit.qty == 0) {
       this.dips[
-        this.dip_to_string(dip_deposit.expirationMs / 1_000, dip_deposit.strike)
+        this.dip_to_string(dip_deposit.expirationMs / 1_000, dip_deposit.strike, dip_deposit.type)
       ] = dip_deposit;
       this.run_risk_manager();
       return;
@@ -67,7 +68,8 @@ export class Router {
         this.dips[
           this.dip_to_string(
             dip_deposit.expirationMs / 1_000,
-            dip_deposit.strike
+            dip_deposit.strike,
+            dip_deposit.type
           )
         ] = dip_deposit;
         this.run_risk_manager();
@@ -77,7 +79,7 @@ export class Router {
       const currentPrice = getPythPrice(new PublicKey(tokenToSplMint(dip_deposit.splToken)));
       const fractionOfYear = (Date.now() - dip_deposit.expirationMs) / 365 * 24 * 60 * 60 * 1_000;
       const vol = THEO_VOL_MAP[dip_deposit.splToken] * (1.15 + Math.random() / 10);
-      const thresholdPrice = blackScholes(currentPrice, dip_deposit.strike / 1_000_000, fractionOfYear, vol, 0.01, 'call');
+      const thresholdPrice = blackScholes(currentPrice, dip_deposit.strike / 1_000_000, fractionOfYear, vol, 0.01, dip_deposit.type);
 
       const price = order["price"];
 
@@ -88,7 +90,8 @@ export class Router {
         this.dips[
           this.dip_to_string(
             dip_deposit.expirationMs / 1_000,
-            dip_deposit.strike
+            dip_deposit.strike,
+            dip_deposit.type
           )
         ] = dip_deposit;
         this.run_risk_manager();
@@ -152,7 +155,9 @@ export class Router {
   async add_dip(
     expirationSec: number,
     strike: number,
+    type: string,
     splMint: PublicKey,
+    premiumMint: PublicKey,
     connection: Connection
   ): Promise<void> {
     const [optionMint] = await findProgramAddressWithMintAndStrikeAndExpiration(
@@ -160,8 +165,9 @@ export class Router {
       strike * 1_000_000,
       expirationSec,
       splMint,
-      usdcMintPk,
-      dualMarketProgramID
+      premiumMint,
+      dualMarketProgramID,
+      type
     );
     const mmOptionAccount = await getAssociatedTokenAddress(
       optionMint,
@@ -169,18 +175,18 @@ export class Router {
     );
     const balance = await connection.getTokenAccountBalance(mmOptionAccount);
 
-    this.dips[this.dip_to_string(expirationSec, strike)] = {
+    this.dips[this.dip_to_string(expirationSec, strike, type)] = {
       splToken: splMintToToken(splMint),
-      premiumAsset: "USD",
+      premiumAsset: splMintToToken(premiumMint),
       expirationMs: expirationSec * 1_000,
       strike: strike,
-      type: "call",
+      type: tokenType(type),
       qty: Number(balance.value.uiAmount),
     };
   }
 
-  dip_to_string(expirationSec: number, strike: number): string {
-    return `Expiration:${expirationSec}_Strike:${strike}`;
+  dip_to_string(expirationSec: number, strike: number, type: string): string {
+    return `Expiration:${expirationSec}_Strike:${strike}_${type}`;
   }
 
   async refresh_dips() {
@@ -199,6 +205,9 @@ export class Router {
         const { expiration } = dipState;
         const expirationSec = expiration;
         const { splMint } = dipState;
+        const type = dipState.type;
+        const { premiumMint } = dipState;
+        const premiumAsset = splMintToToken(premiumMint);
 
         const durationMs = expirationSec * 1_000 - Date.now();
         if (durationMs < 0) {
@@ -207,12 +216,12 @@ export class Router {
 
         if (splMintToToken(splMint) == this.token) {
           const alreadyPolled: boolean =
-            this.dip_to_string(expirationSec, strike) in this.dips;
+            this.dip_to_string(expirationSec, strike, type) in this.dips;
 
           // Always run add_dip since it refreshes the values if the subscribe
           // fails. Can fail in devnet because some incorrectly defined DIPs.
           try {
-            await this.add_dip(expirationSec, strike, splMint, connection);
+            await this.add_dip(expirationSec, strike, type, splMint, premiumMint, connection);
           } catch (err) {
             continue;
           }
@@ -227,8 +236,9 @@ export class Router {
               strike * 1_000_000,
               expiration,
               splMint,
-              usdcMintPk,
-              dualMarketProgramID
+              premiumMint,
+              dualMarketProgramID,
+              type
             );
           const mmOptionAccount = await getAssociatedTokenAddress(
             optionMint,
@@ -239,10 +249,10 @@ export class Router {
           const poller: Poller = new Poller(
             cluster,
             this.token,
-            "USD",
+            premiumAsset,
             expirationSec,
             strike,
-            "call",
+            type,
             (deposit: DIPDeposit) => {
               this.route(deposit);
             }

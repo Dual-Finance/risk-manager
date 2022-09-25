@@ -7,7 +7,7 @@ import {
   Token,
   TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
-import { soBTCPk, soETHPk, wSOLPk, percentDrift, API_URL, IS_DEV } from "./config";
+import { soBTCPk, soETHPk, wSOLPk, percentDrift, API_URL, IS_DEV, usdcMintPk } from "./config";
 import { PythHttpClient, getPythProgramKeyForCluster } from "@pythnetwork/client";
 
 export function readKeypair() {
@@ -61,9 +61,11 @@ export function parseDipState(buf: Buffer) {
   const vaultSplBump = Number(buf.readUInt8(121));
   const optionMint = new PublicKey(buf.slice(122, 154));
   const optionBump = Number(buf.readUInt8(154));
-  const vaultUsdc = new PublicKey(buf.slice(155, 187));
-  const vaultUsdcBump = Number(buf.readUInt8(187));
-  const usdcMint = new PublicKey(buf.slice(188, 220));
+  const vaultPremium = new PublicKey(buf.slice(155, 187));
+  const vaultPremiumBump = Number(buf.readUInt8(187));
+  const premiumMint = new PublicKey(buf.slice(188, 220));
+  const type = String(buf.slice(188, 220));
+  const premiumAsset = String(buf.slice(188, 220));
   return {
     strike,
     expiration,
@@ -74,9 +76,11 @@ export function parseDipState(buf: Buffer) {
     vaultSplBump,
     optionMint,
     optionBump,
-    vaultUsdc,
-    vaultUsdcBump,
-    usdcMint,
+    vaultPremium,
+    vaultPremiumBump,
+    premiumMint,
+    type,
+    premiumAsset
   };
 }
 
@@ -85,8 +89,9 @@ export async function findProgramAddressWithMintAndStrikeAndExpiration(
   strikePrice: number,
   expiration: number,
   splMint: PublicKey,
-  usdcMint: PublicKey,
-  programId: PublicKey
+  premiumMint: PublicKey,
+  programId: PublicKey,
+  type: string
 ) {
   return PublicKey.findProgramAddress(
     [
@@ -94,7 +99,8 @@ export async function findProgramAddressWithMintAndStrikeAndExpiration(
       toBytes(strikePrice),
       toBytes(expiration),
       splMint.toBuffer(),
-      usdcMint.toBuffer(),
+      premiumMint.toBuffer(),
+      Buffer.from(utils.bytes.utf8.encode(type))
     ],
     programId
   );
@@ -141,6 +147,9 @@ export function splMintToToken(splMint: PublicKey) {
   if (splMint.toBase58() == soETHPk.toBase58()) {
     return "ETH";
   }
+  if (splMint.toBase58() == usdcMintPk.toBase58()) {
+    return "USDC";
+  }
   return "UNKNOWN_TOKEN";
 }
 
@@ -183,4 +192,14 @@ export async function getPythPrice(splMint: PublicKey) {
     }
   }
   return 0.0;
+}
+
+export function tokenType(type: string) {
+  if (type == "Upside") {
+    return "call";
+  }
+  if (type == "Downside") {
+    return "put";
+  }
+  return undefined;
 }

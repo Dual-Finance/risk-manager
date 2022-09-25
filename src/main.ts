@@ -74,7 +74,7 @@ async function main() {
         console.log(err);
         console.log(err.stack);
       }
-    }, 1_000 * (scalperWindow + (((Math.random()*2) - 1) * scalperWindow * percentDrift))
+    }, 1_000 * (scalperWindow + (((Math.random()*2) - 1) * scalperWindow * percentDrift) - (2 * staggerTime))
   );
 }
 

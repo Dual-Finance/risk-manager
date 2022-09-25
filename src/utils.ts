@@ -25,6 +25,13 @@ export function sleepRandom(period: number) {
   });
 }
 
+// Sleep Exact Amount of Time
+export function sleepExact(period: number) {
+  return new Promise(function (resolve) {
+    setTimeout(resolve, period * 1_000);
+  });
+}
+
 export function readBigUInt64LE(buffer: Buffer, offset = 0) {
   const first = buffer[offset];
   const last = buffer[offset + 7];

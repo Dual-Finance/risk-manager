@@ -36,10 +36,11 @@ import {
   optionVaultPk,
   riskManagerPk,
   mangoTesterPk,
-  API_URL
+  API_URL,
+  percentDrift
 } from "./config";
 import { DIPDeposit } from "./common";
-import { getAssociatedTokenAddress, readKeypair, sleepRandom, tokenToSplMint } from "./utils";
+import { getAssociatedTokenAddress, readKeypair, sleepExact, sleepRandom, tokenToSplMint } from "./utils";
 
 export class Scalper {
   client: MangoClient;
@@ -324,7 +325,19 @@ export class Scalper {
         }    
         await sleepRandom(fillScan);
       }
+      // Avoid overlap of replace orders and fills by checking one last time
+      if (Math.abs(hedgeDeltaTotal * fairValue) < (this.minSize * fairValue)) {
+        fillFeed.removeEventListener('message', deltaFillListener);
+        console.log(this.symbol, "Delta Hedge Complete: Websocket Fill");
+        return;
+      }
       fillFeed.removeEventListener('message', deltaFillListener);
+      const filledSize = await fillSize(perpMarket, this.connection, deltaOrderId);
+      const fillDeltaTotal = mangoPerpDelta + dipTotalDelta + spotDelta + mangoSpotDelta + filledSize;
+      if (Math.abs(fillDeltaTotal * fairValue) < (this.minSize * fairValue)) {
+        console.log(this.symbol, "Delta Hedge Complete: Loaded Fills");
+        return;
+      }
       await this.deltaHedge(
         dipProduct,
         mangoGroup,
@@ -462,7 +475,12 @@ export class Scalper {
     } catch (err) {
         console.log(this.symbol, "Gamma Ask Error", err);
         console.log(this.symbol, "Gamma Ask Error Details",err.stack);
-      }
+    }
+    
+    // Sleep for the max time of the reruns then kill thread
+    await sleepExact((1 + percentDrift) * scalperWindow);
+    console.log(this.symbol, "Remove stale gamma fill listener", gammaBidID, gammaAskID)
+    fillFeed.removeEventListener('message', gammaFillListener);
   }
 
   async cancelStaleOrders(

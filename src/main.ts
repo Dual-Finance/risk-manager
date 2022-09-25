@@ -1,7 +1,8 @@
 import { DIPDeposit } from "./common";
 import { Router } from "./router";
 import { Scalper } from "./scalper";
-import { IS_DEV, percentDrift, scalperWindow, cluster } from "./config";
+import { IS_DEV, percentDrift, scalperWindow, cluster, staggerTime } from "./config";
+import { sleepExact } from "./utils";
 
 async function main() {
   console.log ('Risk Manager Running on', cluster, new Date().toUTCString())
@@ -40,23 +41,32 @@ async function main() {
     'ETH'
   );
 
+  console.log('Run SOL Risk Manager', new Date().toUTCString());
   await solRouter.refresh_dips();
   solRouter.run_risk_manager();
   if (!IS_DEV) {
+    await sleepExact(staggerTime);
+    console.log('Run BTC Risk Manager', new Date().toUTCString());
     await btcRouter.refresh_dips();
     btcRouter.run_risk_manager();
+    await sleepExact(staggerTime);
+    console.log('Run ETH Risk Manager', new Date().toUTCString());
     await ethRouter.refresh_dips();
     ethRouter.run_risk_manager();
   }
 
   setInterval(async () => {
-      console.log('Rerun All Risk Managers', new Date().toUTCString());
       try {
+        console.log('Rerun SOL Risk Manager', new Date().toUTCString());
         await solRouter.refresh_dips();
         solRouter.run_risk_manager();
         if (!IS_DEV) {
+          await sleepExact(staggerTime);
+          console.log('Rerun BTC Risk Manager', new Date().toUTCString());
           await btcRouter.refresh_dips();
           btcRouter.run_risk_manager();
+          await sleepExact(staggerTime);
+          console.log('Rerun ETH Risk Manager', new Date().toUTCString());
           await ethRouter.refresh_dips();
           ethRouter.run_risk_manager();
         }
@@ -64,7 +74,7 @@ async function main() {
         console.log(err);
         console.log(err.stack);
       }
-    }, 1_000 * (scalperWindow + (((Math.random()*2) - 1) * scalperWindow * percentDrift))
+    }, 1_000 * (scalperWindow + (((Math.random()*2) - 1) * scalperWindow * percentDrift) - (2 * staggerTime))
   );
 }
 

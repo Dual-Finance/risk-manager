@@ -61,3 +61,4 @@ export const fillScan = 1; // Number of seconds during twap intervals to check f
 export const percentDrift = 0.05; // Percentage of time to allow drift of the timed actions
 export const gammaThreshold = 0.05; // Percentage of gamma to calc delta hedge threshold
 export const maxHedges = 10; // Maximum amount of orders to delta hedge across
+export const staggerTime = 30; // Seconds to wait between reruns of each product

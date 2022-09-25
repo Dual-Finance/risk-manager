@@ -467,7 +467,8 @@ export class Scalper {
     
     // Sleep for the max time of the reruns then kill thread
     await sleepExact((1 + percentDrift) * scalperWindow);
-    return;
+    console.log(this.symbol, "Remove stale gamma fill listener", gammaBidID, gammaAskID)
+    fillFeed.removeEventListener('message', gammaFillListener);
   }
 
   async cancelStaleOrders(

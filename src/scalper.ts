@@ -325,7 +325,19 @@ export class Scalper {
         }    
         await sleepRandom(fillScan);
       }
+      // Avoid overlap of replace orders and fills by checking one last time
+      if (Math.abs(hedgeDeltaTotal * fairValue) < (this.minSize * fairValue)) {
+        fillFeed.removeEventListener('message', deltaFillListener);
+        console.log(this.symbol, "Delta Hedge Complete: Websocket Fill");
+        return;
+      }
       fillFeed.removeEventListener('message', deltaFillListener);
+      const filledSize = await fillSize(perpMarket, this.connection, deltaOrderId);
+      const fillDeltaTotal = mangoPerpDelta + dipTotalDelta + spotDelta + mangoSpotDelta + filledSize;
+      if (Math.abs(fillDeltaTotal * fairValue) < (this.minSize * fairValue)) {
+        console.log(this.symbol, "Delta Hedge Complete: Loaded Fills");
+        return;
+      }
       await this.deltaHedge(
         dipProduct,
         mangoGroup,

@@ -41,55 +41,41 @@ async function main() {
     'ETH'
   );
 
+  console.log('Run SOL Risk Manager', new Date().toUTCString());
   await solRouter.refresh_dips();
   solRouter.run_risk_manager();
   if (!IS_DEV) {
     await sleepExact(staggerTime);
+    console.log('Run BTC Risk Manager', new Date().toUTCString());
     await btcRouter.refresh_dips();
     btcRouter.run_risk_manager();
     await sleepExact(staggerTime);
+    console.log('Run ETH Risk Manager', new Date().toUTCString());
     await ethRouter.refresh_dips();
     ethRouter.run_risk_manager();
   }
 
   setInterval(async () => {
-      console.log('Rerun SOL Risk Manager', new Date().toUTCString());
       try {
+        console.log('Rerun SOL Risk Manager', new Date().toUTCString());
         await solRouter.refresh_dips();
         solRouter.run_risk_manager();
+        if (!IS_DEV) {
+          await sleepExact(staggerTime);
+          console.log('Rerun BTC Risk Manager', new Date().toUTCString());
+          await btcRouter.refresh_dips();
+          btcRouter.run_risk_manager();
+          await sleepExact(staggerTime);
+          console.log('Rerun ETH Risk Manager', new Date().toUTCString());
+          await ethRouter.refresh_dips();
+          ethRouter.run_risk_manager();
+        }
       } catch (err) {
         console.log(err);
         console.log(err.stack);
       }
     }, 1_000 * (scalperWindow + (((Math.random()*2) - 1) * scalperWindow * percentDrift))
   );
-
-  if (!IS_DEV) {
-    await sleepExact(staggerTime);
-    setInterval(async () => {
-      console.log('Rerun BTC Risk Manager', new Date().toUTCString());
-      try {
-        await btcRouter.refresh_dips();
-        btcRouter.run_risk_manager();
-      } catch (err) {
-        console.log(err);
-        console.log(err.stack);
-      }
-    }, 1_000 * (scalperWindow + (((Math.random()*2) - 1) * scalperWindow * percentDrift))
-  );
-    await sleepExact(staggerTime);
-    setInterval(async () => {
-      console.log('Rerun ETH Risk Manager', new Date().toUTCString());
-      try {
-        await ethRouter.refresh_dips();
-        ethRouter.run_risk_manager();
-      } catch (err) {
-        console.log(err);
-        console.log(err.stack);
-      }
-      }, 1_000 * (scalperWindow + (((Math.random()*2) - 1) * scalperWindow * percentDrift))
-    );
-  }
 }
 
 main();

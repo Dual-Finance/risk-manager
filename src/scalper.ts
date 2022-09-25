@@ -36,10 +36,11 @@ import {
   optionVaultPk,
   riskManagerPk,
   mangoTesterPk,
-  API_URL
+  API_URL,
+  percentDrift
 } from "./config";
 import { DIPDeposit } from "./common";
-import { getAssociatedTokenAddress, readKeypair, sleepRandom, tokenToSplMint } from "./utils";
+import { getAssociatedTokenAddress, readKeypair, sleepExact, sleepRandom, tokenToSplMint } from "./utils";
 
 export class Scalper {
   client: MangoClient;
@@ -462,7 +463,11 @@ export class Scalper {
     } catch (err) {
         console.log(this.symbol, "Gamma Ask Error", err);
         console.log(this.symbol, "Gamma Ask Error Details",err.stack);
-      }
+    }
+    
+    // Sleep for the max time of the reruns then kill thread
+    await sleepExact((1 + percentDrift) * scalperWindow);
+    return;
   }
 
   async cancelStaleOrders(
@@ -472,17 +477,22 @@ export class Scalper {
   ): Promise<void> {
     const openOrders = mangoAccount.getPerpOpenOrders();
     if (openOrders.length > 0) {
-      try{
-        console.log(this.symbol,"Canceling Orders");
-        await this.client.cancelAllPerpOrders(
-          mangoGroup,
-          [perpMarket],
-          mangoAccount,
-          this.owner
-        );
-      } catch (err) {
-        console.log(err);
-        console.log(err.stack);
+      for (const order of openOrders) {
+        if (order.marketIndex == this.marketIndex) {
+          try{
+            console.log(this.symbol,"Canceling Orders");
+            await this.client.cancelAllPerpOrders(
+              mangoGroup,
+              [perpMarket],
+              mangoAccount,
+              this.owner
+            );
+          } catch (err) {
+            console.log(err);
+            console.log(err.stack);
+          }
+          break;
+        }
       }
     }
   }

@@ -1,11 +1,11 @@
 import { PublicKey } from "@solana/web3.js";
 
-export const IS_DEV: boolean = false;
+export const IS_DEV: boolean = true;
 export const ENVIRONMENT: string = IS_DEV ? "DEVNET" : "MAINNET";
 
 export const networkName = IS_DEV ? 'devnet.2' : 'mainnet.1';
 export const cluster = IS_DEV ? 'devnet' : 'mainnet-beta';
-export const API_URL = IS_DEV ? 'https://dual-rpc.com/devnet' : 'https://dual-rpc.com/mainnet';
+export const API_URL = IS_DEV ? 'https://mango.devnet.rpcpool.com' : 'https://dual-rpc.com/mainnet';
 export const DUAL_API = IS_DEV ? 'https://dev.api.dual.finance' : 'https://api.dual.finance';
 export const WEBSOCKET_URL = IS_DEV ? 'https://api.devnet.solana.com' : 'https://api.mainnet-beta.solana.com';
 export const FILLS_URL = IS_DEV ? 'ws://api.mngo.cloud:2082' : 'ws://v3.mngo.cloud:8080';
@@ -49,6 +49,8 @@ export const MinContractSize = new Map<string, number> ([
 export const TickSize = new Map<string, number> ([
   ['BTC', 0.1], ['ETH', 0.1], ['SOL', 0.01]
 ]);
+
+export const premiumAssets = ["USDC", "USDH"];
 
 export const rfRate = 0.03; // Risk Free Rate of Return ~ T-Bill Rate
 export const maxNotional = 10000; // Max hedging order size of $10,000

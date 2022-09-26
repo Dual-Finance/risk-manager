@@ -11,7 +11,6 @@ import {
   BookSide,
   PerpMarket,
   MangoGroup,
-  getUnixTs,
   PerpEventLayout,
   FillEvent,
 } from "@blockworks-foundation/mango-client";
@@ -40,7 +39,7 @@ import {
   percentDrift
 } from "./config";
 import { DIPDeposit } from "./common";
-import { getAssociatedTokenAddress, readKeypair, sleepExact, sleepRandom, tokenToSplMint } from "./utils";
+import { getAssociatedTokenAddress, getDIPType, readKeypair, sleepExact, sleepRandom, tokenToSplMint } from "./utils";
 
 export class Scalper {
   client: MangoClient;
@@ -532,7 +531,7 @@ function getDIPDelta(dipProduct: DIPDeposit[], fairValue: number, symbol: string
         yearsUntilMaturity,
         impliedVol,
         rfRate,
-        dip.type
+        getDIPType(dip)
       ) *
         dip.qty +
       deltaSum;
@@ -591,7 +590,7 @@ function getDIPGamma(dipProduct: DIPDeposit[], fairValue: number, symbol: string
         yearsUntilMaturity,
         impliedVol,
         rfRate,
-        dip.type
+        getDIPType(dip)
       ) *
         dip.qty +
       gammaSum;

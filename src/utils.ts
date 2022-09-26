@@ -7,8 +7,9 @@ import {
   Token,
   TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
-import { soBTCPk, soETHPk, wSOLPk, percentDrift, API_URL, IS_DEV, usdcMintPk } from "./config";
+import { soBTCPk, soETHPk, wSOLPk, percentDrift, API_URL, IS_DEV, usdcMintPk, premiumAssets } from "./config";
 import { PythHttpClient, getPythProgramKeyForCluster } from "@pythnetwork/client";
+import { DIPDeposit } from "./common";
 
 export function readKeypair() {
   return JSON.parse(
@@ -54,7 +55,7 @@ export function readBigUInt64LE(buffer: Buffer, offset = 0) {
 export function parseDipState(buf: Buffer) {
   const strike = Number(readBigUInt64LE(buf, 8));
   const expiration = Number(readBigUInt64LE(buf, 16));
-  const splMint = new PublicKey(buf.slice(24, 56));
+  const baseMint = new PublicKey(buf.slice(24, 56));
   const vaultMint = new PublicKey(buf.slice(56, 88));
   const vaultMintBump = Number(buf.readUInt8(88));
   const vaultSpl = new PublicKey(buf.slice(89, 121));
@@ -63,13 +64,12 @@ export function parseDipState(buf: Buffer) {
   const optionBump = Number(buf.readUInt8(154));
   const vaultPremium = new PublicKey(buf.slice(155, 187));
   const vaultPremiumBump = Number(buf.readUInt8(187));
-  const premiumMint = new PublicKey(buf.slice(188, 220));
-  const type = String(buf.slice(188, 220));
-  const premiumAsset = String(buf.slice(188, 220));
+  const quoteMint = new PublicKey(buf.slice(188, 220));
+  const quoteAsset = String(buf.slice(188, 220));
   return {
     strike,
     expiration,
-    splMint,
+    baseMint,
     vaultMint,
     vaultMintBump,
     vaultSpl,
@@ -78,9 +78,8 @@ export function parseDipState(buf: Buffer) {
     optionBump,
     vaultPremium,
     vaultPremiumBump,
-    premiumMint,
-    type,
-    premiumAsset
+    quoteMint,
+    quoteAsset
   };
 }
 
@@ -88,19 +87,17 @@ export async function findProgramAddressWithMintAndStrikeAndExpiration(
   seed: string,
   strikePrice: number,
   expiration: number,
-  splMint: PublicKey,
-  premiumMint: PublicKey,
+  baseMint: PublicKey,
+  quoteMint: PublicKey,
   programId: PublicKey,
-  type: string
 ) {
   return PublicKey.findProgramAddress(
     [
       Buffer.from(utils.bytes.utf8.encode(seed)),
       toBytes(strikePrice),
       toBytes(expiration),
-      splMint.toBuffer(),
-      premiumMint.toBuffer(),
-      Buffer.from(utils.bytes.utf8.encode(type))
+      baseMint.toBuffer(),
+      quoteMint.toBuffer(),
     ],
     programId
   );
@@ -137,17 +134,17 @@ export function timeSinceMidDay() {
   return diff;
 }
 
-export function splMintToToken(splMint: PublicKey) {
-  if (splMint.toBase58() == wSOLPk.toBase58()) {
+export function splMintToToken(baseMint: PublicKey) {
+  if (baseMint.toBase58() == wSOLPk.toBase58()) {
     return "SOL";
   }
-  if (splMint.toBase58() == soBTCPk.toBase58()) {
+  if (baseMint.toBase58() == soBTCPk.toBase58()) {
     return "BTC";
   }
-  if (splMint.toBase58() == soETHPk.toBase58()) {
+  if (baseMint.toBase58() == soETHPk.toBase58()) {
     return "ETH";
   }
-  if (splMint.toBase58() == usdcMintPk.toBase58()) {
+  if (baseMint.toBase58() == usdcMintPk.toBase58()) {
     return "USDC";
   }
   return "UNKNOWN_TOKEN";
@@ -179,7 +176,7 @@ export function tokenToPythSymbol(token: string) {
   return undefined;
 }
 
-export async function getPythPrice(splMint: PublicKey) {
+export async function getPythPrice(baseMint: PublicKey) {
   const connection: Connection = new Connection(API_URL);
   const pythPublicKey = getPythProgramKeyForCluster(IS_DEV ? 'devnet': 'mainnet-beta');
   const pythClient = new PythHttpClient(connection, pythPublicKey);
@@ -187,19 +184,45 @@ export async function getPythPrice(splMint: PublicKey) {
 
   for (let symbol of data.symbols) {
     const price = data.productPrice.get(symbol)!;
-    if (tokenToPythSymbol(splMintToToken(splMint)) == symbol) {
+    if (tokenToPythSymbol(splMintToToken(baseMint)) == symbol) {
       return price.price;
     }
   }
   return 0.0;
 }
 
-export function tokenType(type: string) {
-  if (type == "Upside") {
-    return "call";
+export function getDIPType(dip_deposit: DIPDeposit) {
+  for (let premium of premiumAssets){
+    if (dip_deposit.quoteAsset == premium) {
+      return "call";
+    }
+    if (dip_deposit.baseAsset == premium) {
+      return "put";
+    }
   }
-  if (type == "Downside") {
-    return "put";
+  return 'undefined';
+}
+
+export function getDIPDirection(dip_deposit: DIPDeposit) {
+  for (let premium of premiumAssets){
+    if (dip_deposit.quoteAsset == premium) {
+      return "Upside";
+    }
+    if (dip_deposit.baseAsset == premium) {
+      return "Downside";
+    }
   }
-  return undefined;
+  return 'undefined';
+}
+
+export function adjustStrike(dip_deposit: DIPDeposit) {
+  for (let premium of premiumAssets){
+    if (dip_deposit.quoteAsset == premium) {
+      return dip_deposit.strike;
+    }
+    if (dip_deposit.baseAsset == premium) {
+      return 1 / dip_deposit.strike;
+    }
+  }
+  return 0;
 }

@@ -12,28 +12,25 @@ import { WEBSOCKET_URL } from "./config";
 export class Poller {
   cluster: string;
   callback: (deposit: DIPDeposit) => void;
-  splToken: string;
-  premiumAsset: string;
+  baseAsset: string;
+  quoteAsset: string;
   expirationSec: number;
   strike: number;
-  type: string;
 
   constructor(
     cluster: string,
-    splToken: string,
-    premiumAsset: string,
+    baseAsset: string,
+    quoteAsset: string,
     expirationSec: number,
     strike: number,
-    type: string,
     callback: (deposit: DIPDeposit) => void
   ) {
     this.cluster = cluster;
     this.callback = callback;
-    this.splToken = splToken;
-    this.premiumAsset = premiumAsset;
+    this.baseAsset = baseAsset;
+    this.quoteAsset = quoteAsset;
     this.expirationSec = expirationSec;
     this.strike = strike;
-    this.type = type;
   }
 
   subscribe(address: string): void {
@@ -47,7 +44,7 @@ export class Poller {
       // @ts-ignore
       const new_amount = parseTokenAccount(accountInfo.data).amount.toNumber();
       let decimals = 6;
-      switch(this.splToken) {
+      switch(this.baseAsset) {
         // BTC
         case 'JDXktC6gbDXq4zuW3BT6ToSE7timShHQBL449ULDdoMv':
         case '9n4nbM75f5Ui33ZbPYXn59EwSgE8CGsHtAeTH5YFeJ9E':
@@ -67,11 +64,10 @@ export class Poller {
       }
 
       const dip_deposit = {
-        splToken: this.splToken,
-        premiumAsset: this.premiumAsset,
+        baseAsset: this.baseAsset,
+        quoteAsset: this.quoteAsset,
         expirationMs: this.expirationSec * 1_000,
         strike: this.strike,
-        type: this.type,
         qty: new_amount / Math.pow(10, decimals),
       };
       this.callback(dip_deposit);

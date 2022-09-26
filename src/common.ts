@@ -1,10 +1,9 @@
 import { PublicKey } from "@solana/web3.js";
 
 export interface DIPDeposit {
-  splToken: string;
-  premiumAsset: string;
+  baseAsset: string;
+  quoteAsset: string;
   expirationMs: number;
   strike: number;
-  type: string;
   qty: number;
 }

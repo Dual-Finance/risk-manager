@@ -22,6 +22,7 @@ import {
   tokenToSplMint,
   getDIPDirection,
   adjustStrike,
+  getDIPType,
 } from "./utils";
 import fetch from "cross-fetch";
 import * as apiSecret from "../apiSecret.json";
@@ -49,11 +50,10 @@ export class Router {
   // or risk_manager_callback
   route(dip_deposit: DIPDeposit): void {
     const date = new Date(dip_deposit.expirationMs);
-    const dipType = getDIPDirection(dip_deposit);
     const dipStrike = adjustStrike(dip_deposit);
     const symbol = `${dip_deposit.baseAsset}.${dip_deposit.quoteAsset}.${date.getUTCFullYear()}-${
       date.getUTCMonth() + 1
-    }-${date.getUTCDate()}.${dipStrike * 1_000_000}.${dipType}.E.P`;
+    }-${date.getUTCDate()}.${dipStrike * 1_000_000}.${getDIPDirection(dip_deposit)}.E.P`;
     console.log("Routing for", symbol, "Deposit:", dip_deposit);
 
     // This happens after sending tokens to a MM. Exit early.
@@ -80,7 +80,7 @@ export class Router {
       const currentPrice = getPythPrice(new PublicKey(tokenToSplMint(dip_deposit.baseAsset)));
       const fractionOfYear = (Date.now() - dip_deposit.expirationMs) / 365 * 24 * 60 * 60 * 1_000;
       const vol = THEO_VOL_MAP[dip_deposit.baseAsset] * (1.15 + Math.random() / 10);
-      const thresholdPrice = blackScholes(currentPrice, dipStrike / 1_000_000, fractionOfYear, vol, 0.01, dipType);
+      const thresholdPrice = blackScholes(currentPrice, dipStrike / 1_000_000, fractionOfYear, vol, 0.01, getDIPType(dip_deposit));
 
       const price = order["price"];
 

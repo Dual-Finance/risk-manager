@@ -45,6 +45,15 @@ export class Poller {
       const new_amount = parseTokenAccount(accountInfo.data).amount.toNumber();
       let decimals = 6;
       switch(this.baseAsset) {
+        // USDC
+        case 'HJiQv33nKujRmZQ3sJBSosXgCEmiHs3mG1yd9VcLawPM':
+        case 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v':
+          decimals = 6;
+          break;
+          // USDH
+        case 'USDH1SM1ojwWUga67PGrgFWUHibbjqMvuMaDkRJTgkX':
+            decimals = 6;
+            break;
         // BTC
         case 'JDXktC6gbDXq4zuW3BT6ToSE7timShHQBL449ULDdoMv':
         case '9n4nbM75f5Ui33ZbPYXn59EwSgE8CGsHtAeTH5YFeJ9E':

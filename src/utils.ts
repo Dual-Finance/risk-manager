@@ -7,7 +7,7 @@ import {
   Token,
   TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
-import { soBTCPk, soETHPk, wSOLPk, percentDrift, API_URL, IS_DEV, usdcMintPk, premiumAssets } from "./config";
+import { soBTCPk, soETHPk, wSOLPk, percentDrift, API_URL, IS_DEV, usdcMintPk, premiumAssets, usdhMintPk } from "./config";
 import { PythHttpClient, getPythProgramKeyForCluster } from "@pythnetwork/client";
 import { DIPDeposit } from "./common";
 
@@ -147,6 +147,9 @@ export function splMintToToken(baseMint: PublicKey) {
   if (baseMint.toBase58() == usdcMintPk.toBase58()) {
     return "USDC";
   }
+  if (baseMint.toBase58() == usdhMintPk.toBase58()) {
+    return "USDH";
+  }
   return "UNKNOWN_TOKEN";
 }
 
@@ -159,6 +162,12 @@ export function tokenToSplMint(token: string) {
   }
   if (token == "ETH") {
     return soETHPk;
+  }
+  if (token == "USDC") {
+    return usdcMintPk;
+  }
+  if (token == "USDH") {
+    return usdhMintPk;
   }
   return undefined;
 }
@@ -200,6 +209,7 @@ export function getDIPType(dip_deposit: DIPDeposit) {
       return "put";
     }
   }
+  console.log("Unknown Premium Asset for DIP Type");
   return 'undefined';
 }
 
@@ -212,10 +222,12 @@ export function getDIPDirection(dip_deposit: DIPDeposit) {
       return "Downside";
     }
   }
+  console.log("Unknown Premium Asset for DIP Direction");
   return 'undefined';
 }
 
 export function adjustStrike(dip_deposit: DIPDeposit) {
+  // TOOD remove iteration
   for (let premium of premiumAssets){
     if (dip_deposit.quoteAsset == premium) {
       return dip_deposit.strike;
@@ -224,5 +236,6 @@ export function adjustStrike(dip_deposit: DIPDeposit) {
       return 1 / dip_deposit.strike;
     }
   }
+  console.log("Unknown Strike Based on Premium Asset");
   return 0;
 }

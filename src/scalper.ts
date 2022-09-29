@@ -37,7 +37,8 @@ import {
   riskManagerPk,
   mangoTesterPk,
   API_URL,
-  percentDrift
+  percentDrift,
+  DELTA_OFFSET
 } from "./config";
 import { DIPDeposit } from "./common";
 import { getAssociatedTokenAddress, readKeypair, sleepExact, sleepRandom, tokenToSplMint } from "./utils";
@@ -54,6 +55,7 @@ export class Scalper {
   tickSize: number;
   perpMarketConfig;
   marketIndex: number;
+  deltaOffset: number;
 
   constructor(symbol: string) {
     // Setup Client
@@ -75,6 +77,7 @@ export class Scalper {
     this.impliedVol = THEO_VOL_MAP.get(symbol);
     this.minSize = MinContractSize.get(symbol);
     this.tickSize = TickSize.get(symbol);
+    this.deltaOffset = DELTA_OFFSET.get(symbol);
   }
 
   async scalperMango(dipProduct: DIPDeposit[]): Promise<void> {
@@ -164,7 +167,7 @@ export class Scalper {
     // TODO Use getNetExposureByAsset()
 
     // Get all spot positions Option Vault, Risk Manager, Mango Tester
-    const spotDelta = await getSpotDelta(this.connection, this.symbol);
+    const spotDelta = await getSpotDelta(this.connection, this.symbol) + this.deltaOffset;
 
     // Get Total Delta Position to hedge
     let hedgeDeltaTotal = mangoPerpDelta + dipTotalDelta + spotDelta + mangoSpotDelta;

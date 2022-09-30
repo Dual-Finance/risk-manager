@@ -53,7 +53,7 @@ export const TickSize = new Map<string, number> ([
 // Adjust delta hedges for loans, negative values allow positive spot balances in mango
 // CAUTION! Turn off scalper, send funds to mango & update value before running!
 export const DELTA_OFFSET = new Map<string, number> ([
-  ['BTC', 0], ['ETH', 0], ['SOL', 0]
+  ['BTC', 0], ['ETH', 0], ['SOL', -100]
 ]);
 
 export const rfRate = 0.03; // Risk Free Rate of Return ~ T-Bill Rate

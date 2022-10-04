@@ -10,7 +10,7 @@ import {
   optionVaultPk,
   OPTION_MINT_ADDRESS_SEED,
   PROTCOL_API_KEY,
-  THEO_VOL_MAP,
+  rfRate,
 } from "./config";
 import { Poller } from "./poller";
 import {
@@ -23,6 +23,7 @@ import {
   getDIPDirection,
   adjustStrike,
   getDIPType,
+  getDIPVol
 } from "./utils";
 import fetch from "cross-fetch";
 import * as apiSecret from "../apiSecret.json";
@@ -79,8 +80,8 @@ export class Router {
 
       const currentPrice = getPythPrice(new PublicKey(tokenToSplMint(dip_deposit.baseAsset)));
       const fractionOfYear = (Date.now() - dip_deposit.expirationMs) / 365 * 24 * 60 * 60 * 1_000;
-      const vol = THEO_VOL_MAP[dip_deposit.baseAsset] * (1.15 + Math.random() / 10);
-      const thresholdPrice = blackScholes(currentPrice, dipStrike / 1_000_000, fractionOfYear, vol, 0.01, getDIPType(dip_deposit));
+      const vol = getDIPVol(dip_deposit);
+      const thresholdPrice = blackScholes(currentPrice, dipStrike / 1_000_000, fractionOfYear, vol, rfRate, getDIPType(dip_deposit));
 
       const price = order["price"];
 

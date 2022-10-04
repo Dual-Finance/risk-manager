@@ -7,7 +7,7 @@ import {
   Token,
   TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
-import { soBTCPk, soETHPk, wSOLPk, percentDrift, API_URL, IS_DEV, usdcMintPk, premiumAssets, usdhMintPk } from "./config";
+import { soBTCPk, soETHPk, wSOLPk, percentDrift, API_URL, IS_DEV, usdcMintPk, premiumAssets, usdhMintPk, THEO_VOL_MAP } from "./config";
 import { PythHttpClient, getPythProgramKeyForCluster } from "@pythnetwork/client";
 import { DIPDeposit } from "./common";
 
@@ -238,4 +238,20 @@ export function adjustStrike(dip_deposit: DIPDeposit) {
   }
   console.log("Unknown Strike Based on Premium Asset");
   return 0;
+}
+
+export function getDIPVol(dip_deposit: DIPDeposit) {
+  let vol = 0;
+  for (let premium of premiumAssets){
+    if (dip_deposit.quoteAsset == premium) {
+      vol = THEO_VOL_MAP[dip_deposit.baseAsset] * (1.15 + Math.random() / 10);
+      return vol;
+    }
+    if (dip_deposit.baseAsset == premium) {
+      vol = THEO_VOL_MAP[dip_deposit.quoteAsset] * (1.15 + Math.random() / 10);
+      return vol;
+    }
+  }
+  console.log("Unknown Premium Asset for DIP Type");
+  return vol;
 }

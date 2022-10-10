@@ -62,7 +62,7 @@ export class Scalper {
     this.config = new Config(configFile);
     this.groupConfig = this.config.getGroupWithName(networkName) as GroupConfig;
     this.connection = new Connection(
-      API_URL,
+      this.config.cluster_urls[this.groupConfig.cluster],
       "processed" as Commitment
     );
     this.client = new MangoClient(

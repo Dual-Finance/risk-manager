@@ -48,9 +48,12 @@ export class Router {
   // or risk_manager_callback
   route(dip_deposit: DIPDeposit): void {
     const date = new Date(dip_deposit.expirationMs);
-    const symbol = `${dip_deposit.splToken}.USDC.${date.getUTCFullYear()}-${
+
+    // TODO: Update this for other types of assets
+
+    const symbol = `${dip_deposit.splToken},USDC,${date.getUTCFullYear()}-${
       date.getUTCMonth() + 1
-    }-${date.getUTCDate()}.${dip_deposit.strike * 1_000_000}.UPSIDE.A.P`;
+    }-${date.getUTCDate()},${dip_deposit.strike * 1_000_000},UPSIDE,E,P`;
     console.log("Routing for", symbol, "Deposit:", dip_deposit);
 
     // This happens after sending tokens to a MM. Exit early.
@@ -58,6 +61,7 @@ export class Router {
       this.dips[
         this.dip_to_string(dip_deposit.expirationMs / 1_000, dip_deposit.strike)
       ] = dip_deposit;
+      console.log("DIP Deposit quantity zero");
       this.run_risk_manager();
       return;
     }
@@ -71,6 +75,7 @@ export class Router {
           )
         ] = dip_deposit;
         this.run_risk_manager();
+        console.log("No remaining quantity", order);
         return;
       }
 

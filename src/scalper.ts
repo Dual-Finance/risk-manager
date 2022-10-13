@@ -39,7 +39,7 @@ import {
   API_URL,
   percentDrift,
   DELTA_OFFSET,
-  MANGO_DOWNTIME,
+  MANGO_DOWNTIME_THRESHOLD,
 } from "./config";
 import { DIPDeposit } from "./common";
 import { getAssociatedTokenAddress, readKeypair, sleepExact, sleepRandom, tokenToSplMint } from "./utils";
@@ -100,7 +100,7 @@ export class Scalper {
       this.perpMarketConfig.quoteDecimals
     );
     // Check if Mango is live
-    if ((Date.now() - perpMarket.lastUpdated.toNumber()*1000) / (1000*60) > MANGO_DOWNTIME) {
+    if ((Date.now() - perpMarket.lastUpdated.toNumber()*1000) / (1000*60) > MANGO_DOWNTIME_THRESHOLD) {
       console.log(this.symbol, "Mango Down! Last Updated:", new Date(perpMarket.lastUpdated.toNumber()*1000))
       return;
     }

@@ -38,7 +38,8 @@ import {
   mangoTesterPk,
   API_URL,
   percentDrift,
-  DELTA_OFFSET
+  DELTA_OFFSET,
+  MANGO_DOWNTIME,
 } from "./config";
 import { DIPDeposit } from "./common";
 import { getAssociatedTokenAddress, readKeypair, sleepExact, sleepRandom, tokenToSplMint } from "./utils";
@@ -81,6 +82,11 @@ export class Scalper {
   }
 
   async scalperMango(dipProduct: DIPDeposit[]): Promise<void> {
+    if (MANGO_DOWNTIME) {
+      console.log(this.symbol, "Mango is Down")
+      return;
+    }
+
     this.perpMarketConfig = getMarketByBaseSymbolAndKind(
       this.groupConfig,
       this.symbol,

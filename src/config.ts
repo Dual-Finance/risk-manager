@@ -1,7 +1,6 @@
 import { PublicKey } from "@solana/web3.js";
 
 export const IS_DEV: boolean = false;
-export const MANGO_DOWNTIME: boolean = true;
 export const ENVIRONMENT: string = IS_DEV ? "DEVNET" : "MAINNET";
 
 export const networkName = IS_DEV ? 'devnet.2' : 'mainnet.1';
@@ -69,3 +68,4 @@ export const percentDrift = 0.05; // Percentage of time to allow drift of the ti
 export const gammaThreshold = 0.05; // Percentage of gamma to calc delta hedge threshold
 export const maxHedges = 10; // Maximum amount of orders to delta hedge across
 export const staggerTime = 30; // Seconds to wait between reruns of each product
+export const MANGO_DOWNTIME = 15; // Time in Minutes to stop routing transactions to Mango

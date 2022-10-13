@@ -82,11 +82,6 @@ export class Scalper {
   }
 
   async scalperMango(dipProduct: DIPDeposit[]): Promise<void> {
-    if (MANGO_DOWNTIME) {
-      console.log(this.symbol, "Mango is Down")
-      return;
-    }
-
     this.perpMarketConfig = getMarketByBaseSymbolAndKind(
       this.groupConfig,
       this.symbol,
@@ -104,7 +99,11 @@ export class Scalper {
       this.perpMarketConfig.baseDecimals,
       this.perpMarketConfig.quoteDecimals
     );
-
+    // Check if Mango is live
+    if ((Date.now() - perpMarket.lastUpdated.toNumber()*1000) / (1000*60) > MANGO_DOWNTIME) {
+      console.log(this.symbol, "Mango Down! Last Updated:", new Date(perpMarket.lastUpdated.toNumber()*1000))
+      return;
+    }
     // Open Mango Websocket
     const fillFeed = new WebSocket(FILLS_URL!);
     fillFeed.onopen = function(e) {

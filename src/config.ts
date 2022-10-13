@@ -1,11 +1,12 @@
 import { PublicKey } from "@solana/web3.js";
 
-export const IS_DEV: boolean = false;
+export const IS_DEV: boolean = true;
 export const ENVIRONMENT: string = IS_DEV ? "DEVNET" : "MAINNET";
 
 export const networkName = IS_DEV ? 'devnet.2' : 'mainnet.1';
 export const cluster = IS_DEV ? 'devnet' : 'mainnet-beta';
-export const API_URL = IS_DEV ? 'https://dual-rpc.com/devnet' : 'https://dual-rpc.com/mainnet';
+export const API_URL = IS_DEV ? 'https://solana-devnet.g.alchemy.com/v2/e5EQixWHc-n0F3JTe-ueWzKZIJDMYXTi' 
+  : 'https://solana-mainnet.g.alchemy.com/v2/GdkPP9kAPDUH_qVo8GQbUIoD32BZyAbA';
 export const DUAL_API = IS_DEV ? 'https://dev.api.dual.finance' : 'https://api.dual.finance';
 export const WEBSOCKET_URL = IS_DEV ? 'https://api.devnet.solana.com' : 'https://api.mainnet-beta.solana.com';
 export const FILLS_URL = IS_DEV ? 'ws://api.mngo.cloud:2082' : 'ws://v3.mngo.cloud:8080';
@@ -68,3 +69,4 @@ export const percentDrift = 0.05; // Percentage of time to allow drift of the ti
 export const gammaThreshold = 0.05; // Percentage of gamma to calc delta hedge threshold
 export const maxHedges = 10; // Maximum amount of orders to delta hedge across
 export const staggerTime = 30; // Seconds to wait between reruns of each product
+export const fundingThreshold = 0.25; // % Funding to switch to serum orders

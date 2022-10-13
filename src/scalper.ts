@@ -11,11 +11,11 @@ import {
   BookSide,
   PerpMarket,
   MangoGroup,
-  getUnixTs,
   PerpEventLayout,
   FillEvent,
 } from "@blockworks-foundation/mango-client";
 import { Keypair, Commitment, Connection, LAMPORTS_PER_SOL } from "@solana/web3.js";
+import { Market } from '@project-serum/serum';
 import configFile from "./ids.json";
 import {
   rfRate,
@@ -36,10 +36,10 @@ import {
   optionVaultPk,
   riskManagerPk,
   mangoTesterPk,
-  API_URL,
   percentDrift,
   DELTA_OFFSET,
   MANGO_DOWNTIME_THRESHOLD,
+  fundingThreshold,
 } from "./config";
 import { DIPDeposit } from "./common";
 import { getAssociatedTokenAddress, readKeypair, sleepExact, sleepRandom, tokenToSplMint } from "./utils";
@@ -104,6 +104,19 @@ export class Scalper {
       console.log(this.symbol, "Mango Down! Last Updated:", new Date(perpMarket.lastUpdated.toNumber()*1000))
       return;
     }
+
+    const spotMarketConfig = getMarketByBaseSymbolAndKind(
+      this.groupConfig,
+      this.symbol,
+      'spot',
+    );
+    const spotMarket = await Market.load(
+      this.connection,
+      spotMarketConfig.publicKey,
+      undefined,
+      this.groupConfig.serumProgramId,
+    );
+
     // Open Mango Websocket
     const fillFeed = new WebSocket(FILLS_URL!);
     fillFeed.onopen = function(e) {
@@ -119,6 +132,7 @@ export class Scalper {
         dipProduct,
         mangoGroup,
         perpMarket,
+        spotMarket,
         fillFeed, 
         hedgeCount
       );
@@ -139,6 +153,7 @@ export class Scalper {
     dipProduct: DIPDeposit[],
     mangoGroup: MangoGroup,
     perpMarket: PerpMarket,
+    spotMarket: Market,
     fillFeed: WebSocket,
     hedgeCount: number
   ): Promise<void> {
@@ -160,7 +175,14 @@ export class Scalper {
       .toNumber();
 
     await this.cancelStaleOrders(mangoAccount, mangoGroup, perpMarket);
-
+    
+    // Funding Rate to determine spot or perp order
+    const bidSide = await perpMarket.loadBids(this.connection)
+    const askSide = await perpMarket.loadAsks(this.connection)
+    const fundingRate = 24*365*perpMarket.getCurrentFundingRate(mangoGroup, mangoCache, this.marketIndex, bidSide, askSide)
+    console.log (this.symbol, "Perp Funding Rate", fundingRate);
+    const buySpot = fundingRate > fundingThreshold ? true : false;
+    const sellSpot = fundingRate*-1 < fundingThreshold ? true : false; 
     // Calc DIP delta for new position
     const dipTotalDelta = getDIPDelta(dipProduct, fairValue, this.symbol);
 
@@ -175,7 +197,7 @@ export class Scalper {
     const spotDelta = await getSpotDelta(this.connection, this.symbol) + this.deltaOffset;
 
     // Get Total Delta Position to hedge
-    let hedgeDeltaTotal = mangoPerpDelta + dipTotalDelta + spotDelta + mangoSpotDelta;
+    let hedgeDeltaTotal = IS_DEV ? 0.1 : mangoPerpDelta + dipTotalDelta + spotDelta + mangoSpotDelta;
     
     // Check if Delta Hedge is greater than min gamma threshold
     const dipTotalGamma = getDIPGamma(dipProduct, fairValue, this.symbol);
@@ -195,10 +217,19 @@ export class Scalper {
 
     // Determine if hedge needs to buy or sell delta
     const hedgeSide = hedgeDeltaTotal < 0 ? "buy" : "sell";
+    let hedgeProduct;
+    if (hedgeSide == "buy" && buySpot) {
+      hedgeProduct = "-SPOT";
+    } else if (hedgeSide == "sell" && sellSpot){
+      hedgeProduct = "-SPOT";
+    } else {
+      hedgeProduct = "-PERP";
+    }
     console.log(
       this.symbol,
       "Target Delta Hedge:",
       hedgeSide,
+      hedgeProduct,
       hedgeDeltaTotal*-1,
       "DIP Δ:",
       dipTotalDelta,
@@ -215,8 +246,8 @@ export class Scalper {
     // Fetch proper orderbook
     const bookSide =
       hedgeDeltaTotal < 0
-        ? await perpMarket.loadAsks(this.connection)
-        : await perpMarket.loadBids(this.connection);
+        ? askSide
+        : bidSide;
 
     // Break up order depending on whether the book can support it
       const hedgeDeltaClip =
@@ -243,7 +274,7 @@ export class Scalper {
         const parsedEvent = JSON.parse(event.data);
         if (
           parsedEvent['status'] === 'New' &&
-          parsedEvent['market'] === this.symbol.concat("-PERP")
+          parsedEvent['market'] === this.symbol.concat(hedgeProduct)
         ) {
           const fillBytes = Buffer.from(parsedEvent['event'], 'base64');
           const fillEvent: FillEvent = PerpEventLayout.decode(fillBytes).fill;
@@ -258,6 +289,7 @@ export class Scalper {
               this.symbol,
               'Delta Filled',
               hedgeSide,
+              hedgeProduct,
               "Qty",
               fillQty,
               "Price",
@@ -281,6 +313,7 @@ export class Scalper {
       console.log(
         this.symbol,
         hedgeSide,
+        hedgeProduct,
         Math.abs(hedgeDeltaClip),
         "Limit:",
         hedgePrice,
@@ -290,19 +323,35 @@ export class Scalper {
         deltaOrderId,
       );
       try {
-        await this.client.placePerpOrder2(
-          mangoGroup,
-          mangoAccount,
-          perpMarket,
-          this.owner,
-          hedgeSide,
-          hedgePrice,
-          Math.abs(hedgeDeltaClip),
-          {
-            orderType: "limit",
-            clientOrderId: deltaOrderId,
-          }
-        );
+        // SPOT order
+        if (hedgeProduct == "-SPOT"){
+          await this.client.placeSpotOrder2(
+            mangoGroup,
+            mangoAccount,
+            spotMarket,
+            this.owner,
+            hedgeSide,
+            hedgePrice,
+            Math.abs(hedgeDeltaClip),
+            "limit",
+            deltaOrderId,
+            true,
+          );
+        } else {
+          await this.client.placePerpOrder2(
+            mangoGroup,
+            mangoAccount,
+            perpMarket,
+            this.owner,
+            hedgeSide,
+            hedgePrice,
+            Math.abs(hedgeDeltaClip),
+            {
+              orderType: "limit",
+              clientOrderId: deltaOrderId,
+            }
+          );
+        }
       } catch (err) {
         console.log(err);
         console.log(err.stack);
@@ -350,6 +399,7 @@ export class Scalper {
         dipProduct,
         mangoGroup,
         perpMarket,
+        spotMarket,
         fillFeed,
         hedgeCount
       );
@@ -608,7 +658,7 @@ function getDIPGamma(dipProduct: DIPDeposit[], fairValue: number, symbol: string
   return gammaSum;
 }
 
-// Fill Size from any orders
+// Fill Size from any perp orders
 async function fillSize(
   perpMarket: PerpMarket,
   connection: Connection,
@@ -630,6 +680,7 @@ async function fillSize(
   }
   return filledQty;
 }
+// TODO spotFillSize()
 
 // Get Spot Balance
 async function getSpotDelta(connection: Connection, symbol: string) {

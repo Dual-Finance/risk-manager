@@ -99,6 +99,7 @@ export class Scalper {
       this.perpMarketConfig.baseDecimals,
       this.perpMarketConfig.quoteDecimals
     );
+    
     // Check if Mango is live
     if ((Date.now() - perpMarket.lastUpdated.toNumber()*1000) / (1000*60) > MANGO_DOWNTIME_THRESHOLD) {
       console.log(this.symbol, "Mango Down! Last Updated:", new Date(perpMarket.lastUpdated.toNumber()*1000))

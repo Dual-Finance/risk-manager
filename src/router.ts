@@ -85,6 +85,8 @@ export class Router {
       const thresholdPrice = blackScholes(currentPrice, dip_deposit.strike / 1_000_000, fractionOfYear, vol, 0.01, 'call');
 
       const price = order["price"];
+      // TODO: Test this to make sure the decimals are correct on each.
+      console.log("MM price:", price, "BVE price:", thresholdPrice);
 
       if (thresholdPrice > price) {
         // If the price is worse than the BVE, then do not use the MM, treat it
@@ -139,6 +141,7 @@ export class Router {
   }
 
   async fetchMMOrder(symbol: string): Promise<number> {
+    // TODO: Lookup in the pricing object on chain
     try {
       const order = (
         await (

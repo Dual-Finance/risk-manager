@@ -14,7 +14,7 @@ import {
   PerpEventLayout,
   FillEvent,
 } from "@blockworks-foundation/mango-client";
-import { Keypair, Commitment, Connection, LAMPORTS_PER_SOL } from "@solana/web3.js";
+import { Keypair, Commitment, Connection, LAMPORTS_PER_SOL, PublicKey, Account } from "@solana/web3.js";
 import { Market } from '@project-serum/serum';
 import configFile from "./ids.json";
 import {
@@ -43,6 +43,7 @@ import {
 } from "./config";
 import { DIPDeposit } from "./common";
 import { getAssociatedTokenAddress, readKeypair, sleepExact, sleepRandom, tokenToSplMint } from "./utils";
+import { DexMarket } from "@project-serum/serum-dev-tools";
 
 export class Scalper {
   client: MangoClient;
@@ -99,10 +100,11 @@ export class Scalper {
       this.perpMarketConfig.baseDecimals,
       this.perpMarketConfig.quoteDecimals
     );
-    
+
     // Check if Mango is live
     if ((Date.now() - perpMarket.lastUpdated.toNumber()*1000) / (1000*60) > MANGO_DOWNTIME_THRESHOLD) {
       console.log(this.symbol, "Mango Down! Last Updated:", new Date(perpMarket.lastUpdated.toNumber()*1000))
+      await this.scalperSerum()
       return;
     }
 
@@ -117,7 +119,7 @@ export class Scalper {
       undefined,
       this.groupConfig.serumProgramId,
     );
-
+    
     // Open Mango Websocket
     const fillFeed = new WebSocket(FILLS_URL!);
     fillFeed.onopen = function(e) {
@@ -148,6 +150,88 @@ export class Scalper {
       console.log(this.symbol, "Main Error", err)
       console.log(this.symbol, "Main Error Detail", err.stack)  
     }
+  }
+
+  async scalperSerum(): Promise<void> {
+    const spotMarketConfig = getMarketByBaseSymbolAndKind(
+      this.groupConfig,
+      this.symbol,
+      'spot',
+    );
+    const spotMarket = await Market.load(
+      this.connection,
+      spotMarketConfig.publicKey,
+      undefined,
+      this.groupConfig.serumProgramId,
+    );
+    
+    // Fetching orderbooks
+    let bids = await spotMarket.loadBids(this.connection);
+    let asks = await spotMarket.loadAsks(this.connection);
+    // L2 orderbook data
+    for (let [price, size] of bids.getL2(20)) {
+      console.log(price, size);
+    }
+    // Full orderbook data
+    for (let order of asks) {
+      console.log(
+        order.orderId,
+        order.price,
+        order.size,
+        order.side, // 'buy' or 'sell'
+      );
+    }
+    
+    // Placing orders
+    try{
+    await DexMarket.placeOrder(
+      this.connection, 
+      this.owner,
+      spotMarket,
+      'buy', // 'buy' or 'sell'
+      'limit',
+      0.1,
+      20,
+    );
+  } catch (err) {
+    console.log(err);
+    console.log(err.stack);
+  }
+    
+    // Retrieving open orders by owner
+    let myOrders = await spotMarket.loadOrdersForOwner(this.connection, this.owner.publicKey);
+    console.log(this.owner, "Open Orders", myOrders)
+    
+    // Cancelling orders
+    for (let order of myOrders) {
+      await DexMarket.cancelOrder(this.connection, this.owner, spotMarket, order);
+    }
+    
+    // Retrieving fills
+    for (let fill of await spotMarket.loadFills(this.connection)) {
+      console.log(fill.orderId, fill.price, fill.size, fill.side);
+    }
+    
+    // TODO Settle funds
+    // for (let openOrders of await DexMarket.getOrdersForOwner(
+    //   this.owner,
+    //   spotMarket,
+    //   this.connection,
+    // )) {
+    //   if (openOrders.baseTokenFree > 0 || openOrders.quoteTokenFree > 0) {
+    //     // spl-token accounts to which to send the proceeds from trades
+    //     let baseTokenAccount = new PublicKey('...');
+    //     let quoteTokenAccount = new PublicKey('...');
+    
+    //     await spotMarket.settleFunds(
+    //       this.connection,
+    //       accountOwner,
+    //       openOrders,
+    //       baseTokenAccount,
+    //       quoteTokenAccount,
+    //     );
+    //   }
+    // }
   }
 
   async deltaHedge(

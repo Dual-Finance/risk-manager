@@ -518,6 +518,7 @@ export class Scalper {
         fillFeed
       );
     */
+      // TODO: serum settlement
     }
     catch (err){
       console.log(this.symbol, "Main Error", err, err.stack)

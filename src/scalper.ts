@@ -587,6 +587,8 @@ export class Scalper {
   
     // Place an order to get delta neutral
     // TODO: Place this order and listen for the twap window until either it has gotten to neutral, or is not going to fill
+
+    // TODO: Consider whether order splicing is necessary
   }
 
 }

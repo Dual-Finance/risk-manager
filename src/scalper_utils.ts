@@ -139,8 +139,8 @@ export async function fillSize(
   }
   return filledQty;
 }
-// TODO spotFillSize()
 
+// TODO: Update this to also take into account the serum position
 // Get Spot Balance
 export async function getSpotDelta(connection: Connection, symbol: string) {
   let mainDelta = 0;
@@ -164,7 +164,6 @@ export async function getSpotDelta(connection: Connection, symbol: string) {
     } catch (err) {
       tokenDelta = 0;
     }
-    // console.log(symbol, "Spot Δ", account.toString(), mainDelta, tokenDelta, spotDelta)
     spotDelta = mainDelta + tokenDelta + spotDelta;
   }
   return spotDelta;

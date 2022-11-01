@@ -1,6 +1,6 @@
 import { PublicKey } from "@solana/web3.js";
 
-export const IS_DEV: boolean = true;
+export const IS_DEV: boolean = false;
 export const ENVIRONMENT: string = IS_DEV ? "DEVNET" : "MAINNET";
 
 export const networkName = IS_DEV ? 'devnet.2' : 'mainnet.1';
@@ -55,6 +55,9 @@ export const TickSize = new Map<string, number> ([
 export const DELTA_OFFSET = new Map<string, number> ([
   ['BTC', 0], ['ETH', 0], ['SOL', -100]
 ]);
+
+// TODO: Make this be the account that we are watching and match owner.publicKey no matter the other settings
+export const SERUM_ACCOUNT = "CkcJx7Uwgxck5zm3DqUp2N1ikkkoPn2wA8zf7oS4tFSZ";
 
 export const rfRate = 0.03; // Risk Free Rate of Return ~ T-Bill Rate
 export const maxNotional = 10000; // Max hedging order size of $10,000

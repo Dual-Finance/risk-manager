@@ -1,5 +1,3 @@
-// @ts-ignore
-import * as greeks from "greeks";
 import WebSocket from 'ws';
 import {
   Config,
@@ -8,17 +6,15 @@ import {
   MangoAccount,
   MangoClient,
   MangoCache,
-  BookSide,
   PerpMarket,
   MangoGroup,
   PerpEventLayout,
   FillEvent,
 } from "@blockworks-foundation/mango-client";
-import { Keypair, Commitment, Connection, LAMPORTS_PER_SOL, PublicKey, Account } from "@solana/web3.js";
+import { Keypair, Commitment, Connection } from "@solana/web3.js";
 import { Market } from '@project-serum/serum';
 import configFile from "./ids.json";
 import {
-  rfRate,
   networkName,
   THEO_VOL_MAP,
   maxNotional,
@@ -33,17 +29,15 @@ import {
   fillScan,
   gammaThreshold,
   maxHedges,
-  optionVaultPk,
-  riskManagerPk,
-  mangoTesterPk,
   percentDrift,
   DELTA_OFFSET,
   MANGO_DOWNTIME_THRESHOLD,
   fundingThreshold,
 } from "./config";
 import { DIPDeposit } from "./common";
-import { getAssociatedTokenAddress, readKeypair, sleepExact, sleepRandom, tokenToSplMint } from "./utils";
+import { readKeypair, sleepExact, sleepRandom, tokenToSplMint } from "./utils";
 import { DexMarket } from "@project-serum/serum-dev-tools";
+import { fillSize, getDIPDelta, getDIPGamma, getSpotDelta, loadPrices, orderSplice } from './scalper_utils';
 
 export class Scalper {
   client: MangoClient;
@@ -617,7 +611,7 @@ export class Scalper {
     );
     this.marketIndex = this.perpMarketConfig.marketIndex;
 
-    // Open Mango Websocket
+    // Open Serum Websocket
     const fillFeed = new WebSocket(FILLS_URL!);
     fillFeed.onopen = function(e) {
       console.log('Connected to Mango Websocket', new Date().toUTCString())
@@ -654,143 +648,4 @@ export class Scalper {
     // TODO Settle funds
   }
 
-}
-
-async function loadPrices(mangoGroup: MangoGroup, connection: Connection) {
-  const [mangoCache]: [MangoCache] = await Promise.all([
-    mangoGroup.loadCache(connection),
-  ]);
-  return [mangoCache];
-}
-
-function getDIPDelta(dipProduct: DIPDeposit[], fairValue: number, symbol: string) {
-  const impliedVol = THEO_VOL_MAP.get(symbol);
-  let yearsUntilMaturity: number;
-  let deltaSum = 0;
-  for (const dip of dipProduct) {
-    yearsUntilMaturity =
-      (dip.expirationMs - Date.now()) / (365 * 60 * 60 * 24 * 1_000);
-    deltaSum =
-      greeks.getDelta(
-        fairValue,
-        dip.strike,
-        yearsUntilMaturity,
-        impliedVol,
-        rfRate,
-        dip.type
-      ) *
-        dip.qty +
-      deltaSum;
-  }
-  return deltaSum;
-}
-
-// Splice delta hedge orders if available liquidity not supportive
-function orderSplice(
-  qty: number,
-  price: number,
-  notionalMax: number,
-  slippage: number,
-  side: BookSide,
-  market: PerpMarket
-) {
-  let spliceFactor:number;
-  const [_, nativeQty] = market.uiToNativePriceQuantity(0, qty);
-  if (qty > 0 && side.getImpactPriceUi(nativeQty) < price * (1 - slippage)) {
-    spliceFactor = Math.max((qty * price) / notionalMax, 1);
-    console.log(
-      "Sell Price Impact: ",
-      side.getImpactPriceUi(nativeQty),
-      "High Slippage!",
-      spliceFactor
-    );
-  } else if (
-    qty < 0 &&
-    side.getImpactPriceUi(nativeQty) > price * (1 + slippage)
-  ) {
-    spliceFactor = Math.max((qty * price) / notionalMax, 1);
-    console.log(
-      "Buy Price Impact: ",
-      side.getImpactPriceUi(nativeQty),
-      "High Slippage!",
-      spliceFactor
-    );
-  } else {
-    spliceFactor = 1;
-    console.log("Slippage Tolerable", side.getImpactPriceUi(nativeQty));
-  }
-  return spliceFactor
-}
-
-function getDIPGamma(dipProduct: DIPDeposit[], fairValue: number, symbol: string) {
-  const impliedVol = THEO_VOL_MAP.get(symbol);
-  let yearsUntilMaturity: number;
-  let gammaSum = 0;
-  for (const dip of dipProduct) {
-    yearsUntilMaturity =
-      (dip.expirationMs - Date.now()) / (365 * 60 * 60 * 24 * 1_000);
-    gammaSum =
-      greeks.getGamma(
-        fairValue,
-        dip.strike,
-        yearsUntilMaturity,
-        impliedVol,
-        rfRate,
-        dip.type
-      ) *
-        dip.qty +
-      gammaSum;
-    gammaSum = gammaSum;
-  }
-  return gammaSum;
-}
-
-// Fill Size from any perp orders
-async function fillSize(
-  perpMarket: PerpMarket,
-  connection: Connection,
-  orderID: number
-) {
-  let filledQty = 0;
-  // Possible issue using loadFills instead of Websocket?
-  for (const fill of await perpMarket.loadFills(connection)) {
-    if (
-      fill.makerClientOrderId.toString() == orderID.toString() ||
-      fill.takerClientOrderId.toString() == orderID.toString()
-    ) {
-      if (fill.takerSide == "buy") {
-        filledQty = filledQty + fill.quantity;
-      } else if (fill.takerSide == "sell") {
-        filledQty = filledQty - fill.quantity;
-      }
-    }
-  }
-  return filledQty;
-}
-// TODO spotFillSize()
-
-// Get Spot Balance
-async function getSpotDelta(connection: Connection, symbol: string) {
-  let mainDelta = 0;
-  let tokenDelta = 0;
-  let spotDelta = 0;
-  let tokenDecimals = 1;
-  let accountList = [mangoTesterPk, optionVaultPk, riskManagerPk];
-  for (const account of accountList){
-    if (symbol == 'SOL'){
-      mainDelta = await connection.getBalance(account)/LAMPORTS_PER_SOL;
-    }
-    try{
-        const tokenAccount = await getAssociatedTokenAddress(tokenToSplMint(symbol), account);
-        const balance = await connection.getTokenAccountBalance(tokenAccount);
-        const tokenBalance = Number(balance.value.amount);
-        tokenDecimals = balance.value.decimals;
-        tokenDelta = tokenBalance/Math.pow(10,tokenDecimals);
-    } catch (err) {
-        tokenDelta = 0;
-    }
-    // console.log(symbol, "Spot Δ", account.toString(), mainDelta, tokenDelta, spotDelta)
-    spotDelta = mainDelta + tokenDelta + spotDelta;
-  }
-  return spotDelta
 }

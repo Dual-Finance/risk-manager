@@ -16,7 +16,7 @@ async function main() {
       console.log("Route to MM", deposit);
     },
     (deposits: DIPDeposit[]) => {
-      solScalper.scalperMango(deposits);
+      solScalper.pickAndRunScalper(deposits);
     },
     'SOL'
   );
@@ -26,7 +26,7 @@ async function main() {
       console.log("Route to MM", deposit);
     },
     (deposits: DIPDeposit[]) => {
-      btcScalper.scalperMango(deposits);
+      btcScalper.pickAndRunScalper(deposits);
     },
     'BTC'
   );
@@ -36,7 +36,7 @@ async function main() {
       console.log("Route to MM", deposit);
     },
     (deposits: DIPDeposit[]) => {
-      ethScalper.scalperMango(deposits);
+      ethScalper.pickAndRunScalper(deposits);
     },
     'ETH'
   );

@@ -82,7 +82,8 @@ export class Scalper {
     this.deltaOffset = DELTA_OFFSET.get(symbol);
   }
 
-  async scalperMango(dipProduct: DIPDeposit[]): Promise<void> {
+  async pickAndRunScalper(dipProduct: DIPDeposit[]): Promise<void> {
+    console.log("Choosing scalper");
     this.perpMarketConfig = getMarketByBaseSymbolAndKind(
       this.groupConfig,
       this.symbol,
@@ -104,9 +105,33 @@ export class Scalper {
     // Check if Mango is live
     if ((Date.now() - perpMarket.lastUpdated.toNumber()*1000) / (1000*60) > MANGO_DOWNTIME_THRESHOLD) {
       console.log(this.symbol, "Mango Down! Last Updated:", new Date(perpMarket.lastUpdated.toNumber()*1000))
-      await this.scalperSerum()
+      await this.scalperSerum(dipProduct);
       return;
     }
+
+    await this.scalperMango(dipProduct);
+    return;
+  }
+
+  async scalperMango(dipProduct: DIPDeposit[]): Promise<void> {
+    console.log("Running mango scalper");
+    this.perpMarketConfig = getMarketByBaseSymbolAndKind(
+      this.groupConfig,
+      this.symbol,
+      "perp"
+    );
+    this.marketIndex = this.perpMarketConfig.marketIndex;
+
+    // Setup for scalping
+    const mangoGroup: MangoGroup = await this.client.getMangoGroup(
+      this.groupConfig.publicKey
+    );
+    const perpMarket: PerpMarket = await mangoGroup.loadPerpMarket(
+      this.connection,
+      this.marketIndex,
+      this.perpMarketConfig.baseDecimals,
+      this.perpMarketConfig.quoteDecimals
+    );
 
     const spotMarketConfig = getMarketByBaseSymbolAndKind(
       this.groupConfig,
@@ -150,88 +175,6 @@ export class Scalper {
       console.log(this.symbol, "Main Error", err)
       console.log(this.symbol, "Main Error Detail", err.stack)  
     }
-  }
-
-  async scalperSerum(): Promise<void> {
-    const spotMarketConfig = getMarketByBaseSymbolAndKind(
-      this.groupConfig,
-      this.symbol,
-      'spot',
-    );
-    const spotMarket = await Market.load(
-      this.connection,
-      spotMarketConfig.publicKey,
-      undefined,
-      this.groupConfig.serumProgramId,
-    );
-    
-    // Fetching orderbooks
-    let bids = await spotMarket.loadBids(this.connection);
-    let asks = await spotMarket.loadAsks(this.connection);
-    // L2 orderbook data
-    for (let [price, size] of bids.getL2(20)) {
-      console.log(price, size);
-    }
-    // Full orderbook data
-    for (let order of asks) {
-      console.log(
-        order.orderId,
-        order.price,
-        order.size,
-        order.side, // 'buy' or 'sell'
-      );
-    }
-    
-    // Placing orders
-    try{
-    await DexMarket.placeOrder(
-      this.connection, 
-      this.owner,
-      spotMarket,
-      'buy', // 'buy' or 'sell'
-      'limit',
-      0.1,
-      20,
-    );
-  } catch (err) {
-    console.log(err);
-    console.log(err.stack);
-  }
-    
-    // Retrieving open orders by owner
-    let myOrders = await spotMarket.loadOrdersForOwner(this.connection, this.owner.publicKey);
-    console.log(this.owner, "Open Orders", myOrders)
-    
-    // Cancelling orders
-    for (let order of myOrders) {
-      await DexMarket.cancelOrder(this.connection, this.owner, spotMarket, order);
-    }
-    
-    // Retrieving fills
-    for (let fill of await spotMarket.loadFills(this.connection)) {
-      console.log(fill.orderId, fill.price, fill.size, fill.side);
-    }
-    
-    // TODO Settle funds
-    // for (let openOrders of await DexMarket.getOrdersForOwner(
-    //   this.owner,
-    //   spotMarket,
-    //   this.connection,
-    // )) {
-    //   if (openOrders.baseTokenFree > 0 || openOrders.quoteTokenFree > 0) {
-    //     // spl-token accounts to which to send the proceeds from trades
-    //     let baseTokenAccount = new PublicKey('...');
-    //     let quoteTokenAccount = new PublicKey('...');
-    
-    //     await spotMarket.settleFunds(
-    //       this.connection,
-    //       accountOwner,
-    //       openOrders,
-    //       baseTokenAccount,
-    //       quoteTokenAccount,
-    //     );
-    //   }
-    // }
   }
 
   async deltaHedge(
@@ -652,6 +595,65 @@ export class Scalper {
       }
     }
   }
+
+  async scalperSerum(dipProduct: DIPDeposit[]): Promise<void> {
+    console.log("Running serum scalper");
+    const spotMarketConfig = getMarketByBaseSymbolAndKind(
+      this.groupConfig,
+      this.symbol,
+      'spot',
+    );
+    const spotMarket = await Market.load(
+      this.connection,
+      spotMarketConfig.publicKey,
+      undefined,
+      this.groupConfig.serumProgramId,
+    );
+
+    this.perpMarketConfig = getMarketByBaseSymbolAndKind(
+      this.groupConfig,
+      this.symbol,
+      "perp"
+    );
+    this.marketIndex = this.perpMarketConfig.marketIndex;
+
+    // Open Mango Websocket
+    const fillFeed = new WebSocket(FILLS_URL!);
+    fillFeed.onopen = function(e) {
+      console.log('Connected to Mango Websocket', new Date().toUTCString())
+    };
+    fillFeed.onerror = function(error) {
+      console.log(`Websocket Error ${error.message}`);
+    };
+
+    let hedgeCount = 1;
+    try {
+      await this.deltaHedgeSerum(
+        dipProduct,
+        mangoGroup,
+        perpMarket,
+        spotMarket,
+        fillFeed, 
+        hedgeCount
+      );
+      await this.gammaScalpSerum(
+        dipProduct,
+        mangoGroup,
+        perpMarket,
+        fillFeed
+      );
+    }
+    catch (err){
+      console.log(this.symbol, "Main Error", err)
+      console.log(this.symbol, "Main Error Detail", err.stack)  
+    }
+    
+    // TODO: Do something like this
+    // https://github.com/tardis-dev/serum-dex-ui/blob/master/src/utils/serum-vial.tsx#L83
+ 
+    // TODO Settle funds
+  }
+
 }
 
 async function loadPrices(mangoGroup: MangoGroup, connection: Connection) {

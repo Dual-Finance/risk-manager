@@ -69,9 +69,9 @@ export class SerumVialClient {
 export type SerumVialTradeMessage = {
   readonly type: "trade";
   readonly price: string;
-  readonly size: string;
+  readonly size: number;
   readonly side: "buy" | "sell";
-  readonly id: string;
+  readonly id: number;
   readonly market: string;
   readonly version: number;
   readonly slot: number;

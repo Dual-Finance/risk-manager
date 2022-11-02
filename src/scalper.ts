@@ -75,8 +75,8 @@ export class Scalper {
     );
 
     // Check if Mango is live
-    if ((Date.now() - perpMarket.lastUpdated.toNumber()*1000) / (1000*60) > MANGO_DOWNTIME_THRESHOLD) {
-      console.log(this.symbol, "Mango Down! Last Updated:", new Date(perpMarket.lastUpdated.toNumber()*1000))
+    if ((Date.now() - perpMarket.lastUpdated.toNumber() * 1_000) / (1_000 * 60) > MANGO_DOWNTIME_THRESHOLD) {
+      console.log(this.symbol, "Mango Down! Last Updated:", new Date(perpMarket.lastUpdated.toNumber() * 1_000))
       await this.scalperSerum(dipProduct);
     } else {
       await this.scalperMango(dipProduct);
@@ -302,7 +302,7 @@ export class Scalper {
       console.log("Failed to place order", err, err.stack);
     }
 
-    // Wait the twapInterval of time to see if the positions gets to neutral.
+    // Wait the twapInterval of time to see if the position gets to neutral.
     console.log(this.symbol, "Scan Delta Fills for ~", twapInterval, "seconds");
     for (let i = 0; i < twapInterval / fillScan; i++) {
       if (Math.abs(hedgeDeltaTotal * fairValue) < (this.minSize * fairValue)) {
@@ -396,6 +396,7 @@ export class Scalper {
         if (bidFill || askFill) {
           console.log(this.symbol, 'Gamma Filled', bidFill ? "BID" : "ASK", new Date().toUTCString());
           fillFeed.removeEventListener('message', gammaFillListener);
+          // Do not need to remove the unfilled order since it will be cancelled in the recursive call.
           this.gammaScalp(
             dipProduct,
             mangoGroup,
@@ -465,8 +466,7 @@ export class Scalper {
               this.owner
             );
           } catch (err) {
-            console.log(err);
-            console.log(err.stack);
+            console.log(err, err.stack);
           }
           break;
         }
@@ -497,17 +497,11 @@ export class Scalper {
 
     // Open Serum websocket for checking fills
     const serumVialClient = new SerumVialClient();
-    const fillFeed = serumVialClient.streamData(
-      ['trades'],
-      [`${this.symbol}/USDC`],
-      (message: SerumVialTradeMessage) => {
-        console.log("Message", message);
-      }
-    );
 
     try {
       await this.deltaHedgeSerum(
         dipProduct,
+        serumVialClient,
         1
       );
     /*
@@ -527,6 +521,7 @@ export class Scalper {
 
   async deltaHedgeSerum(
     dipProduct: DIPDeposit[],
+    serumVialClient: SerumVialClient,
     deltaHedgeDepth: number,
   ): Promise<void> {
     const spotMarketConfig = getMarketByBaseSymbolAndKind(
@@ -569,10 +564,9 @@ export class Scalper {
     // Get all spot positions Option Vault, Risk Manager, Mango Tester
     const spotDelta = await getSpotDelta(this.connection, this.symbol) + this.deltaOffset;
   
-    // Get Total Delta Position to hedge
-    // TODO: Fill this in
-    // let hedgeDeltaTotal = IS_DEV ? 0.1 : mangoPerpDelta + dipTotalDelta + spotDelta + mangoSpotDelta;
-    let hedgeDeltaTotal = 0;
+    // Get Total Delta Position to hedge. Use .1 for DEV to force that it does
+    // something.
+    let hedgeDeltaTotal = IS_DEV ? 0.1 : dipTotalDelta + spotDelta;
 
     // Check whether we need to hedge.
     const dipTotalGamma = getDIPGamma(dipProduct, fairValue, this.symbol);
@@ -584,11 +578,157 @@ export class Scalper {
     } else {
       console.log(this.symbol, "is above delta threshold:", deltaThreshold);
     }
-  
-    // Place an order to get delta neutral
-    // TODO: Place this order and listen for the twap window until either it has gotten to neutral, or is not going to fill
 
-    // TODO: Consider whether order splicing is necessary
+    // TODO: Order splicing if necessary
+  
+    // Place an order to get delta neutral.
+    const hedgePrice = hedgeDeltaTotal < 0 ? fairValue * (1 + slippageTolerance) : fairValue * (1 - slippageTolerance);
+
+    const hedgeSide = hedgeDeltaTotal < 0 ? "buy" : "sell";
+    try {
+      console.log("Placing order to get to delta neutral");
+      await DexMarket.placeOrder(
+        this.connection, 
+        this.owner,
+        spotMarket,
+        hedgeSide,
+        'limit',
+        Math.abs(hedgeDeltaTotal),
+        hedgePrice,
+      );
+    } catch (err) {
+      console.log(err, err.stack);
+    }
+
+    serumVialClient.streamData(
+      ['trades'],
+      [`${this.symbol}/USDC`],
+      (message: SerumVialTradeMessage) => {
+        console.log("Got a trade", message);
+        const fillQty = (hedgeSide == 'buy' ? 1 : -1) * message.size;
+        hedgeDeltaTotal = hedgeDeltaTotal + fillQty;
+      }
+    );
+
+    // Wait the twapInterval of time to see if the position gets to neutral.
+    console.log(this.symbol, "Scan Delta Fills for ~", twapInterval, "seconds");
+    for (let i = 0; i < twapInterval / fillScan; i++) {
+      if (Math.abs(hedgeDeltaTotal * fairValue) < (this.minSize * fairValue)) {
+        // No need to remove listener since the streamData will stop doing
+        // anything useful.
+        console.log(this.symbol, "Delta Hedge on Serum Complete: Websocket Fill");
+        return;
+      }
+      await sleepRandom(fillScan);
+    }
+
+    console.log(this.symbol, "Delta Hedge on Serum failed");
   }
+
+  async gammaScalpSerum(
+    dipProduct: DIPDeposit[],
+    mangoGroup: MangoGroup,
+    perpMarket: PerpMarket,
+    fillFeed: WebSocket,
+    gammaScalpDepth: number,
+  ): Promise<void> {
+    /*
+    // Cancel stale orders
+
+    // Avoid unsafe recursion.
+
+    // Find fair value and total gamma
+    // const fairValue = mangoGroup.getPrice(this.marketIndex, mangoCache).toNumber();
+    // const dipTotalGamma = getDIPGamma(dipProduct, fairValue, this.symbol);
+
+    // Calc scalperWindow std deviation spread from zScore & IV for gamma levels
+    //const stdDevSpread =
+    //  this.impliedVol / Math.sqrt((365 * 24 * 60 * 60) / scalperWindow) * zScore;
+    //const netGamma = IS_DEV ? Math.max(0.01, dipTotalGamma * stdDevSpread * fairValue) : dipTotalGamma * stdDevSpread * fairValue;
+
+    //console.log(this.symbol, "Position Gamma Γ:", netGamma, "Fair Value", fairValue);
+    //if ((netGamma * fairValue) < (this.minSize * fairValue)){
+    //  console.log(this.symbol, 'Gamma Hedge Too Small')
+    //  return
+    //}
+
+    // Make order ids
+    const orderIdGamma = new Date().getTime() * 2;
+    const gammaBid = fairValue * (1 - stdDevSpread);
+    const gammaBidID = orderIdGamma + 1;
+    const gammaAsk = fairValue * (1 + stdDevSpread);
+    const gammaAskID = orderIdGamma + 2;
+
+    fillFeed.removeAllListeners('message');
+    // Create gamma listener that watches for fill events
+    const gammaFillListener = (event) => {
+      const parsedEvent = JSON.parse(event.data);
+      if (
+        parsedEvent['status'] === 'New' &&
+        parsedEvent['market'] === this.symbol.concat("-PERP")
+      ) {
+        const fillBytes = Buffer.from(parsedEvent['event'], 'base64');
+        const fillEvent: FillEvent = PerpEventLayout.decode(fillBytes).fill;
+        const bidFill =
+          fillEvent.makerClientOrderId.toString() == gammaBidID.toString() ||
+          fillEvent.takerClientOrderId.toString() == gammaBidID.toString();
+        const askFill =
+          fillEvent.makerClientOrderId.toString() == gammaAskID.toString() ||
+          fillEvent.takerClientOrderId.toString() == gammaAskID.toString();
+        if (bidFill || askFill) {
+          console.log(this.symbol, 'Gamma Filled', bidFill ? "BID" : "ASK", new Date().toUTCString());
+          fillFeed.removeEventListener('message', gammaFillListener);
+          this.gammaScalp(
+            dipProduct,
+            mangoGroup,
+            perpMarket,
+            fillFeed,
+            gammaScalpDepth + 1
+          );
+        }
+      }
+    };
+    if (fillFeed.readyState == WebSocket.OPEN) {
+      fillFeed.addEventListener('message', gammaFillListener);
+      console.log(this.symbol, "Listening For Gamma Scalps");
+    } else {
+      console.log(this.symbol, "Websocket State", fillFeed.readyState)
+    }
+
+    // Place Gamma scalp bid & offer
+    try {
+      await this.client.placePerpOrder2(
+        mangoGroup,
+        mangoAccount,
+        perpMarket,
+        this.owner,
+        "buy",
+        gammaBid,
+        netGamma,
+        { orderType: "postOnlySlide", clientOrderId: gammaBidID }
+      );
+      console.log(this.symbol, "Gamma Bid", gammaBid, "ID", gammaBidID);
+      await this.client.placePerpOrder2(
+        mangoGroup,
+        mangoAccount,
+        perpMarket,
+        this.owner,
+        "sell",
+        gammaAsk,
+        netGamma,
+        { orderType: "postOnlySlide", clientOrderId: gammaAskID }
+      );
+      console.log(this.symbol, "Gamma Ask", gammaAsk, "ID", gammaAskID);
+    } catch (err) {
+      console.log(this.symbol, "Gamma Error", err, err.stack);
+    }
+    
+    // Sleep for the max time of the reruns then kill thread
+    await sleepExact((1 + percentDrift) * scalperWindow);
+    console.log(this.symbol, "Remove stale gamma fill listener", gammaBidID, gammaAskID)
+    fillFeed.removeEventListener('message', gammaFillListener);
+    */
+  }
+
 
 }

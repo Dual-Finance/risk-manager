@@ -56,7 +56,6 @@ export const DELTA_OFFSET = new Map<string, number> ([
   ['BTC', 0], ['ETH', 0], ['SOL', -100]
 ]);
 
-// TODO: Make this be the account that we are watching and match owner.publicKey no matter the other settings
 export const SERUM_ACCOUNT = "CkcJx7Uwgxck5zm3DqUp2N1ikkkoPn2wA8zf7oS4tFSZ";
 
 export const rfRate = 0.03; // Risk Free Rate of Return ~ T-Bill Rate

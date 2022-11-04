@@ -504,14 +504,11 @@ export class Scalper {
         serumVialClient,
         1
       );
-    /*
       await this.gammaScalpSerum(
         dipProduct,
-        mangoGroup,
-        perpMarket,
-        fillFeed
+        serumVialClient,
+        1
       );
-    */
       // TODO: serum settlement
     }
     catch (err){
@@ -587,8 +584,7 @@ export class Scalper {
     console.log(this.owner.publicKey.toBase58());
     const hedgeSide = hedgeDeltaTotal < 0 ? "buy" : "sell";
     try {
-      //const amount = Math.round(Math.abs(hedgeDeltaTotal) * 10) / 10;
-      const amount = .1;
+      const amount = Math.round(Math.abs(hedgeDeltaTotal) * 10) / 10;
       const price = Math.floor(Math.abs(hedgePrice) * 100) / 100;
       console.log("Placing order to get to delta neutral", amount, price, hedgeSide);
       await DexMarket.placeOrder(

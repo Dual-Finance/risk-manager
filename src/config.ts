@@ -60,7 +60,7 @@ export const DELTA_OFFSET = new Map<string, number> ([
   ['BTC', 0], ['ETH', 0], ['SOL', -117.7]
 ]);
 
-export const SERUM_ACCOUNT = "CkcJx7Uwgxck5zm3DqUp2N1ikkkoPn2wA8zf7oS4tFSZ";
+export const SERUM_ACCOUNT = "Gx2DtYaQZYGcYonh8LPQ3mG8ppA3vJL4NF3vB8Yo8pmr";
 
 export const rfRate = 0.03; // Risk Free Rate of Return ~ T-Bill Rate
 export const maxNotional = 10000; // Max hedging order size of $10,000

@@ -520,8 +520,12 @@ export class Scalper {
     // Clean the state by cancelling all existing open orders.
     let myOrders = await spotMarket.loadOrdersForOwner(this.connection, this.owner.publicKey);
     for (let order of myOrders) {
-      console.log(this.symbol, "Cancelling open order", order.size, this.symbol, "@", order.price, order.orderId);
-      await DexMarket.cancelOrder(this.connection, this.owner, spotMarket, order);
+      try {
+        console.log(this.symbol, "Cancelling open order", order.size, this.symbol, "@", order.price, order.orderId);
+        await DexMarket.cancelOrder(this.connection, this.owner, spotMarket, order);
+      } catch (err) {
+        console.log(this.symbol, "Delta Hedge", err, err.stack);
+      }
     }
 
     // Prevent too much recursion.
@@ -574,7 +578,7 @@ export class Scalper {
     
     try {
       const amountDelta = Math.round(Math.abs(hedgeDeltaTotal) * 10) / 10;
-      const priceDelta = Math.floor(Math.abs(hedgePrice) * 10) / 10;
+      const priceDelta = Math.floor(Math.abs(hedgePrice) * 100) / 100;
       console.log(this.symbol, hedgeSide, "Serum-SPOT", Math.abs(amountDelta), "Limit:", priceDelta, "#", deltaHedgeCount);
       await DexMarket.placeOrder(
         this.connection, 
@@ -589,6 +593,7 @@ export class Scalper {
       console.log(this.symbol, "Delta Hedge", err, err.stack);
     }
 
+    // TODO turn this off after delta hedging
     serumVialClient.streamData(
       ['trades'],
       [`${this.symbol}/USDC`],
@@ -640,8 +645,12 @@ export class Scalper {
     // Clean the state by cancelling all existing open orders.
     let myOrders = await spotMarket.loadOrdersForOwner(this.connection, this.owner.publicKey);
     for (let order of myOrders) {
-      console.log(this.symbol, "Cancelling open order", order.size, this.symbol, "@", order.price, order.orderId);
-      await DexMarket.cancelOrder(this.connection, this.owner, spotMarket, order);
+      try {
+        console.log(this.symbol, "Cancelling open order", order.size, this.symbol, "@", order.price, order.orderId);
+        await DexMarket.cancelOrder(this.connection, this.owner, spotMarket, order);
+      } catch (err) {
+        console.log(this.symbol, "Delta Hedge", err, err.stack);
+      }
     }
 
     // Prevent too much recursion.

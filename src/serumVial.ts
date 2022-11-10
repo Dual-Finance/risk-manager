@@ -18,10 +18,12 @@ export class SerumVialClient {
       const message = JSON.parse(msg.data as string);
       if (message.type === "trade") {
         const tradeMessage = message as SerumVialTradeMessage;
+        // TODO cleanup filtering
         if (
           tradeMessage.makerAccount == SERUM_ACCOUNT ||
           tradeMessage.takerAccount == SERUM_ACCOUNT
-        ) {
+        )
+         {
           onmessage(tradeMessage);
         }
       }

@@ -46,6 +46,10 @@ export const MinContractSize = new Map<string, number> ([
   ['BTC', 0.0001], ['ETH', 0.001], ['SOL', 0.01]
 ]);
 
+export const MinSerumSize = new Map<string, number> ([
+  ['BTC', 0.0001], ['ETH', 0.001], ['SOL', 0.1]
+]);
+
 export const TickSize = new Map<string, number> ([
   ['BTC', 0.1], ['ETH', 0.1], ['SOL', 0.01]
 ]);
@@ -53,7 +57,7 @@ export const TickSize = new Map<string, number> ([
 // Adjust delta hedges for loans, negative values allow positive spot balances in mango
 // CAUTION! Turn off scalper, send funds to mango & update value before running!
 export const DELTA_OFFSET = new Map<string, number> ([
-  ['BTC', 0], ['ETH', 0], ['SOL', -100]
+  ['BTC', 0], ['ETH', 0], ['SOL', -117.7]
 ]);
 
 export const SERUM_ACCOUNT = "CkcJx7Uwgxck5zm3DqUp2N1ikkkoPn2wA8zf7oS4tFSZ";
@@ -69,6 +73,7 @@ export const fillScan = 1; // Number of seconds during twap intervals to check f
 export const percentDrift = 0.05; // Percentage of time to allow drift of the timed actions
 export const gammaThreshold = 0.05; // Percentage of gamma to calc delta hedge threshold
 export const maxHedges = 10; // Maximum amount of orders to delta hedge across
+export const gammaCycles = 10; // Maximum amount of cycles to allow scalps
 export const staggerTime = 30; // Seconds to wait between reruns of each product
 export const MANGO_DOWNTIME_THRESHOLD = 15; // Time in Minutes to stop routing transactions to Mango
 export const fundingThreshold = 0.25; // % Funding to switch to serum orders

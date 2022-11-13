@@ -18,7 +18,6 @@ export class SerumVialClient {
       const message = JSON.parse(msg.data as string);
       if (message.type === "trade") {
         const tradeMessage = message as SerumVialTradeMessage;
-        // TODO cleanup filtering
         if (
           tradeMessage.makerAccount == SERUM_ACCOUNT ||
           tradeMessage.takerAccount == SERUM_ACCOUNT
@@ -29,17 +28,17 @@ export class SerumVialClient {
       }
     };
 
-    this._ws.onclose = (ev) => {
-      if (this._disposed) {
-        return;
-      }
+    // this._ws.onclose = (ev) => {
+    //   if (this._disposed) {
+    //     return;
+    //   }
 
-      console.log(
-        `Connection to ${WS_URL} closed, code: ${ev.code}. Restarting....`
-      );
+    //   console.log(
+    //     `Connection to ${WS_URL} closed, code: ${ev.code}. Restarting....`
+    //   );
 
-      this.streamData(channels, markets, onmessage);
-    };
+    //   this.streamData(channels, markets, onmessage);
+    // };
 
     const subPayloads = channels.map((channel) => {
       return JSON.stringify({
@@ -66,6 +65,22 @@ export class SerumVialClient {
       this._ws && this._ws.close();
     };
   }
+
+  public closeSerumVial(
+  ) {
+    this._ws.close();
+  }
+
+  public removeAnyListeners(){
+    this._ws.removeAllListeners();
+  }
+
+  public checkSerumVial(
+    ) {
+      let state: number;
+      state = this._ws.readyState;
+      return state;
+    }
 }
 
 export type SerumVialTradeMessage = {

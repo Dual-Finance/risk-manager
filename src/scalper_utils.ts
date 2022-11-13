@@ -6,9 +6,10 @@ import {
   MangoGroup,
   PerpMarket,
 } from "@blockworks-foundation/mango-client";
-import { Connection, LAMPORTS_PER_SOL } from "@solana/web3.js";
+import { Connection, LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
 import { DIPDeposit } from "./common";
 import {
+  ACCOUNT_MAP,
   mangoTesterPk,
   optionVaultPk,
   rfRate,
@@ -16,6 +17,7 @@ import {
   THEO_VOL_MAP,
 } from "./config";
 import { getAssociatedTokenAddress, tokenToSplMint } from "./utils";
+import { DexMarket } from "@project-serum/serum-dev-tools";
 
 export async function loadPrices(
   mangoGroup: MangoGroup,
@@ -168,3 +170,36 @@ export async function getSpotDelta(connection: Connection, symbol: string) {
   }
   return spotDelta;
 }
+export async function settleSerum(connection, owner, market, base, quote) {
+  for (let openOrders of await market.findOpenOrdersAccountsForOwner(
+    connection,
+    owner.publicKey,
+  )) {
+    if (openOrders.baseTokenFree > 0 || openOrders.quoteTokenFree > 0) {
+      // spl-token accounts to which to send the proceeds from trades
+      let baseTokenAccount = new PublicKey (ACCOUNT_MAP.get(base));
+      let quoteTokenAccount = new PublicKey (ACCOUNT_MAP.get(quote));
+
+      await market.settleFunds(
+        connection,
+        owner,
+        openOrders,
+        baseTokenAccount,
+        quoteTokenAccount,
+      );
+    }
+  }
+}
+
+export async function cancelSerumOrders(connection, owner, spotMarket, symbol) {
+  let myOrders = await spotMarket.loadOrdersForOwner(connection, owner.publicKey);
+  for (let order of myOrders) {
+    try {
+      console.log(symbol, "Cancelling open order", order.size, symbol, "@", order.price, order.orderId);
+      await DexMarket.cancelOrder(connection, owner, spotMarket, order);
+    } catch (err) {
+      console.log(this.symbol, "Cancel Serum Orders", err, err.stack);
+    }
+  }
+}
+  

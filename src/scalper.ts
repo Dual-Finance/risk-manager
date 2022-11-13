@@ -3,19 +3,19 @@ import {
   Config, getMarketByBaseSymbolAndKind, GroupConfig, MangoAccount, MangoClient, MangoCache,
   PerpMarket, MangoGroup, PerpEventLayout, FillEvent, MarketConfig,
 } from "@blockworks-foundation/mango-client";
-import { Keypair, Commitment, Connection } from "@solana/web3.js";
+import { Keypair, Commitment, Connection, PublicKey } from "@solana/web3.js";
 import { Market } from '@project-serum/serum';
 import configFile from "./ids.json";
 import {
   networkName, THEO_VOL_MAP, maxNotional, slippageTolerance, twapInterval, scalperWindow,
   zScore, MinContractSize, TickSize, FILLS_URL, IS_DEV, fillScan, gammaThreshold,
-  maxHedges, percentDrift, DELTA_OFFSET, MANGO_DOWNTIME_THRESHOLD, fundingThreshold, gammaCycles, MinSerumSize,
+  maxHedges, percentDrift, DELTA_OFFSET, MANGO_DOWNTIME_THRESHOLD, fundingThreshold, gammaCycles, MinSerumSize, serumLiquidityFactor,
 } from "./config";
 import { DIPDeposit } from "./common";
-import { readKeypair, sleepExact, sleepRandom } from "./utils";
+import { getPythPrice, readKeypair, sleepExact, sleepRandom, tokenToSplMint } from "./utils";
 import { SerumVialClient, SerumVialTradeMessage } from "./serumVial";
 import { DexMarket } from "@project-serum/serum-dev-tools";
-import { fillSize, getDIPDelta, getDIPGamma, getSpotDelta, loadPrices, orderSplice } from './scalper_utils';
+import { cancelSerumOrders, fillSize, getDIPDelta, getDIPGamma, getSpotDelta, loadPrices, orderSplice, settleSerum } from './scalper_utils';
 
 export class Scalper {
   client: MangoClient;
@@ -493,7 +493,7 @@ export class Scalper {
         serumVialClient,
         1
       );
-      // TODO: serum settlement
+      // TODO: serum settlement to move to mango if needed
     }
     catch (err){
       console.log(this.symbol, "Main Error", err, err.stack)
@@ -518,14 +518,13 @@ export class Scalper {
     );
 
     // Clean the state by cancelling all existing open orders.
-    let myOrders = await spotMarket.loadOrdersForOwner(this.connection, this.owner.publicKey);
-    for (let order of myOrders) {
-      try {
-        console.log(this.symbol, "Cancelling open order", order.size, this.symbol, "@", order.price, order.orderId);
-        await DexMarket.cancelOrder(this.connection, this.owner, spotMarket, order);
-      } catch (err) {
-        console.log(this.symbol, "Delta Hedge", err, err.stack);
-      }
+    await cancelSerumOrders(this.connection, this.owner, spotMarket, this.symbol);
+
+    // Settle Funds
+    try{
+      await settleSerum(this.connection, this.owner, spotMarket, this.symbol, "USDC");
+    } catch (err) {
+      console.log(this.symbol, "Settling Funds", err, err.stack);
     }
 
     // Prevent too much recursion.
@@ -534,14 +533,28 @@ export class Scalper {
       return;
     }
 
+    // TODO turn this off after delta hedging
+    // TODO settle funds after fills
+    serumVialClient.streamData(
+      ['trades'],
+      [`${this.symbol}/USDC`],
+      (message: SerumVialTradeMessage) => {
+        console.log(this.symbol, "Delta Hedge Fill!", message);
+        const fillQty = (hedgeSide == 'buy' ? 1 : -1) * message.size;
+        hedgeDeltaTotal = hedgeDeltaTotal + fillQty;
+      }
+    );
+
     // Find fair value.
-    console.log(this.symbol, "Loading Serum Fair Value...");
+    console.log(this.symbol, "Loading Fair Value...");
+    const pythPrice = await getPythPrice(new PublicKey(tokenToSplMint(this.symbol)));
     const bids = await spotMarket.loadBids(this.connection);
     const asks = await spotMarket.loadAsks(this.connection);
     const [bidPrice, _bidSize] = bids.getL2(1)[0];
     const [askPrice, _askSize] = asks.getL2(1)[0];
-    const fairValue = (bidPrice + askPrice) / 2.0;
-    console.log(this.symbol, "Serum Fair Value", fairValue);
+    const midValue = (bidPrice + askPrice) / 2.0;
+    const fairValue = midValue*serumLiquidityFactor + pythPrice*(1-serumLiquidityFactor);
+    console.log(this.symbol, "Pyth Price", pythPrice, "Serum Mid Value", midValue, "Fair Value", fairValue);
 
     // Get the DIP Delta
     const dipTotalDelta = getDIPDelta(dipProduct, fairValue, this.symbol);
@@ -593,24 +606,13 @@ export class Scalper {
       console.log(this.symbol, "Delta Hedge", err, err.stack);
     }
 
-    // TODO turn this off after delta hedging
-    serumVialClient.streamData(
-      ['trades'],
-      [`${this.symbol}/USDC`],
-      (message: SerumVialTradeMessage) => {
-        console.log(this.symbol, "Delta Hedge Fill!", message);
-        const fillQty = (hedgeSide == 'buy' ? 1 : -1) * message.size;
-        hedgeDeltaTotal = hedgeDeltaTotal + fillQty;
-      }
-    );
-
     // Wait the twapInterval of time to see if the position gets to neutral.
     console.log(this.symbol, "Scan Delta Fills for ~", twapInterval, "seconds");
     for (let i = 0; i < twapInterval / fillScan; i++) {
       // TODO Test hedgeDeltaTotal update async from serum vial
       if (Math.abs(hedgeDeltaTotal * fairValue) < (this.minSpotSize * fairValue)) {
-        // No need to remove listener since the streamData will stop doing
-        // anything useful.
+        serumVialClient.removeAnyListeners();
+        serumVialClient.closeSerumVial();
         console.log(this.symbol, "Delta Hedge Complete: Serum Vial");
         return;
       }
@@ -618,6 +620,8 @@ export class Scalper {
     }
 
     console.log(this.symbol, "Serum Delta Hedge failed");
+    serumVialClient.removeAnyListeners();
+    serumVialClient.closeSerumVial();
     // await this.deltaHedgeSerum(
     //   dipProduct,
     //   serumVialClient,
@@ -641,32 +645,54 @@ export class Scalper {
       undefined,
       this.groupConfig.serumProgramId,
     );
-
+    // TODO confirm clearing listeners is working
+    serumVialClient.removeAnyListeners();
     // Clean the state by cancelling all existing open orders.
-    let myOrders = await spotMarket.loadOrdersForOwner(this.connection, this.owner.publicKey);
-    for (let order of myOrders) {
-      try {
-        console.log(this.symbol, "Cancelling open order", order.size, this.symbol, "@", order.price, order.orderId);
-        await DexMarket.cancelOrder(this.connection, this.owner, spotMarket, order);
-      } catch (err) {
-        console.log(this.symbol, "Delta Hedge", err, err.stack);
-      }
+    await cancelSerumOrders(this.connection, this.owner, spotMarket, this.symbol);
+    // Settle Funds
+    try{
+      await settleSerum(this.connection, this.owner, spotMarket, this.symbol, "USDC");
+    } catch (err) {
+      console.log(this.symbol, "Settling Funds", err, err.stack);
     }
 
     // Prevent too much recursion.
     if (gammaScalpCount > gammaCycles) {
-      console.log(this.symbol, "Maximum scalps acheived!");
+      console.log(this.symbol, "Maximum scalps acheived!", gammaScalpCount);
       return;
     }
 
-    // Find fair value and total gamma
+    if (serumVialClient.checkSerumVial() == 1) {
+      serumVialClient.removeAnyListeners();
+      serumVialClient.closeSerumVial();
+    }
+    
+    serumVialClient.streamData(
+      ['trades'],
+      [`${this.symbol}/USDC`],
+      (message: SerumVialTradeMessage) => {
+        console.log(this.symbol, "Gamma Scalp Filled!", message);
+        serumVialClient.removeAnyListeners();
+        serumVialClient.closeSerumVial();
+        this.gammaScalpSerum(
+          dipProduct,
+          serumVialClient,
+          gammaScalpCount + 1,
+        );
+      }
+    );
+
+    // Find fair value.
+    console.log(this.symbol, "Loading Fair Value...");
+    const pythPrice = await getPythPrice(new PublicKey(tokenToSplMint(this.symbol)));
     const bids = await spotMarket.loadBids(this.connection);
     const asks = await spotMarket.loadAsks(this.connection);
     const [bidPrice, _bidSize] = bids.getL2(1)[0];
     const [askPrice, _askSize] = asks.getL2(1)[0];
-    const fairValue = (bidPrice + askPrice) / 2.0;
+    const midValue = (bidPrice + askPrice) / 2.0;
+    const fairValue = midValue*serumLiquidityFactor + pythPrice*(1-serumLiquidityFactor);
+    console.log(this.symbol, "Pyth Price", pythPrice, "Serum Mid Value", midValue, "Fair Value", fairValue);
     const dipTotalGamma = getDIPGamma(dipProduct, fairValue, this.symbol);
-    console.log(this.symbol, "Serum Fair Value", fairValue);
 
     // Calc scalperWindow std deviation spread from zScore & IV for gamma levels
     const stdDevSpread = this.impliedVol / Math.sqrt((365 * 24 * 60 * 60) / scalperWindow) * zScore;
@@ -681,22 +707,12 @@ export class Scalper {
       return
     }
 
-    serumVialClient.streamData(
-      ['trades'],
-      [`${this.symbol}/USDC`],
-      (message: SerumVialTradeMessage) => {
-        console.log(this.symbol, "Gamma Scalp Filled!", message);
-        this.gammaScalpSerum(
-          dipProduct,
-          serumVialClient,
-          gammaScalpCount + 1,
-        );
-      }
-    );
-
+    // Check again for orders to cancel
+    await cancelSerumOrders(this.connection, this.owner, spotMarket, this.symbol);
     const amountGamma = Math.round(Math.abs(netGamma) * 10) / 10;
     const priceBid = Math.floor(Math.abs(gammaBid) * 100) / 100;
     const priceAsk = Math.floor(Math.abs(gammaAsk) * 100) / 100;
+    // TODO send these orders in parallel if possible
     try{
       await DexMarket.placeOrder(
         this.connection, 

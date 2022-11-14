@@ -58,7 +58,7 @@ export const MinContractSize = new Map<string, number> ([
 ]);
 
 export const MinSerumSize = new Map<string, number> ([
-  ['BTC', 0.0001], ['ETH', 0.001], ['SOL', 0.1]
+  ['BTC', 0.0001], ['ETH', 0.001], ['SOL', 0.01]
 ]);
 
 export const TickSize = new Map<string, number> ([
@@ -73,9 +73,9 @@ export const DELTA_OFFSET = new Map<string, number> ([
 
 export const rfRate = 0.03; // Risk Free Rate of Return ~ T-Bill Rate
 export const maxNotional = 10000; // Max hedging order size of $10,000
-export const slippageTolerance = 0.001; // Allow 10bps above/below FMV on limit orders
+export const slippageTolerance = 0.002; // Allow xbps above/below FMV on limit orders
 export const twapInterval = 15; // Number of seconds to space spliced orders across
-export const scalperWindow = 600; // Number of seconds for each gamma scalping window
+export const scalperWindow = 300; // Number of seconds for each gamma scalping window
 export const monthAdj = 1; // Adjustment since Date.UTC is zero based
 export const zScore = 1.282; // Corresponds to 80% CI
 export const fillScan = 1; // Number of seconds during twap intervals to check for websocket fills

@@ -57,16 +57,19 @@ async function main() {
 
   setInterval(async () => {
       try {
-        console.log('Rerun SOL Risk Manager', new Date().toUTCString());
+        console.log("------------------------------------------------")
+        console.log('RERUN SOL Risk Manager', new Date().toUTCString());
         await solRouter.refresh_dips();
         solRouter.run_risk_manager();
         // if (!IS_DEV) {
         //   await sleepExact(staggerTime);
-        //   console.log('Rerun BTC Risk Manager', new Date().toUTCString());
+        //   console.log("------------------------------------------------")
+        //   console.log('RERUN BTC Risk Manager', new Date().toUTCString());
         //   await btcRouter.refresh_dips();
         //   btcRouter.run_risk_manager();
         //   await sleepExact(staggerTime);
-        //   console.log('Rerun ETH Risk Manager', new Date().toUTCString());
+        //   console.log("------------------------------------------------")
+        //   console.log('RERUN ETH Risk Manager', new Date().toUTCString());
         //   await ethRouter.refresh_dips();
         //   ethRouter.run_risk_manager();
         // }

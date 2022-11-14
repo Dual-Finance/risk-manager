@@ -482,30 +482,41 @@ export class Scalper {
 
     // Open Serum websocket for checking fills
     const serumVialClient = new SerumVialClient();
+    serumVialClient.openSerumVial();
+    let programStatus = 0;
+    console.log("Check A", programStatus, serumVialClient.checkSerumVial())
 
     try {
       await this.deltaHedgeSerum(
         dipProduct,
         serumVialClient,
-        1
+        1,
+        programStatus
       );
       await this.gammaScalpSerum(
         dipProduct,
         serumVialClient,
-        1
+        1,
+        programStatus
       );
       // TODO: serum settlement to move to mango if needed
     }
     catch (err){
       console.log(this.symbol, "Main Error", err, err.stack)
     }
+    serumVialClient.closeSerumVial();
+    console.log("Thread End", programStatus, serumVialClient.checkSerumVial())
   }
 
   async deltaHedgeSerum(
     dipProduct: DIPDeposit[],
     serumVialClient: SerumVialClient,
     deltaHedgeCount: number,
+    programStatus: number
   ): Promise<void> {
+    console.log("Check B", programStatus, serumVialClient.checkSerumVial())
+    programStatus = 1;
+    console.log("Check C", programStatus, serumVialClient.checkSerumVial())
     const spotMarketConfig = getMarketByBaseSymbolAndKind(
       this.groupConfig,
       this.symbol,
@@ -535,14 +546,18 @@ export class Scalper {
     }
 
     // TODO turn this off after delta hedging
-    // TODO settle funds after fills
     serumVialClient.streamData(
       ['trades'],
       [`${this.symbol}/USDC`],
       (message: SerumVialTradeMessage) => {
-        console.log(this.symbol, "Delta Hedge Fill!", message);
-        const fillQty = (hedgeSide == 'buy' ? 1 : -1) * message.size;
-        hedgeDeltaTotal = hedgeDeltaTotal + fillQty;
+        console.log("Fill Check A", programStatus, serumVialClient.checkSerumVial())
+        if (programStatus == 1) {
+          console.log(this.symbol, "Delta Hedge Filled!", message.size, message.market, message.price, message.timestamp);
+          const fillQty = (hedgeSide == 'buy' ? 1 : -1) * message.size;
+          hedgeDeltaTotal = hedgeDeltaTotal + fillQty;
+          serumVialClient.removeAnyListeners();
+          console.log("Fill Check AA", programStatus, serumVialClient.checkSerumVial())
+        }
       }
     );
 
@@ -591,7 +606,7 @@ export class Scalper {
     const hedgePrice = hedgeDeltaTotal < 0 ? fairValue * (1 + slippageTolerance) : fairValue * (1 - slippageTolerance);
     
     try {
-      const amountDelta = Math.round(Math.abs(hedgeDeltaTotal) * 10) / 10;
+      const amountDelta = Math.round(Math.abs(hedgeDeltaTotal) * 100) / 100;
       const priceDelta = Math.floor(Math.abs(hedgePrice) * 100) / 100;
       console.log(this.symbol, hedgeSide, "Serum-SPOT", Math.abs(amountDelta), "Limit:", priceDelta, "#", deltaHedgeCount);
       await DexMarket.placeOrder(
@@ -608,12 +623,12 @@ export class Scalper {
     }
 
     // Wait the twapInterval of time to see if the position gets to neutral.
+    console.log("Check CC", programStatus, serumVialClient.checkSerumVial())
     console.log(this.symbol, "Scan Delta Fills for ~", twapInterval, "seconds");
     for (let i = 0; i < twapInterval / fillScan; i++) {
       // TODO Test hedgeDeltaTotal update async from serum vial
       if (Math.abs(hedgeDeltaTotal * fairValue) < (this.minSpotSize * fairValue)) {
         serumVialClient.removeAnyListeners();
-        serumVialClient.closeSerumVial();
         console.log(this.symbol, "Delta Hedge Complete: Serum Vial");
         return;
       }
@@ -622,19 +637,24 @@ export class Scalper {
 
     console.log(this.symbol, "Serum Delta Hedge failed");
     serumVialClient.removeAnyListeners();
-    serumVialClient.closeSerumVial();
-    // await this.deltaHedgeSerum(
-    //   dipProduct,
-    //   serumVialClient,
-    //   deltaHedgeCount + 1,
-    // );
+    console.log("Check D", programStatus, serumVialClient.checkSerumVial())
+    await this.deltaHedgeSerum(
+      dipProduct,
+      serumVialClient,
+      deltaHedgeCount + 1,
+      programStatus
+    );
   }
 
   async gammaScalpSerum(
     dipProduct: DIPDeposit[],
     serumVialClient: SerumVialClient,
     gammaScalpCount: number,
+    programStatus: number
   ): Promise<void> {
+    console.log("Check a", programStatus, serumVialClient.checkSerumVial())
+    programStatus = 2;
+    console.log("Check b", programStatus, serumVialClient.checkSerumVial())
     const spotMarketConfig = getMarketByBaseSymbolAndKind(
       this.groupConfig,
       this.symbol,
@@ -663,23 +683,27 @@ export class Scalper {
       return;
     }
 
-    if (serumVialClient.checkSerumVial() == 1) {
-      serumVialClient.removeAnyListeners();
-      serumVialClient.closeSerumVial();
+    if (serumVialClient.checkSerumVial() != 1) {
+      serumVialClient.openSerumVial();
     }
     
+    //if (serumVialClient == null)
     serumVialClient.streamData(
       ['trades'],
       [`${this.symbol}/USDC`],
       (message: SerumVialTradeMessage) => {
-        console.log(this.symbol, "Gamma Scalp Filled!", message);
-        serumVialClient.removeAnyListeners();
-        serumVialClient.closeSerumVial();
-        this.gammaScalpSerum(
-          dipProduct,
-          serumVialClient,
-          gammaScalpCount + 1,
-        );
+        console.log("Fill Check B", programStatus, serumVialClient.checkSerumVial())
+        if (programStatus == 2){
+          console.log(this.symbol, "Gamma Scalp Filled!", message.size, message.market, message.price, message.timestamp);
+          serumVialClient.removeAnyListeners();
+          serumVialClient.closeSerumVial();
+          this.gammaScalpSerum(
+            dipProduct,
+            serumVialClient,
+            gammaScalpCount + 1,
+            programStatus
+          );
+        }
       }
     );
 
@@ -698,7 +722,7 @@ export class Scalper {
     // Calc scalperWindow std deviation spread from zScore & IV for gamma levels
     const stdDevSpread = this.impliedVol / Math.sqrt((365 * 24 * 60 * 60) / scalperWindow) * zScore;
     // TODO remove static gamma after testing mainnet
-    const netGamma = IS_DEV ? Math.max(0.1, dipTotalGamma * stdDevSpread * fairValue) : Math.max(0.1, dipTotalGamma * stdDevSpread * fairValue);
+    const netGamma = IS_DEV ? Math.max(0.01, dipTotalGamma * stdDevSpread * fairValue) : Math.max(0.01, dipTotalGamma * stdDevSpread * fairValue);
     const gammaBid = fairValue * (1 - stdDevSpread);
     const gammaAsk = fairValue * (1 + stdDevSpread);
 
@@ -710,7 +734,7 @@ export class Scalper {
 
     // Check again for orders to cancel
     await cancelSerumOrders(this.connection, this.owner, spotMarket, this.symbol);
-    const amountGamma = Math.round(Math.abs(netGamma) * 10) / 10;
+    const amountGamma = Math.round(Math.abs(netGamma) * 100) / 100;
     const priceBid = Math.floor(Math.abs(gammaBid) * 100) / 100;
     const priceAsk = Math.floor(Math.abs(gammaAsk) * 100) / 100;
     // TODO send these orders in parallel if possible
@@ -725,9 +749,9 @@ export class Scalper {
         priceBid,
       );
       console.log(this.symbol, "Gamma", amountGamma, "Bid", priceBid);
-  } catch (err) {
-    console.log(this.symbol, "Gamma Bid", err, err.stack);
-  }
+    } catch (err) {
+      console.log(this.symbol, "Gamma Bid", err, err.stack);
+    }
     try{
       await DexMarket.placeOrder(
       this.connection, 
@@ -739,11 +763,13 @@ export class Scalper {
       priceAsk,
     );
     console.log(this.symbol, "Gamma", amountGamma, "Ask", priceAsk);
-  } catch (err) {
-    console.log(this.symbol, "Gamma Ask", err, err.stack);
-  }
+    } catch (err) {
+      console.log(this.symbol, "Gamma Ask", err, err.stack);
+    }
 
     await sleepExact((1 + percentDrift) * scalperWindow);
+    console.log("Check c", programStatus, serumVialClient.checkSerumVial());
+    programStatus = 3;
+    console.log("Check d", programStatus, serumVialClient.checkSerumVial());
   }
-
 }

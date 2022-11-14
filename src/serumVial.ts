@@ -1,7 +1,7 @@
 import WebSocket from "ws";
 import { SERUM_ACCOUNT } from "./config";
 
-const WS_URL = "wss://api.serum-vial.dev/v1/ws";
+const WS_URL = "wss://vial.mngo.cloud/v1/ws";
 
 export class SerumVialClient {
   private _ws: WebSocket | undefined = undefined;
@@ -12,8 +12,8 @@ export class SerumVialClient {
     markets: string[],
     onmessage: (message: any) => void
   ) {
-    this._ws = new WebSocket(WS_URL);
-
+    // this._ws = new WebSocket(WS_URL);
+  
     this._ws.onmessage = (msg) => {
       const message = JSON.parse(msg.data as string);
       if (message.type === "trade") {
@@ -65,6 +65,13 @@ export class SerumVialClient {
       this._ws && this._ws.close();
     };
   }
+  public openSerumVial(
+    ) {
+      this._ws = new WebSocket(WS_URL);
+    //   this._ws.addEventListener('open', function (event) {
+    //     this._ws.send('Hello Server!');
+    // });
+    }
 
   public closeSerumVial(
   ) {

@@ -9,7 +9,8 @@ import configFile from "./ids.json";
 import {
   networkName, THEO_VOL_MAP, maxNotional, slippageTolerance, twapInterval, scalperWindow,
   zScore, MinContractSize, TickSize, FILLS_URL, IS_DEV, fillScan, gammaThreshold,
-  maxHedges, percentDrift, DELTA_OFFSET, MANGO_DOWNTIME_THRESHOLD, fundingThreshold, gammaCycles, MinSerumSize, serumLiquidityFactor,
+  maxHedges, percentDrift, DELTA_OFFSET, MANGO_DOWNTIME_THRESHOLD, fundingThreshold, gammaCycles, 
+  MinSerumSize, serumLiquidityFactor, SERUM_FORK_ID, SERUM_MKT_MAP,
 } from "./config";
 import { DIPDeposit } from "./common";
 import { getPythPrice, readKeypair, sleepExact, sleepRandom, tokenToSplMint } from "./utils";
@@ -512,9 +513,9 @@ export class Scalper {
     );
     const spotMarket = await Market.load(
       this.connection,
-      spotMarketConfig.publicKey,
+      new PublicKey (SERUM_MKT_MAP.get(this.symbol)),
       undefined,
-      this.groupConfig.serumProgramId,
+      SERUM_FORK_ID,
     );
 
     // Clean the state by cancelling all existing open orders.
@@ -641,9 +642,9 @@ export class Scalper {
     );
     const spotMarket = await Market.load(
       this.connection,
-      spotMarketConfig.publicKey,
+      new PublicKey (SERUM_MKT_MAP.get(this.symbol)),
       undefined,
-      this.groupConfig.serumProgramId,
+      SERUM_FORK_ID,
     );
     // TODO confirm clearing listeners is working
     serumVialClient.removeAnyListeners();

@@ -36,10 +36,17 @@ export const riskManagerPk = new PublicKey(
 export const mangoTesterPk = new PublicKey(
   "CkcJx7Uwgxck5zm3DqUp2N1ikkkoPn2wA8zf7oS4tFSZ"
 );
+export const SERUM_FORK_ID = new PublicKey("srmqPvymJeFKQ4zGQed1GFppgkRHL9kaELCbyksJtPX");
+export const SERUM_MKT_MAP = new Map<string, string> ([
+  ['SOL', '8BnEgHoWFysVcuFFX7QztDmzuH8r5ZFvyP3sYwn1XTh6']
+]);
 export const ACCOUNT_MAP = new Map<string, string> ([
   ['BTC', '79ee6JPqTPUDzX4FeAWSntFatmpb5BY5LQrXzMX3aAE6'], ['ETH', 'F7qSsLofbpZBfZ11wkajX9JPshSEeyGpaFvDeuur2mNW'], 
   ['SOL', '9EaYbxzU1YJwJojKsKp3U38PBy5aqcN2KS9Xc8hAxZB7'], ['USDC', '2gyJ4SZyQtUEXCLRa459nbWaFzuN8uvyoUsVb7xmpkh1']
 ]);
+
+export const SERUM_ACCOUNT = "6A4xj97ah6QJmMyJb5jTKSNXVsdc2sJSak3wneSMJrPX";
+
 export const OPTION_MINT_ADDRESS_SEED = "option-mint";
 
 export const THEO_VOL_MAP = new Map<string, number> ([
@@ -63,8 +70,6 @@ export const TickSize = new Map<string, number> ([
 export const DELTA_OFFSET = new Map<string, number> ([
   ['BTC', 0], ['ETH', 0], ['SOL', -117.7]
 ]);
-
-export const SERUM_ACCOUNT = "Gx2DtYaQZYGcYonh8LPQ3mG8ppA3vJL4NF3vB8Yo8pmr";
 
 export const rfRate = 0.03; // Risk Free Rate of Return ~ T-Bill Rate
 export const maxNotional = 10000; // Max hedging order size of $10,000

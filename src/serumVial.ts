@@ -12,8 +12,6 @@ export class SerumVialClient {
     markets: string[],
     onmessage: (message: any) => void
   ) {
-    // this._ws = new WebSocket(WS_URL);
-  
     this._ws.onmessage = (msg) => {
       const message = JSON.parse(msg.data as string);
       if (message.type === "trade") {
@@ -28,17 +26,17 @@ export class SerumVialClient {
       }
     };
 
-    // this._ws.onclose = (ev) => {
-    //   if (this._disposed) {
-    //     return;
-    //   }
+    this._ws.onclose = (ev) => {
+      if (this._disposed) {
+        return;
+      }
 
-    //   console.log(
-    //     `Connection to ${WS_URL} closed, code: ${ev.code}. Restarting....`
-    //   );
+      console.log(
+        `Connection to ${WS_URL} closed, code: ${ev.code}. Restarting....`
+      );
 
-    //   this.streamData(channels, markets, onmessage);
-    // };
+      this.streamData(channels, markets, onmessage);
+    };
 
     const subPayloads = channels.map((channel) => {
       return JSON.stringify({
@@ -65,25 +63,19 @@ export class SerumVialClient {
       this._ws && this._ws.close();
     };
   }
-  public openSerumVial(
-    ) {
+  public openSerumVial() {
       this._ws = new WebSocket(WS_URL);
-    //   this._ws.addEventListener('open', function (event) {
-    //     this._ws.send('Hello Server!');
-    // });
     }
 
-  public closeSerumVial(
-  ) {
+  public closeSerumVial() {
     this._ws.close();
   }
 
-  public removeAnyListeners(){
-    this._ws.removeAllListeners();
+  public removeAnyListeners() {
+    this._ws.onmessage = () => {};
   }
 
-  public checkSerumVial(
-    ) {
+  public checkSerumVial() {
       let state: number;
       state = this._ws.readyState;
       return state;

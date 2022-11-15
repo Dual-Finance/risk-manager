@@ -1,6 +1,6 @@
 import { PublicKey } from "@solana/web3.js";
 
-export const IS_DEV: boolean = false;
+export const IS_DEV: boolean = true;
 export const ENVIRONMENT: string = IS_DEV ? "DEVNET" : "MAINNET";
 
 export const networkName = IS_DEV ? 'devnet.2' : 'mainnet.1';

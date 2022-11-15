@@ -31,10 +31,6 @@ export class SerumVialClient {
         return;
       }
 
-      console.log(
-        `Connection to ${WS_URL} closed, code: ${ev.code}. Restarting....`
-      );
-
       this.streamData(channels, markets, onmessage);
     };
 
@@ -63,9 +59,10 @@ export class SerumVialClient {
       this._ws && this._ws.close();
     };
   }
+
   public openSerumVial() {
       this._ws = new WebSocket(WS_URL);
-    }
+  }
 
   public closeSerumVial() {
     this._ws.close();
@@ -79,7 +76,7 @@ export class SerumVialClient {
       let state: number;
       state = this._ws.readyState;
       return state;
-    }
+  }
 }
 
 export type SerumVialTradeMessage = {

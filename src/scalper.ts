@@ -534,7 +534,7 @@ export class Scalper {
       ['trades'],
       [`${this.symbol}/USDC`],
       (message: SerumVialTradeMessage) => {
-        console.log(this.symbol, "Delta Hedge Filled!", message.size, message.market, message.price, message.timestamp);
+        console.log(this.symbol, "Delta Hedge Filled!", hedgeSide, message.size, message.market, message.price, message.timestamp);
         const fillQty = (hedgeSide == 'buy' ? 1 : -1) * message.size;
         hedgeDeltaTotal = hedgeDeltaTotal + fillQty;
         this.serumVialClient.removeAnyListeners();
@@ -544,15 +544,21 @@ export class Scalper {
     // Find fair value.
     console.log(this.symbol, "Loading Fair Value...");
     const pythPrice = await getPythPrice(new PublicKey(tokenToSplMint(this.symbol)));
-    // TODO: Handle when pyth does not have a price
-
     const bids = await spotMarket.loadBids(this.connection);
     const asks = await spotMarket.loadAsks(this.connection);
     const [bidPrice, _bidSize] = bids.getL2(1)[0];
     const [askPrice, _askSize] = asks.getL2(1)[0];
     const midValue = (bidPrice + askPrice) / 2.0;
-    const fairValue = midValue*serumLiquidityFactor + pythPrice*(1-serumLiquidityFactor);
-    console.log(this.symbol, "Pyth Price", pythPrice, "Serum Mid Value", midValue, "Fair Value", fairValue);
+    // Handle when pyth does not have a price
+    let fairValue
+    if (pythPrice > 0) {
+      fairValue = midValue*serumLiquidityFactor + pythPrice*(1-serumLiquidityFactor);
+      console.log(this.symbol, "Pyth Price", pythPrice, "Serum Mid Value", midValue, "Fair Value", fairValue);
+    } else {
+      fairValue = midValue;
+      console.log(this.symbol, "Pyth Price Bad Using Serum Mid Value", midValue, "Fair Value", fairValue);
+    }
+    
 
     // Get the DIP Delta
     const dipTotalDelta = getDIPDelta(dipProduct, fairValue, this.symbol);
@@ -607,7 +613,6 @@ export class Scalper {
     // Wait the twapInterval of time to see if the position gets to neutral.
     console.log(this.symbol, "Scan Delta Fills for ~", twapInterval, "seconds");
     for (let i = 0; i < twapInterval / fillScan; i++) {
-      // TODO: Test hedgeDeltaTotal update async from serum vial
       if (Math.abs(hedgeDeltaTotal * fairValue) < (this.minSpotSize * fairValue)) {
         this.serumVialClient.removeAnyListeners();
         console.log(this.symbol, "Delta Hedge Complete: Serum Vial");
@@ -676,14 +681,20 @@ export class Scalper {
     const [bidPrice, _bidSize] = bids.getL2(1)[0];
     const [askPrice, _askSize] = asks.getL2(1)[0];
     const midValue = (bidPrice + askPrice) / 2.0;
-    const fairValue = midValue*serumLiquidityFactor + pythPrice*(1-serumLiquidityFactor);
-    console.log(this.symbol, "Pyth Price", pythPrice, "Serum Mid Value", midValue, "Fair Value", fairValue);
+    // Handle when pyth does not have a price
+    let fairValue
+    if (pythPrice > 0) {
+      fairValue = midValue*serumLiquidityFactor + pythPrice*(1-serumLiquidityFactor);
+      console.log(this.symbol, "Pyth Price", pythPrice, "Serum Mid Value", midValue, "Fair Value", fairValue);
+    } else {
+      fairValue = midValue;
+      console.log(this.symbol, "Pyth Price Bad Using Serum Mid Value", midValue, "Fair Value", fairValue);
+    }
     const dipTotalGamma = getDIPGamma(dipProduct, fairValue, this.symbol);
 
     // Calc scalperWindow std deviation spread from zScore & IV for gamma levels
     const stdDevSpread = this.impliedVol / Math.sqrt((365 * 24 * 60 * 60) / scalperWindow) * zScore;
-    // TODO: remove static gamma after testing mainnet
-    const netGamma = IS_DEV ? Math.max(0.01, dipTotalGamma * stdDevSpread * fairValue) : Math.max(0.01, dipTotalGamma * stdDevSpread * fairValue);
+    const netGamma = IS_DEV ? Math.max(0.01, dipTotalGamma * stdDevSpread * fairValue) : dipTotalGamma * stdDevSpread * fairValue;
     const gammaBid = fairValue * (1 - stdDevSpread);
     const gammaAsk = fairValue * (1 + stdDevSpread);
 

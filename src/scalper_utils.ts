@@ -170,6 +170,7 @@ export async function getSpotDelta(connection: Connection, symbol: string) {
   }
   return spotDelta;
 }
+
 export async function settleSerum(connection, owner, market, base, quote) {
   for (let openOrders of await market.findOpenOrdersAccountsForOwner(
     connection,
@@ -195,10 +196,10 @@ export async function cancelSerumOrders(connection, owner, spotMarket, symbol) {
   let myOrders = await spotMarket.loadOrdersForOwner(connection, owner.publicKey);
   for (let order of myOrders) {
     try {
-      console.log(symbol, "Cancelling open order", order.size, symbol, "@", order.price, order.orderId);
+      console.log(symbol, "Cancelling open order", order.size, symbol, "@", order.price, order.orderId.toString());
       await DexMarket.cancelOrder(connection, owner, spotMarket, order);
     } catch (err) {
-      console.log(this.symbol, "Cancel Serum Orders", err, err.stack);
+      console.log(symbol, "Cancel Serum Orders", err, err.stack);
     }
   }
 }

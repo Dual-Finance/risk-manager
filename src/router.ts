@@ -54,6 +54,7 @@ export class Router {
     const symbol = `${dip_deposit.splToken},USDC,${date.getUTCFullYear()}-${
       date.getUTCMonth() + 1
     }-${date.getUTCDate()},${dip_deposit.strike * 1_000_000},UPSIDE,E,P`;
+    console.log("++++++++++++++++++++++++++++++++++++++++++++++++++++");
     console.log("Routing for", symbol, "Deposit:", dip_deposit);
 
     // This happens after sending tokens to a MM. Exit early.
@@ -176,7 +177,7 @@ export class Router {
 
     this.dips[this.dip_to_string(expirationSec, strike)] = {
       splToken: splMintToToken(splMint),
-      premiumAsset: "USD",
+      premiumAsset: "USDC",
       expirationMs: expirationSec * 1_000,
       strike: strike,
       type: "call",

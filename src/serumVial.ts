@@ -1,5 +1,5 @@
 import WebSocket from "ws";
-import { SERUM_ACCOUNT } from "./config";
+import { OPENBOOK_ACCOUNT } from "./config";
 
 const WS_URL = "wss://vial.mngo.cloud/v1/ws";
 
@@ -17,8 +17,8 @@ export class SerumVialClient {
       if (message.type === "trade") {
         const tradeMessage = message as SerumVialTradeMessage;
         if (
-          tradeMessage.makerAccount == SERUM_ACCOUNT ||
-          tradeMessage.takerAccount == SERUM_ACCOUNT
+          tradeMessage.makerAccount == OPENBOOK_ACCOUNT ||
+          tradeMessage.takerAccount == OPENBOOK_ACCOUNT
         )
          {
           onmessage(tradeMessage);

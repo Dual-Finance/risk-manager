@@ -10,13 +10,13 @@ import {
   networkName, THEO_VOL_MAP, maxNotional, slippageTolerance, twapInterval, scalperWindow,
   zScore, MinContractSize, TickSize, FILLS_URL, IS_DEV, fillScan, gammaThreshold,
   maxHedges, percentDrift, DELTA_OFFSET, MANGO_DOWNTIME_THRESHOLD, fundingThreshold, gammaCycles, 
-  MinSerumSize, serumLiquidityFactor, SERUM_FORK_ID, SERUM_MKT_MAP,
+  MinOpenBookSize, openBookLiquidityFactor, OPENBOOK_FORK_ID, OPENBOOK_MKT_MAP,
 } from "./config";
 import { DIPDeposit } from "./common";
 import { getPythPrice, readKeypair, sleepExact, sleepRandom, tokenToSplMint } from "./utils";
 import { SerumVialClient, SerumVialTradeMessage } from "./serumVial";
 import { DexMarket } from "@project-serum/serum-dev-tools";
-import { cancelSerumOrders, fillSize, getDIPDelta, getDIPGamma, getSpotDelta, loadPrices, orderSplice, settleSerum } from './scalper_utils';
+import { cancelOpenBookOrders, fillSize, getDIPDelta, getDIPGamma, getSpotDelta, loadPrices, orderSplice, settleOpenBook } from './scalper_utils';
 
 export class Scalper {
   client: MangoClient;
@@ -53,7 +53,7 @@ export class Scalper {
     this.symbol = symbol;
     this.impliedVol = THEO_VOL_MAP.get(symbol);
     this.minSize = MinContractSize.get(symbol);
-    this.minSpotSize = MinSerumSize.get(symbol);
+    this.minSpotSize = MinOpenBookSize.get(symbol);
     this.tickSize = TickSize.get(symbol);
     this.deltaOffset = DELTA_OFFSET.get(symbol);
 
@@ -84,7 +84,7 @@ export class Scalper {
     // Check if Mango is live
     if ((Date.now() - perpMarket.lastUpdated.toNumber() * 1_000) / (1_000 * 60) > MANGO_DOWNTIME_THRESHOLD) {
       console.log(this.symbol, "Mango Down! Last Updated:", new Date(perpMarket.lastUpdated.toNumber() * 1_000))
-      await this.scalperSerum(dipProduct);
+      await this.scalperOpenBook(dipProduct);
     } else {
       await this.scalperMango(dipProduct);
     }
@@ -115,9 +115,9 @@ export class Scalper {
     );
     const spotMarket = await Market.load(
       this.connection,
-      spotMarketConfig.publicKey,
+      new PublicKey (OPENBOOK_MKT_MAP.get(this.symbol)),
       undefined,
-      this.groupConfig.serumProgramId,
+      OPENBOOK_FORK_ID,
     );
     
     // Open Mango Websocket
@@ -481,52 +481,54 @@ export class Scalper {
     }
   }
 
-  async scalperSerum(dipProduct: DIPDeposit[]): Promise<void> {
-    console.log(this.symbol, "Hedging on Serum");
+  async scalperOpenBook(dipProduct: DIPDeposit[]): Promise<void> {
+    console.log(this.symbol, "Hedging on OpenBook");
 
     this.serumVialClient.removeAnyListeners();
 
     try {
-      await this.deltaHedgeSerum(
+      await this.deltaHedgeOpenBook(
         dipProduct,
         1,
       );
-      await this.gammaScalpSerum(
+      await this.gammaScalpOpenBook(
         dipProduct,
         1,
       );
-      // TODO: serum settlement to move to mango if needed
+      // TODO: OpenBook settlement to move to mango if needed
     }
     catch (err){
       console.log(this.symbol, "Main Error", err, err.stack)
     }
-    this.serumVialClient.closeSerumVial();
+
+    // TODO confirm unnecessary caused a crash
+    // this.serumVialClient.closeSerumVial();
   }
 
-  async deltaHedgeSerum(
+  async deltaHedgeOpenBook(
     dipProduct: DIPDeposit[],
     deltaHedgeCount: number,
   ): Promise<void> {
     const spotMarket = await Market.load(
       this.connection,
-      new PublicKey (SERUM_MKT_MAP.get(this.symbol)),
+      new PublicKey (OPENBOOK_MKT_MAP.get(this.symbol)),
       undefined,
-      SERUM_FORK_ID,
+      OPENBOOK_FORK_ID,
     );
 
     // Clean the state by cancelling all existing open orders.
-    await cancelSerumOrders(this.connection, this.owner, spotMarket, this.symbol);
+    await cancelOpenBookOrders(this.connection, this.owner, spotMarket, this.symbol);
 
     // Settle Funds
     try{
-      await settleSerum(this.connection, this.owner, spotMarket, this.symbol, "USDC");
+      await settleOpenBook(this.connection, this.owner, spotMarket, this.symbol, "USDC");
     } catch (err) {
       console.log(this.symbol, "Settling Funds", err, err.stack);
     }
 
     // Prevent too much recursion.
     if (deltaHedgeCount > maxHedges) {
-      console.log(this.symbol, "Max Serum Hedges exceeded!");
+      console.log(this.symbol, "Max OpenBook Hedges exceeded!");
       return;
     }
 
@@ -552,11 +554,11 @@ export class Scalper {
     // Handle when pyth does not have a price
     let fairValue
     if (pythPrice > 0) {
-      fairValue = midValue*serumLiquidityFactor + pythPrice*(1-serumLiquidityFactor);
-      console.log(this.symbol, "Pyth Price", pythPrice, "Serum Mid Value", midValue, "Fair Value", fairValue);
+      fairValue = midValue*openBookLiquidityFactor + pythPrice*(1-openBookLiquidityFactor);
+      console.log(this.symbol, "Pyth Price", pythPrice, "OpenBook Mid Value", midValue, "Fair Value", fairValue);
     } else {
       fairValue = midValue;
-      console.log(this.symbol, "Pyth Price Bad Using Serum Mid Value", midValue, "Fair Value", fairValue);
+      console.log(this.symbol, "Pyth Price Bad Using OpenBook Mid Value", midValue, "Fair Value", fairValue);
     }
     
 
@@ -566,8 +568,7 @@ export class Scalper {
     // Get all spot positions Option Vault, Risk Manager, Mango Tester
     const spotDelta = await getSpotDelta(this.connection, this.symbol) + this.deltaOffset;
   
-    // Get Total Delta Position to hedge. Use .1 for DEV to force that it does
-    // something.
+    // Get Total Delta Position to hedge. Use .1 for DEV to force that it does something.
     let hedgeDeltaTotal = IS_DEV ? 0.1 : dipTotalDelta + spotDelta;
     const hedgeSide = hedgeDeltaTotal < 0 ? 'buy' : 'sell';
     // TODO: Mango delta positions
@@ -595,8 +596,8 @@ export class Scalper {
     
     try {
       const amountDelta = Math.round(Math.abs(hedgeDeltaTotal) * 100) / 100;
-      const priceDelta = Math.floor(Math.abs(hedgePrice) * 100) / 100;
-      console.log(this.symbol, hedgeSide, "Serum-SPOT", Math.abs(amountDelta), "Limit:", priceDelta, "#", deltaHedgeCount);
+      const priceDelta = Math.floor(Math.abs(hedgePrice) * 1000) / 1000;
+      console.log(this.symbol, hedgeSide, "OpenBook-SPOT", Math.abs(amountDelta), "Limit:", priceDelta, "#", deltaHedgeCount);
       await DexMarket.placeOrder(
         this.connection, 
         this.owner,
@@ -615,36 +616,38 @@ export class Scalper {
     for (let i = 0; i < twapInterval / fillScan; i++) {
       if (Math.abs(hedgeDeltaTotal * fairValue) < (this.minSpotSize * fairValue)) {
         this.serumVialClient.removeAnyListeners();
-        console.log(this.symbol, "Delta Hedge Complete: Serum Vial");
+        console.log(this.symbol, "Delta Hedge Complete: SerumVial");
         return;
       }
       await sleepRandom(fillScan);
     }
 
-    console.log(this.symbol, "Serum Delta Hedge failed");
+    console.log(this.symbol, "OpenBook Delta Hedge Refresh", deltaHedgeCount);
     this.serumVialClient.removeAnyListeners();
-    await this.deltaHedgeSerum(
+    await this.deltaHedgeOpenBook(
       dipProduct,
       deltaHedgeCount + 1,
     );
   }
 
-  async gammaScalpSerum(
+  async gammaScalpOpenBook(
     dipProduct: DIPDeposit[],
     gammaScalpCount: number,
   ): Promise<void> {
     const spotMarket = await Market.load(
       this.connection,
-      new PublicKey(SERUM_MKT_MAP.get(this.symbol)),
+      new PublicKey(OPENBOOK_MKT_MAP.get(this.symbol)),
       undefined,
-      SERUM_FORK_ID,
+      OPENBOOK_FORK_ID,
     );
     this.serumVialClient.removeAnyListeners();
+
     // Clean the state by cancelling all existing open orders.
-    await cancelSerumOrders(this.connection, this.owner, spotMarket, this.symbol);
+    await cancelOpenBookOrders(this.connection, this.owner, spotMarket, this.symbol);
+
     // Settle Funds
     try {
-      await settleSerum(this.connection, this.owner, spotMarket, this.symbol, "USDC");
+      await settleOpenBook(this.connection, this.owner, spotMarket, this.symbol, "USDC");
     } catch (err) {
       console.log(this.symbol, "Settling Funds", err, err.stack);
     }
@@ -666,7 +669,7 @@ export class Scalper {
         console.log(this.symbol, "Gamma Scalp Filled!", message.size, message.market, message.price, message.timestamp);
         this.serumVialClient.removeAnyListeners();
         this.serumVialClient.closeSerumVial();
-        this.gammaScalpSerum(
+        this.gammaScalpOpenBook(
           dipProduct,
           gammaScalpCount + 1,
         );
@@ -684,11 +687,11 @@ export class Scalper {
     // Handle when pyth does not have a price
     let fairValue
     if (pythPrice > 0) {
-      fairValue = midValue*serumLiquidityFactor + pythPrice*(1-serumLiquidityFactor);
-      console.log(this.symbol, "Pyth Price", pythPrice, "Serum Mid Value", midValue, "Fair Value", fairValue);
+      fairValue = midValue*openBookLiquidityFactor + pythPrice*(1-openBookLiquidityFactor);
+      console.log(this.symbol, "Pyth Price", pythPrice, "OpenBook Mid Value", midValue, "Fair Value", fairValue);
     } else {
       fairValue = midValue;
-      console.log(this.symbol, "Pyth Price Bad Using Serum Mid Value", midValue, "Fair Value", fairValue);
+      console.log(this.symbol, "Pyth Price Bad Using OpenBook Mid Value", midValue, "Fair Value", fairValue);
     }
     const dipTotalGamma = getDIPGamma(dipProduct, fairValue, this.symbol);
 
@@ -705,10 +708,11 @@ export class Scalper {
     }
 
     // Check again for orders to cancel
-    await cancelSerumOrders(this.connection, this.owner, spotMarket, this.symbol);
+    await cancelOpenBookOrders(this.connection, this.owner, spotMarket, this.symbol);
+
     const amountGamma = Math.round(Math.abs(netGamma) * 100) / 100;
-    const priceBid = Math.floor(Math.abs(gammaBid) * 100) / 100;
-    const priceAsk = Math.floor(Math.abs(gammaAsk) * 100) / 100;
+    const priceBid = Math.floor(Math.abs(gammaBid) * 1000) / 1000;
+    const priceAsk = Math.floor(Math.abs(gammaAsk) * 1000) / 1000;
     // TODO send these orders in parallel if possible
     try{
       await DexMarket.placeOrder(

@@ -36,8 +36,8 @@ export const riskManagerPk = new PublicKey(
 export const mangoTesterPk = new PublicKey(
   "CkcJx7Uwgxck5zm3DqUp2N1ikkkoPn2wA8zf7oS4tFSZ"
 );
-export const SERUM_FORK_ID = new PublicKey("srmqPvymJeFKQ4zGQed1GFppgkRHL9kaELCbyksJtPX");
-export const SERUM_MKT_MAP = new Map<string, string> ([
+export const OPENBOOK_FORK_ID = new PublicKey("srmqPvymJeFKQ4zGQed1GFppgkRHL9kaELCbyksJtPX");
+export const OPENBOOK_MKT_MAP = new Map<string, string> ([
   ['SOL', '8BnEgHoWFysVcuFFX7QztDmzuH8r5ZFvyP3sYwn1XTh6']
 ]);
 export const ACCOUNT_MAP = new Map<string, string> ([
@@ -45,7 +45,7 @@ export const ACCOUNT_MAP = new Map<string, string> ([
   ['SOL', '9EaYbxzU1YJwJojKsKp3U38PBy5aqcN2KS9Xc8hAxZB7'], ['USDC', '2gyJ4SZyQtUEXCLRa459nbWaFzuN8uvyoUsVb7xmpkh1']
 ]);
 
-export const SERUM_ACCOUNT = "6A4xj97ah6QJmMyJb5jTKSNXVsdc2sJSak3wneSMJrPX";
+export const OPENBOOK_ACCOUNT = "6A4xj97ah6QJmMyJb5jTKSNXVsdc2sJSak3wneSMJrPX";
 
 export const OPTION_MINT_ADDRESS_SEED = "option-mint";
 
@@ -57,7 +57,7 @@ export const MinContractSize = new Map<string, number> ([
   ['BTC', 0.0001], ['ETH', 0.001], ['SOL', 0.01]
 ]);
 
-export const MinSerumSize = new Map<string, number> ([
+export const MinOpenBookSize = new Map<string, number> ([
   ['BTC', 0.0001], ['ETH', 0.001], ['SOL', 0.01]
 ]);
 
@@ -74,16 +74,16 @@ export const DELTA_OFFSET = new Map<string, number> ([
 export const rfRate = 0.03; // Risk Free Rate of Return ~ T-Bill Rate
 export const maxNotional = 10000; // Max hedging order size of $10,000
 export const slippageTolerance = 0.0015; // Allow xbps above/below FMV on limit orders
-export const twapInterval = 15; // Number of seconds to space spliced orders across
+export const twapInterval = 15; // Number of seconds to space spliced delta orders across
 export const scalperWindow = 600; // Number of seconds for each gamma scalping window
 export const monthAdj = 1; // Adjustment since Date.UTC is zero based
 export const zScore = 1.282; // Corresponds to 80% CI
 export const fillScan = 1; // Number of seconds during twap intervals to check for websocket fills
 export const percentDrift = 0.05; // Percentage of time to allow drift of the timed actions
 export const gammaThreshold = 0.05; // Percentage of gamma to calc delta hedge threshold
-export const maxHedges = 10; // Maximum amount of orders to delta hedge across
+export const maxHedges = 5; // Maximum amount of orders to delta hedge across
 export const gammaCycles = 10; // Maximum amount of cycles to allow scalps
 export const staggerTime = 30; // Seconds to wait between reruns of each product
 export const MANGO_DOWNTIME_THRESHOLD = 15; // Time in Minutes to stop routing transactions to Mango
-export const fundingThreshold = 0.25; // % Funding to switch to serum orders
-export const serumLiquidityFactor = 0.2; // Amount of weight to give serum mid price
+export const fundingThreshold = 0.25; // % Funding to switch to openbook orders
+export const openBookLiquidityFactor = 0.2; // Amount of weight to give openbook mid price

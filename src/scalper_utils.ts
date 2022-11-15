@@ -142,7 +142,7 @@ export async function fillSize(
   return filledQty;
 }
 
-// TODO: Update this to also take into account the serum position
+// TODO: Update this to also take into account the openbook position
 // Get Spot Balance
 export async function getSpotDelta(connection: Connection, symbol: string) {
   let mainDelta = 0;
@@ -171,7 +171,7 @@ export async function getSpotDelta(connection: Connection, symbol: string) {
   return spotDelta;
 }
 
-export async function settleSerum(connection, owner, market, base, quote) {
+export async function settleOpenBook(connection, owner, market, base, quote) {
   for (let openOrders of await market.findOpenOrdersAccountsForOwner(
     connection,
     owner.publicKey,
@@ -192,14 +192,14 @@ export async function settleSerum(connection, owner, market, base, quote) {
   }
 }
 
-export async function cancelSerumOrders(connection, owner, spotMarket, symbol) {
+export async function cancelOpenBookOrders(connection, owner, spotMarket, symbol) {
   let myOrders = await spotMarket.loadOrdersForOwner(connection, owner.publicKey);
   for (let order of myOrders) {
     try {
-      console.log(symbol, "Cancelling open order", order.size, symbol, "@", order.price, order.orderId.toString());
+      console.log(symbol, "Cancelling OpenBook Orders", order.size, symbol, "@", order.price, order.orderId.toString());
       await DexMarket.cancelOrder(connection, owner, spotMarket, order);
     } catch (err) {
-      console.log(symbol, "Cancel Serum Orders", err, err.stack);
+      console.log(symbol, "Cancel OpenBook Orders", err, err.stack);
     }
   }
 }

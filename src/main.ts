@@ -16,60 +16,63 @@ async function main() {
       console.log("Route to MM", deposit);
     },
     (deposits: DIPDeposit[]) => {
-      solScalper.scalperMango(deposits);
+      solScalper.pickAndRunScalper(deposits);
     },
     'SOL'
   );
+// TODO test BTC & ETH after sollet is resolved
+  // const btcRouter: Router = new Router(
+  //   (deposit: DIPDeposit[]) => {
+  //     console.log("Route to MM", deposit);
+  //   },
+  //   (deposits: DIPDeposit[]) => {
+  //     btcScalper.pickAndRunScalper(deposits);
+  //   },
+  //   'BTC'
+  // );
 
-  const btcRouter: Router = new Router(
-    (deposit: DIPDeposit[]) => {
-      console.log("Route to MM", deposit);
-    },
-    (deposits: DIPDeposit[]) => {
-      btcScalper.scalperMango(deposits);
-    },
-    'BTC'
-  );
-
-  const ethRouter: Router = new Router(
-    (deposit: DIPDeposit[]) => {
-      console.log("Route to MM", deposit);
-    },
-    (deposits: DIPDeposit[]) => {
-      ethScalper.scalperMango(deposits);
-    },
-    'ETH'
-  );
+  // const ethRouter: Router = new Router(
+  //   (deposit: DIPDeposit[]) => {
+  //     console.log("Route to MM", deposit);
+  //   },
+  //   (deposits: DIPDeposit[]) => {
+  //     ethScalper.pickAndRunScalper(deposits);
+  //   },
+  //   'ETH'
+  // );
 
   console.log('Run SOL Risk Manager', new Date().toUTCString());
   await solRouter.refresh_dips();
   solRouter.run_risk_manager();
-  if (!IS_DEV) {
-    await sleepExact(staggerTime);
-    console.log('Run BTC Risk Manager', new Date().toUTCString());
-    await btcRouter.refresh_dips();
-    btcRouter.run_risk_manager();
-    await sleepExact(staggerTime);
-    console.log('Run ETH Risk Manager', new Date().toUTCString());
-    await ethRouter.refresh_dips();
-    ethRouter.run_risk_manager();
-  }
+  // if (!IS_DEV) {
+  //   await sleepExact(staggerTime);
+  //   console.log('Run BTC Risk Manager', new Date().toUTCString());
+  //   await btcRouter.refresh_dips();
+  //   btcRouter.run_risk_manager();
+  //   await sleepExact(staggerTime);
+  //   console.log('Run ETH Risk Manager', new Date().toUTCString());
+  //   await ethRouter.refresh_dips();
+  //   ethRouter.run_risk_manager();
+  // }
 
   setInterval(async () => {
       try {
-        console.log('Rerun SOL Risk Manager', new Date().toUTCString());
+        console.log("------------------------------------------------")
+        console.log('RERUN SOL Risk Manager', new Date().toUTCString());
         await solRouter.refresh_dips();
         solRouter.run_risk_manager();
-        if (!IS_DEV) {
-          await sleepExact(staggerTime);
-          console.log('Rerun BTC Risk Manager', new Date().toUTCString());
-          await btcRouter.refresh_dips();
-          btcRouter.run_risk_manager();
-          await sleepExact(staggerTime);
-          console.log('Rerun ETH Risk Manager', new Date().toUTCString());
-          await ethRouter.refresh_dips();
-          ethRouter.run_risk_manager();
-        }
+        // if (!IS_DEV) {
+        //   await sleepExact(staggerTime);
+        //   console.log("------------------------------------------------")
+        //   console.log('RERUN BTC Risk Manager', new Date().toUTCString());
+        //   await btcRouter.refresh_dips();
+        //   btcRouter.run_risk_manager();
+        //   await sleepExact(staggerTime);
+        //   console.log("------------------------------------------------")
+        //   console.log('RERUN ETH Risk Manager', new Date().toUTCString());
+        //   await ethRouter.refresh_dips();
+        //   ethRouter.run_risk_manager();
+        // }
       } catch (err) {
         console.log(err);
         console.log(err.stack);

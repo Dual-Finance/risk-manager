@@ -1,6 +1,7 @@
 {
   "dependencies": {
     "@blockworks-foundation/mango-client": "^3.6.11",
+    "@project-serum/serum-dev-tools": "^1.0.5",
     "@pythnetwork/client": "^2.8.0",
     "@solana/spl-token": "^0.1.8",
     "@solana/web3.js": "^1.50.1",

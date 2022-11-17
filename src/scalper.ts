@@ -683,7 +683,10 @@ export class Scalper {
     // Find fair value.
     console.log(this.symbol, "Loading Fair Value For Scalp", gammaScalpCount);
     let fairValue;
-    if (gammaScalpCount==1){
+    if (priorFillPrice > 0) {
+      fairValue = priorFillPrice;
+      console.log(this.symbol, "Fair Value Set to Prior Fill", fairValue);
+    } else {
       const pythPrice = await getPythPrice(new PublicKey(tokenToSplMint(this.symbol)));
       const bids = await spotMarket.loadBids(this.connection);
       const asks = await spotMarket.loadAsks(this.connection);
@@ -698,9 +701,6 @@ export class Scalper {
         fairValue = midValue;
         console.log(this.symbol, "Pyth Price Bad Using OpenBook Mid Value", midValue, "Fair Value", fairValue);
       }
-  } else {
-    fairValue = priorFillPrice;
-    console.log(this.symbol, "Fair Value Set to Prior Fill", fairValue);
   }
     const dipTotalGamma = getDIPGamma(dipProduct, fairValue, this.symbol);
 

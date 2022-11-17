@@ -494,6 +494,7 @@ export class Scalper {
       await this.gammaScalpOpenBook(
         dipProduct,
         1,
+        0
       );
       // TODO: OpenBook settlement to move to mango if needed
     }
@@ -633,6 +634,7 @@ export class Scalper {
   async gammaScalpOpenBook(
     dipProduct: DIPDeposit[],
     gammaScalpCount: number,
+    priorFillPrice: number
   ): Promise<void> {
     const spotMarket = await Market.load(
       this.connection,
@@ -667,32 +669,39 @@ export class Scalper {
       [`${this.symbol}/USDC`],
       (message: SerumVialTradeMessage) => {
         console.log(this.symbol, "Gamma Scalp Filled!", message.size, message.market, message.price, message.timestamp);
+        let fillPrice = Number(message.price);
         this.serumVialClient.removeAnyListeners();
         this.serumVialClient.closeSerumVial();
         this.gammaScalpOpenBook(
           dipProduct,
           gammaScalpCount + 1,
+          fillPrice
         );
       }
     );
 
     // Find fair value.
-    console.log(this.symbol, "Loading Fair Value...");
-    const pythPrice = await getPythPrice(new PublicKey(tokenToSplMint(this.symbol)));
-    const bids = await spotMarket.loadBids(this.connection);
-    const asks = await spotMarket.loadAsks(this.connection);
-    const [bidPrice, _bidSize] = bids.getL2(1)[0];
-    const [askPrice, _askSize] = asks.getL2(1)[0];
-    const midValue = (bidPrice + askPrice) / 2.0;
-    // Handle when pyth does not have a price
-    let fairValue
-    if (pythPrice > 0) {
-      fairValue = midValue*openBookLiquidityFactor + pythPrice*(1-openBookLiquidityFactor);
-      console.log(this.symbol, "Pyth Price", pythPrice, "OpenBook Mid Value", midValue, "Fair Value", fairValue);
+    console.log(this.symbol, "Loading Fair Value For Scalp", gammaScalpCount);
+    let fairValue;
+    if (priorFillPrice > 0) {
+      fairValue = priorFillPrice;
+      console.log(this.symbol, "Fair Value Set to Prior Fill", fairValue);
     } else {
-      fairValue = midValue;
-      console.log(this.symbol, "Pyth Price Bad Using OpenBook Mid Value", midValue, "Fair Value", fairValue);
-    }
+      const pythPrice = await getPythPrice(new PublicKey(tokenToSplMint(this.symbol)));
+      const bids = await spotMarket.loadBids(this.connection);
+      const asks = await spotMarket.loadAsks(this.connection);
+      const [bidPrice, _bidSize] = bids.getL2(1)[0];
+      const [askPrice, _askSize] = asks.getL2(1)[0];
+      const midValue = (bidPrice + askPrice) / 2.0;
+      // Handle when pyth does not have a price
+      if (pythPrice > 0) {
+        fairValue = midValue*openBookLiquidityFactor + pythPrice*(1-openBookLiquidityFactor);
+        console.log(this.symbol, "Pyth Price", pythPrice, "OpenBook Mid Value", midValue, "Fair Value", fairValue);
+      } else {
+        fairValue = midValue;
+        console.log(this.symbol, "Pyth Price Bad Using OpenBook Mid Value", midValue, "Fair Value", fairValue);
+      }
+  }
     const dipTotalGamma = getDIPGamma(dipProduct, fairValue, this.symbol);
 
     // Calc scalperWindow std deviation spread from zScore & IV for gamma levels

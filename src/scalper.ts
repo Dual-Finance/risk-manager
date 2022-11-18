@@ -13,7 +13,7 @@ import {
   MinOpenBookSize, openBookLiquidityFactor, OPENBOOK_FORK_ID, OPENBOOK_MKT_MAP, OPENBOOK_ACCOUNT_MAP,
 } from "./config";
 import { DIPDeposit } from "./common";
-import { getPythPrice, readKeypair, sleepExact, sleepRandom, tokenToSplMint } from "./utils";
+import { getPythPrice, getSwitchboardPrice, readKeypair, sleepExact, sleepRandom, tokenToSplMint } from "./utils";
 import { SerumVialClient, SerumVialTradeMessage } from "./serumVial";
 import { DexMarket } from "@project-serum/serum-dev-tools";
 import { cancelOpenBookOrders, fillSize, getDIPDelta, getDIPGamma, getSpotDelta, loadPrices, orderSplice, settleOpenBook } from './scalper_utils';
@@ -550,26 +550,23 @@ export class Scalper {
     // Find fair value.
     console.log(this.symbol, "Loading Fair Value...");
     let fairValue;
+    const sbPrice = await getSwitchboardPrice(new PublicKey(tokenToSplMint(this.symbol)));
     const pythPrice = await getPythPrice(new PublicKey(tokenToSplMint(this.symbol)));
     const bids = await spotMarket.loadBids(this.connection);
     const asks = await spotMarket.loadAsks(this.connection);
     const [bidPrice, _bidSize] = bids.getL2(1)[0];
     const [askPrice, _askSize] = asks.getL2(1)[0];
     const midValue = (bidPrice + askPrice) / 2.0;
-    // Handle when pyth does not have a price
-    if (this.symbol == "MNGO"){
-      fairValue = pythPrice.emaPrice.value;
-      console.log(this.symbol, "Use Pyth EMA Price", pythPrice.emaPrice.value, "OpenBook Mid Value", midValue, "Fair Value", fairValue);
+    if (sbPrice > 0) {
+      fairValue = sbPrice;
+      console.log(this.symbol, "SB Price", sbPrice, "OpenBook Mid Value", midValue, "Fair Value", fairValue);
+    } else if (pythPrice.price > 0) {
+      fairValue = midValue*openBookLiquidityFactor + pythPrice.price*(1-openBookLiquidityFactor);
+      console.log(this.symbol, "Pyth Price", pythPrice.price, "OpenBook Mid Value", midValue, "Fair Value", fairValue);
     } else {
-      if (pythPrice.price > 0) {
-        fairValue = midValue*openBookLiquidityFactor + pythPrice.price*(1-openBookLiquidityFactor);
-        console.log(this.symbol, "Pyth Price", pythPrice.price, "OpenBook Mid Value", midValue, "Fair Value", fairValue);
-      } else {
-        fairValue = midValue;
-        console.log(this.symbol, "Pyth Price Bad Using OpenBook Mid Value", midValue, "Fair Value", fairValue);
-      }
+      fairValue = midValue;
+      console.log(this.symbol, "Oracle Prices Bad Using OpenBook Mid Value", midValue, "Fair Value", fairValue);
     }
-    
 
     // Get the DIP Delta
     const dipTotalDelta = getDIPDelta(dipProduct, fairValue, this.symbol);
@@ -696,24 +693,22 @@ export class Scalper {
       fairValue = priorFillPrice;
       console.log(this.symbol, "Fair Value Set to Prior Fill", fairValue);
     } else {
-        const pythPrice = await getPythPrice(new PublicKey(tokenToSplMint(this.symbol)));
-        const bids = await spotMarket.loadBids(this.connection);
-        const asks = await spotMarket.loadAsks(this.connection);
-        const [bidPrice, _bidSize] = bids.getL2(1)[0];
-        const [askPrice, _askSize] = asks.getL2(1)[0];
-        const midValue = (bidPrice + askPrice) / 2.0; 
-      if (this.symbol == "MNGO"){
-        fairValue = pythPrice.emaPrice.value;
-        console.log(this.symbol, "Use Pyth EMA Price", pythPrice.emaPrice.value, "OpenBook Mid Value", midValue, "Fair Value", fairValue);
+      const sbPrice = await getSwitchboardPrice(new PublicKey(tokenToSplMint(this.symbol)));
+      const pythPrice = await getPythPrice(new PublicKey(tokenToSplMint(this.symbol)));
+      const bids = await spotMarket.loadBids(this.connection);
+      const asks = await spotMarket.loadAsks(this.connection);
+      const [bidPrice, _bidSize] = bids.getL2(1)[0];
+      const [askPrice, _askSize] = asks.getL2(1)[0];
+      const midValue = (bidPrice + askPrice) / 2.0;
+      if (sbPrice > 0) {
+        fairValue = sbPrice;
+        console.log(this.symbol, "SB Price", sbPrice, "OpenBook Mid Value", midValue, "Fair Value", fairValue);
+      } else if (pythPrice.price > 0) {
+        fairValue = midValue*openBookLiquidityFactor + pythPrice.price*(1-openBookLiquidityFactor);
+        console.log(this.symbol, "Pyth Price", pythPrice.price, "OpenBook Mid Value", midValue, "Fair Value", fairValue);
       } else {
-        // Handle when pyth does not have a price
-        if (pythPrice.price > 0) {
-          fairValue = midValue*openBookLiquidityFactor + pythPrice.price*(1-openBookLiquidityFactor);
-          console.log(this.symbol, "Pyth Price", pythPrice.price, "OpenBook Mid Value", midValue, "Fair Value", fairValue);
-        } else {
-          fairValue = midValue;
-          console.log(this.symbol, "Pyth Price Bad Using OpenBook Mid Value", midValue, "Fair Value", fairValue);
-        }
+        fairValue = midValue;
+        console.log(this.symbol, "Oracle Prices Bad Using OpenBook Mid Value", midValue, "Fair Value", fairValue);
       }
     }
    

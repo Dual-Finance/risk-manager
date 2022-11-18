@@ -256,16 +256,47 @@ function waitFor(conditionFunction) {
   return new Promise(poll);
 }
 
-export async function getChainlinkPrice() {
-  process.env.ANCHOR_PROVIDER_URL = 'https://api.devnet.solana.com';
+export function tokenToChainlinkSymbol(token: string) {
+  if (token == "SOL") {
+    return "B4vR6BW4WpLh1mFs6LL6iqL4nydbmE5Uzaz2LLsoAXqk";
+  }
+  if (token == "BTC") {
+    return "4NSNfkSgEdAtD8AKyyiu7QsavyR3GSXLXecwDEFbZCZ3";
+  }
+  if (token == "ETH") {
+    return "Aadkg8sVWV6BS5XNTt2mK6Q8FhYWECLdkDuqDHvdnoVT";
+  }
+  if (token == "MNGO") {
+    return "";
+  }
+  return undefined;
+}
+
+export function decimalsBaseSPL(token: string) {
+  if (token == "SOL") {
+    return 8;
+  }
+  if (token == "BTC") {
+    return 8;
+  }
+  if (token == "ETH") {
+    return 8;
+  }
+  if (token == "MNGO") {
+    return 6;
+  }
+  return undefined;
+}
+
+export async function getChainlinkPrice(splMint: PublicKey) {
+  process.env.ANCHOR_PROVIDER_URL = API_URL;
   process.env.ANCHOR_WALLET = os.homedir() + "/mango-explorer/id.json";
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
-  const CHAINLINK_FEED_ADDRESS = "HgTtcbcmp5BeThax5AU8vg4VwK79qAvAKKFMs8txMLW6";
   const CHAINLINK_PROGRAM_ID = new anchor.web3.PublicKey(
     "cjg3oHmg9uuPsP8D6g29NWvhySJkdYdAo9D25PRbKXJ"
   );
-  const feedAddress = new anchor.web3.PublicKey(CHAINLINK_FEED_ADDRESS);
+  const feedAddress = new anchor.web3.PublicKey(tokenToChainlinkSymbol(splMintToToken(splMint)));
 
   let dataFeed = await OCR2Feed.load(CHAINLINK_PROGRAM_ID, provider);
   let listener = null;
@@ -277,5 +308,6 @@ export async function getChainlinkPrice() {
   });
 
   await waitFor((_) => latestValue != 0);
-  return latestValue;
+  const prettyLatestValue = latestValue / Math.pow(10, decimalsBaseSPL(splMintToToken(splMint)));
+  return prettyLatestValue;
 }

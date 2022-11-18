@@ -13,7 +13,7 @@ import {
   MinOpenBookSize, openBookLiquidityFactor, OPENBOOK_FORK_ID, OPENBOOK_MKT_MAP, OPENBOOK_ACCOUNT_MAP, treasuryPositions,
 } from "./config";
 import { DIPDeposit } from "./common";
-import { getPythPrice, getSwitchboardPrice, readKeypair, sleepExact, sleepRandom, tokenToSplMint } from "./utils";
+import { getChainlinkPrice, getPythPrice, getSwitchboardPrice, readKeypair, sleepExact, sleepRandom, tokenToSplMint } from "./utils";
 import { SerumVialClient, SerumVialTradeMessage } from "./serumVial";
 import { DexMarket } from "@project-serum/serum-dev-tools";
 import { cancelOpenBookOrders, fillSize, getDIPDelta, getDIPGamma, getSpotDelta, loadPrices, orderSplice, settleOpenBook } from './scalper_utils';
@@ -559,6 +559,7 @@ export class Scalper {
     // Find fair value.
     console.log(this.symbol, "Loading Fair Value...");
     let fairValue;
+    const chainlinkPrice = await getChainlinkPrice(new PublicKey(tokenToSplMint(this.symbol)));
     const sbPrice = await getSwitchboardPrice(new PublicKey(tokenToSplMint(this.symbol)));
     const pythPrice = await getPythPrice(new PublicKey(tokenToSplMint(this.symbol)));
     const bids = await spotMarket.loadBids(this.connection);
@@ -566,7 +567,10 @@ export class Scalper {
     const [bidPrice, _bidSize] = bids.getL2(1)[0];
     const [askPrice, _askSize] = asks.getL2(1)[0];
     const midValue = (bidPrice + askPrice) / 2.0;
-    if (sbPrice > 0) {
+    if (chainlinkPrice > 0){
+      fairValue = chainlinkPrice;
+      console.log(this.symbol, "Use Chainlink Price", chainlinkPrice);
+    } else if (sbPrice > 0) {
       fairValue = sbPrice;
       console.log(this.symbol, "SB Price", sbPrice, "OpenBook Mid Value", midValue, "Fair Value", fairValue);
     } else if (pythPrice.price > 0) {
@@ -702,6 +706,7 @@ export class Scalper {
       fairValue = priorFillPrice;
       console.log(this.symbol, "Fair Value Set to Prior Fill", fairValue);
     } else {
+      const chainlinkPrice = await getChainlinkPrice(new PublicKey(tokenToSplMint(this.symbol)));
       const sbPrice = await getSwitchboardPrice(new PublicKey(tokenToSplMint(this.symbol)));
       const pythPrice = await getPythPrice(new PublicKey(tokenToSplMint(this.symbol)));
       const bids = await spotMarket.loadBids(this.connection);
@@ -709,7 +714,10 @@ export class Scalper {
       const [bidPrice, _bidSize] = bids.getL2(1)[0];
       const [askPrice, _askSize] = asks.getL2(1)[0];
       const midValue = (bidPrice + askPrice) / 2.0;
-      if (sbPrice > 0) {
+      if (chainlinkPrice > 0){
+        fairValue = chainlinkPrice;
+        console.log(this.symbol, "Use Chainlink Price", chainlinkPrice);
+      } else if (sbPrice > 0) {
         fairValue = sbPrice;
         console.log(this.symbol, "SB Price", sbPrice, "OpenBook Mid Value", midValue, "Fair Value", fairValue);
       } else if (pythPrice.price > 0) {

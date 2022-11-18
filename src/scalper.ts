@@ -8,7 +8,7 @@ import { Market } from '@project-serum/serum';
 import configFile from "./ids.json";
 import {
   networkName, THEO_VOL_MAP, maxNotional, twapInterval, scalperWindow,
-  zScore, MinContractSize, TickSize, FILLS_URL, IS_DEV, fillScan, gammaThreshold,
+  zScore, MinContractSize, TickSize, FILLS_URL, IS_DEV, gammaThreshold,
   maxHedges, percentDrift, DELTA_OFFSET, MANGO_DOWNTIME_THRESHOLD, fundingThreshold, gammaCycles, 
   MinOpenBookSize, openBookLiquidityFactor, OPENBOOK_FORK_ID, OPENBOOK_MKT_MAP, OPENBOOK_ACCOUNT_MAP, treasuryPositions, slippageMax,
 } from "./config";
@@ -273,7 +273,11 @@ export class Scalper {
             "Price", fillPrice, "Remaining", hedgeDeltaTotal, "ID", deltaOrderId,
             new Date().toUTCString()
           );
-          return hedgeDeltaTotal;
+          if (Math.abs(hedgeDeltaTotal * fairValue) < (this.minSize * fairValue)) {
+            fillFeed.removeEventListener('message', deltaFillListener);
+            console.log(this.symbol, "Delta Hedge Complete: Websocket Fill");
+            return;
+          }
         }
       }
     };
@@ -322,23 +326,7 @@ export class Scalper {
 
     // Wait the twapInterval of time to see if the position gets to neutral.
     console.log(this.symbol, "Scan Delta Fills for ~", twapInterval, "seconds");
-    for (let i = 0; i < twapInterval / fillScan; i++) {
-      if (Math.abs(hedgeDeltaTotal * fairValue) < (this.minSize * fairValue)) {
-        fillFeed.removeEventListener('message', deltaFillListener);
-        console.log(this.symbol, "Delta Hedge Complete: Websocket Fill");
-        return;
-      }
-
-      // Use loadFills() in fillSize() as a backup to websocket
-      const filledSize = await fillSize(perpMarket, this.connection, deltaOrderId);
-      const fillDeltaTotal = mangoPerpDelta + dipTotalDelta + spotDelta + mangoSpotDelta + filledSize;
-      if (Math.abs(fillDeltaTotal * fairValue) < (this.minSize * fairValue)) {
-        fillFeed.removeEventListener('message', deltaFillListener);
-        console.log(this.symbol, "Delta Hedge Complete: Loaded Fills");
-        return;
-      }    
-      await sleepRandom(fillScan);
-    }
+    await sleepRandom(twapInterval);
 
     // Cleanup listener.
     fillFeed.removeEventListener('message', deltaFillListener);
@@ -513,9 +501,6 @@ export class Scalper {
     catch (err){
       console.log(this.symbol, "Main Error", err, err.stack)
     }
-
-    // TODO confirm unnecessary caused a crash
-    // this.serumVialClient.closeSerumVial();
   }
 
   async deltaHedgeOpenBook(
@@ -554,6 +539,11 @@ export class Scalper {
         const fillQty = (hedgeSide == 'buy' ? 1 : -1) * message.size;
         hedgeDeltaTotal = hedgeDeltaTotal + fillQty;
         this.serumVialClient.removeAnyListeners();
+        if (Math.abs(hedgeDeltaTotal * fairValue) < (this.minSpotSize * fairValue)) {
+          this.serumVialClient.removeAnyListeners();
+          console.log(this.symbol, "Delta Hedge Complete: SerumVial");
+          return;
+        }
       }
     );
 
@@ -645,28 +635,16 @@ export class Scalper {
     if (spliceFactor == 1){
       const netHedgePeriod = twapInterval*maxHedges;
       console.log(this.symbol, "Scan Delta Fills for ~", netHedgePeriod, "seconds");
-      for (let i = 0; i < netHedgePeriod / fillScan; i++) {
-        if (Math.abs(hedgeDeltaTotal * fairValue) < (this.minSpotSize * fairValue)) {
-          this.serumVialClient.removeAnyListeners();
-          console.log(this.symbol, "Delta Hedge Complete: SerumVial");
-          return;
-        }
-        await sleepRandom(fillScan);
-      }
+      // TODO break this if serumvial filled
+      await sleepRandom(netHedgePeriod);
       console.log(this.symbol, "OpenBook Delta Hedge Failed. Spread %", spreadDelta, "> Slippage %", slippageTolerance*100);
       return;
     }
 
     // Wait the twapInterval of time to see if the position gets to neutral.
     console.log(this.symbol, "Scan Delta Fills for ~", twapInterval, "seconds");
-    for (let i = 0; i < twapInterval / fillScan; i++) {
-      if (Math.abs(hedgeDeltaTotal * fairValue) < (this.minSpotSize * fairValue)) {
-        this.serumVialClient.removeAnyListeners();
-        console.log(this.symbol, "Delta Hedge Complete: SerumVial");
-        return;
-      }
-      await sleepRandom(fillScan);
-    }
+    // TODO break this if serumvial filled
+    await sleepRandom(twapInterval);
 
     console.log(this.symbol, "OpenBook Delta Hedge Refresh", deltaHedgeCount);
     this.serumVialClient.removeAnyListeners();

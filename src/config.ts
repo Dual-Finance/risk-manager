@@ -1,7 +1,7 @@
 import { PublicKey } from "@solana/web3.js";
 import { DIPDeposit } from "./common";
 
-export const IS_DEV: boolean = false;
+export const IS_DEV: boolean = true;
 export const productStatus = new Map<string, boolean> ([
   ['BTC', false], ['ETH', false], ['SOL', true], ['MNGO', false]
 ]);
@@ -114,7 +114,6 @@ export const twapInterval = 15; // Number of seconds to space spliced delta orde
 export const scalperWindow = 600; // Number of seconds for each gamma scalping window
 export const monthAdj = 1; // Adjustment since Date.UTC is zero based
 export const zScore = 1.282; // Corresponds to 80% CI
-export const fillScan = 1; // Number of seconds during twap intervals to check for websocket fills
 export const percentDrift = 0.05; // Percentage of time to allow drift of the timed actions
 export const gammaThreshold = 0.05; // Percentage of gamma to calc delta hedge threshold
 export const maxHedges = 4; // Maximum amount of orders to delta hedge across

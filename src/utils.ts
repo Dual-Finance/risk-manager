@@ -247,7 +247,7 @@ export async function getSwitchboardPrice(splMint: PublicKey) {
   return sbPrice;
 }
 
-  // TODO: Fail after a few tries if chainlink is stuck
+// TODO: Fail after a few tries if chainlink is stuck
 function waitFor(conditionFunction) {
   const poll = (resolve) => {
     if (conditionFunction()) resolve();

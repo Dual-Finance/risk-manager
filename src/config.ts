@@ -1,6 +1,10 @@
 import { PublicKey } from "@solana/web3.js";
+import { DIPDeposit } from "./common";
 
 export const IS_DEV: boolean = true;
+export const productStatus = new Map<string, boolean> ([
+  ['BTC', false], ['ETH', false], ['SOL', true], ['MNGO', true]
+]);
 export const ENVIRONMENT: string = IS_DEV ? "DEVNET" : "MAINNET";
 
 export const networkName = IS_DEV ? 'devnet.2' : 'mainnet.1';
@@ -24,6 +28,10 @@ export const soETHPk = new PublicKey(
   "2FPyTwcZLUg1MDrwsyoP4D6s1tM7hAkHYRjkNb5w6Pxk"
 );
 
+export const mngoPK = new PublicKey(
+  "MangoCzJ36AjZyKwVj3VnYU4GTonjfVEnJmvvWaxLac"
+);
+
 export const dualMarketProgramID = new PublicKey(
   "DiPbvUUJkDhV9jFtQsDFnMEMRJyjW5iS6NMwoySiW8ki"
 );
@@ -36,40 +44,62 @@ export const riskManagerPk = new PublicKey(
 export const mangoTesterPk = new PublicKey(
   "CkcJx7Uwgxck5zm3DqUp2N1ikkkoPn2wA8zf7oS4tFSZ"
 );
-export const OPENBOOK_FORK_ID = new PublicKey("srmqPvymJeFKQ4zGQed1GFppgkRHL9kaELCbyksJtPX");
+export const OPENBOOK_FORK_ID = IS_DEV ?  new PublicKey("EoTcMgcDRTJVZDMZWBoU6rhYHZfkNTVEAfz3uUJRcYGj")
+ : new PublicKey("srmqPvymJeFKQ4zGQed1GFppgkRHL9kaELCbyksJtPX");
 export const OPENBOOK_MKT_MAP = new Map<string, string> ([
-  ['SOL', '8BnEgHoWFysVcuFFX7QztDmzuH8r5ZFvyP3sYwn1XTh6']
+  ['SOL', '8BnEgHoWFysVcuFFX7QztDmzuH8r5ZFvyP3sYwn1XTh6'], ['MNGO', '3NnxQvDcZXputNMxaxsGvqiKpqgPfSYXpNigZNFcknmD']
 ]);
 export const ACCOUNT_MAP = new Map<string, string> ([
   ['BTC', '79ee6JPqTPUDzX4FeAWSntFatmpb5BY5LQrXzMX3aAE6'], ['ETH', 'F7qSsLofbpZBfZ11wkajX9JPshSEeyGpaFvDeuur2mNW'], 
-  ['SOL', '9EaYbxzU1YJwJojKsKp3U38PBy5aqcN2KS9Xc8hAxZB7'], ['USDC', '2gyJ4SZyQtUEXCLRa459nbWaFzuN8uvyoUsVb7xmpkh1']
+  ['SOL', '9EaYbxzU1YJwJojKsKp3U38PBy5aqcN2KS9Xc8hAxZB7'], ['USDC', '2gyJ4SZyQtUEXCLRa459nbWaFzuN8uvyoUsVb7xmpkh1'],
+  ['MNGO', '4zzgXnhfwdtASw9JugEyrPSKzvaN8i2WSDm1bnGiHFcK']
 ]);
-
-export const OPENBOOK_ACCOUNT = "6A4xj97ah6QJmMyJb5jTKSNXVsdc2sJSak3wneSMJrPX";
+export const OPENBOOK_ACCOUNT_MAP = new Map<string, string> ([ 
+  ['SOL', '6A4xj97ah6QJmMyJb5jTKSNXVsdc2sJSak3wneSMJrPX'], ['MNGO', '2KVSgMn5soLxF4E42NUrJWrckx5TZbTwZCUMPcsQLzp2']
+]);
 
 export const OPTION_MINT_ADDRESS_SEED = "option-mint";
 
 export const THEO_VOL_MAP = new Map<string, number> ([
-  ['BTC', 0.60], ['ETH', 0.72], ['SOL', 0.84]
+  ['BTC', 0.60], ['ETH', 0.72], ['SOL', 0.84], ['MNGO', 1.6]
 ]);
 
 export const MinContractSize = new Map<string, number> ([
-  ['BTC', 0.0001], ['ETH', 0.001], ['SOL', 0.01]
+  ['BTC', 0.0001], ['ETH', 0.001], ['SOL', 0.01], ['MNGO', 0.01]
 ]);
 
 export const MinOpenBookSize = new Map<string, number> ([
-  ['BTC', 0.0001], ['ETH', 0.001], ['SOL', 0.01]
+  ['BTC', 0.0001], ['ETH', 0.001], ['SOL', 0.001], ['MNGO', 10]
 ]);
 
 export const TickSize = new Map<string, number> ([
-  ['BTC', 0.1], ['ETH', 0.1], ['SOL', 0.01]
+  ['BTC', 0.1], ['ETH', 0.1], ['SOL', 0.001], ['MNGO', 0.000001]
 ]);
 
 // Adjust delta hedges for loans, negative values allow positive spot balances in mango
 // CAUTION! Turn off scalper, send funds to mango & update value before running!
 export const DELTA_OFFSET = new Map<string, number> ([
-  ['BTC', 0], ['ETH', 0], ['SOL', -117.7]
+  ['BTC', 0], ['ETH', 0], ['SOL', -117.7], ['MNGO', -15]
 ]);
+
+// Enter any Staking Options Owned and to be hedged from the treasury
+export  const treasuryPositions: DIPDeposit[] = [({
+  splToken: 'MNGO',
+  premiumAsset:'USDC',
+  expirationMs: 1672502400000,
+  strike: 0.014,
+  type: 'put',
+  qty: 1790 //TODO increase once approved by DAO 17.9M
+}),
+({
+  splToken: 'MNGO',
+  premiumAsset:'USDC',
+  expirationMs: 1672502400000,
+  strike: 0.0117,
+  type: 'put',
+  qty: 2140 // TODO increase once approved by DAO 21.4M
+})
+]
 
 export const rfRate = 0.03; // Risk Free Rate of Return ~ T-Bill Rate
 export const maxNotional = 10000; // Max hedging order size of $10,000
@@ -81,7 +111,7 @@ export const zScore = 1.282; // Corresponds to 80% CI
 export const fillScan = 1; // Number of seconds during twap intervals to check for websocket fills
 export const percentDrift = 0.05; // Percentage of time to allow drift of the timed actions
 export const gammaThreshold = 0.05; // Percentage of gamma to calc delta hedge threshold
-export const maxHedges = 5; // Maximum amount of orders to delta hedge across
+export const maxHedges = 3; // Maximum amount of orders to delta hedge across
 export const gammaCycles = 10; // Maximum amount of cycles to allow scalps
 export const staggerTime = 30; // Seconds to wait between reruns of each product
 export const MANGO_DOWNTIME_THRESHOLD = 15; // Time in Minutes to stop routing transactions to Mango

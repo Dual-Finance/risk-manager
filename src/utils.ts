@@ -7,8 +7,9 @@ import {
   Token,
   TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
-import { soBTCPk, soETHPk, wSOLPk, percentDrift, API_URL, IS_DEV } from "./config";
+import { soBTCPk, soETHPk, wSOLPk, percentDrift, API_URL, IS_DEV, mngoPK } from "./config";
 import { PythHttpClient, getPythProgramKeyForCluster } from "@pythnetwork/client";
+import SwitchboardProgram from "@switchboard-xyz/sbv2-lite"
 
 export function readKeypair() {
   return JSON.parse(
@@ -141,6 +142,9 @@ export function splMintToToken(splMint: PublicKey) {
   if (splMint.toBase58() == soETHPk.toBase58()) {
     return "ETH";
   }
+  if (splMint.toBase58() == mngoPK.toBase58()) {
+    return "MNGO";
+  }
   return "UNKNOWN_TOKEN";
 }
 
@@ -153,6 +157,9 @@ export function tokenToSplMint(token: string) {
   }
   if (token == "ETH") {
     return soETHPk;
+  }
+  if (token == "MNGO") {
+    return mngoPK;
   }
   return undefined;
 }
@@ -167,6 +174,9 @@ export function tokenToPythSymbol(token: string) {
   if (token == "ETH") {
     return 'Crypto.ETH/USD';
   }
+  if (token == "MNGO") {
+    return 'Crypto.MNGO/USD';
+  }
   return undefined;
 }
 
@@ -179,8 +189,43 @@ export async function getPythPrice(splMint: PublicKey) {
   for (let symbol of data.symbols) {
     const price = data.productPrice.get(symbol)!;
     if (tokenToPythSymbol(splMintToToken(splMint)) == symbol) {
-      return price.price;
+      return price
     }
   }
-  return 0.0;
+  return;
+}
+export function tokenToSBSymbol(token: string) {
+  if (token == "SOL") {
+    return 'GvDMxPzN1sCj7L26YDK2HnMRXEQmQ2aemov8YBtPS7vR';
+  }
+  if (token == "BTC") {
+    return '8SXvChNYFhRq4EZuZvnhjrB3jJRQCv4k3P4W6hesH3Ee';
+  }
+  if (token == "ETH") {
+    return 'HNStfhaLnqwF2ZtJUizaA9uHDAVB976r2AgTUx9LrdEo';
+  }
+  if (token == "MNGO") {
+    return '82kWw8KKysTyZSXovgfPS7msfvnZZc4AAUsUNGp8Kcpy';
+  }
+  return undefined;
+}
+
+export async function getSwitchboardPrice(splMint: PublicKey) {
+  const sbv2 = await SwitchboardProgram.loadMainnet();
+  const assetAggregator = new PublicKey(tokenToSBSymbol(splMintToToken(splMint)));
+  
+  const accountInfo = await sbv2.program.provider.connection.getAccountInfo(
+    assetAggregator
+  );
+  if (!accountInfo) {
+    throw new Error(`Failed to fetch Switchboard account info`);
+  }
+  
+  // Get latest value if its been updated in the last 60 seconds
+  const latestResult = sbv2.decodeLatestAggregatorValue(accountInfo, 60);
+  if (latestResult === null) {
+    throw new Error(`Failed to fetch latest result for Switchboard aggregator`);
+  }
+  const sbPrice = latestResult.toNumber();
+  return sbPrice;
 }

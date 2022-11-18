@@ -57,7 +57,7 @@ export const OPENBOOK_ACCOUNT_MAP = new Map<string, string> ([
 export const OPTION_MINT_ADDRESS_SEED = "option-mint";
 
 export const productStatus = new Map<string, boolean> ([
-  ['BTC', false], ['ETH', false], ['SOL', false], ['MNGO', true]
+  ['BTC', false], ['ETH', false], ['SOL', true], ['MNGO', false]
 ]);
 
 export const THEO_VOL_MAP = new Map<string, number> ([

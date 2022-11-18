@@ -1,7 +1,7 @@
 import { PublicKey } from "@solana/web3.js";
 import { DIPDeposit } from "./common";
 
-export const IS_DEV: boolean = false;
+export const IS_DEV: boolean = true;
 export const productStatus = new Map<string, boolean> ([
   ['BTC', false], ['ETH', false], ['SOL', true], ['MNGO', true]
 ]);

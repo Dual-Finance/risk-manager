@@ -7,9 +7,22 @@ import {
   Token,
   TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
-import { soBTCPk, soETHPk, wSOLPk, percentDrift, API_URL, IS_DEV, mngoPK } from "./config";
-import { PythHttpClient, getPythProgramKeyForCluster } from "@pythnetwork/client";
-import SwitchboardProgram from "@switchboard-xyz/sbv2-lite"
+import {
+  soBTCPk,
+  soETHPk,
+  wSOLPk,
+  percentDrift,
+  API_URL,
+  IS_DEV,
+  mngoPK,
+} from "./config";
+import {
+  PythHttpClient,
+  getPythProgramKeyForCluster,
+} from "@pythnetwork/client";
+import SwitchboardProgram from "@switchboard-xyz/sbv2-lite";
+import * as anchor from "@project-serum/anchor";
+import { OCR2Feed } from "@chainlink/solana-sdk";
 
 export function readKeypair() {
   return JSON.parse(
@@ -20,7 +33,7 @@ export function readKeypair() {
 
 // Sleep Time with some slight randomness to the time
 export function sleepRandom(period: number) {
-  let randomDrift = (Math.random()* 2 -1) * period * percentDrift;
+  let randomDrift = (Math.random() * 2 - 1) * period * percentDrift;
   return new Promise(function (resolve) {
     setTimeout(resolve, (period + randomDrift) * 1_000);
   });
@@ -166,61 +179,65 @@ export function tokenToSplMint(token: string) {
 
 export function tokenToPythSymbol(token: string) {
   if (token == "SOL") {
-    return 'Crypto.SOL/USD';
+    return "Crypto.SOL/USD";
   }
   if (token == "BTC") {
-    return 'Crypto.BTC/USD';
+    return "Crypto.BTC/USD";
   }
   if (token == "ETH") {
-    return 'Crypto.ETH/USD';
+    return "Crypto.ETH/USD";
   }
   if (token == "MNGO") {
-    return 'Crypto.MNGO/USD';
+    return "Crypto.MNGO/USD";
   }
   return undefined;
 }
 
 export async function getPythPrice(splMint: PublicKey) {
   const connection: Connection = new Connection(API_URL);
-  const pythPublicKey = getPythProgramKeyForCluster(IS_DEV ? 'devnet': 'mainnet-beta');
+  const pythPublicKey = getPythProgramKeyForCluster(
+    IS_DEV ? "devnet" : "mainnet-beta"
+  );
   const pythClient = new PythHttpClient(connection, pythPublicKey);
   const data = await pythClient.getData();
 
   for (let symbol of data.symbols) {
     const price = data.productPrice.get(symbol)!;
     if (tokenToPythSymbol(splMintToToken(splMint)) == symbol) {
-      return price
+      return price;
     }
   }
   return;
 }
 export function tokenToSBSymbol(token: string) {
   if (token == "SOL") {
-    return 'GvDMxPzN1sCj7L26YDK2HnMRXEQmQ2aemov8YBtPS7vR';
+    return "GvDMxPzN1sCj7L26YDK2HnMRXEQmQ2aemov8YBtPS7vR";
   }
   if (token == "BTC") {
-    return '8SXvChNYFhRq4EZuZvnhjrB3jJRQCv4k3P4W6hesH3Ee';
+    return "8SXvChNYFhRq4EZuZvnhjrB3jJRQCv4k3P4W6hesH3Ee";
   }
   if (token == "ETH") {
-    return 'HNStfhaLnqwF2ZtJUizaA9uHDAVB976r2AgTUx9LrdEo';
+    return "HNStfhaLnqwF2ZtJUizaA9uHDAVB976r2AgTUx9LrdEo";
   }
   if (token == "MNGO") {
-    return '82kWw8KKysTyZSXovgfPS7msfvnZZc4AAUsUNGp8Kcpy';
+    return "82kWw8KKysTyZSXovgfPS7msfvnZZc4AAUsUNGp8Kcpy";
   }
   return undefined;
 }
 
 export async function getSwitchboardPrice(splMint: PublicKey) {
   const sbv2 = await SwitchboardProgram.loadMainnet();
-  const assetAggregator = new PublicKey(tokenToSBSymbol(splMintToToken(splMint)));
-  
+  const assetAggregator = new PublicKey(
+    tokenToSBSymbol(splMintToToken(splMint))
+  );
+
   const accountInfo = await sbv2.program.provider.connection.getAccountInfo(
     assetAggregator
   );
   if (!accountInfo) {
     throw new Error(`Failed to fetch Switchboard account info`);
   }
-  
+
   // Get latest value if its been updated in the last 60 seconds
   const latestResult = sbv2.decodeLatestAggregatorValue(accountInfo, 60);
   if (latestResult === null) {
@@ -228,4 +245,37 @@ export async function getSwitchboardPrice(splMint: PublicKey) {
   }
   const sbPrice = latestResult.toNumber();
   return sbPrice;
+}
+
+  // TODO: Fail after a few tries if chainlink is stuck
+function waitFor(conditionFunction) {
+  const poll = (resolve) => {
+    if (conditionFunction()) resolve();
+    else setTimeout((_) => poll(resolve), 400);
+  };
+  return new Promise(poll);
+}
+
+export async function getChainlinkPrice() {
+  process.env.ANCHOR_PROVIDER_URL = 'https://api.devnet.solana.com';
+  process.env.ANCHOR_WALLET = os.homedir() + "/mango-explorer/id.json";
+  const provider = anchor.AnchorProvider.env();
+  anchor.setProvider(provider);
+  const CHAINLINK_FEED_ADDRESS = "HgTtcbcmp5BeThax5AU8vg4VwK79qAvAKKFMs8txMLW6";
+  const CHAINLINK_PROGRAM_ID = new anchor.web3.PublicKey(
+    "cjg3oHmg9uuPsP8D6g29NWvhySJkdYdAo9D25PRbKXJ"
+  );
+  const feedAddress = new anchor.web3.PublicKey(CHAINLINK_FEED_ADDRESS);
+
+  let dataFeed = await OCR2Feed.load(CHAINLINK_PROGRAM_ID, provider);
+  let listener = null;
+
+  let latestValue = 0;
+  listener = dataFeed.onRound(feedAddress, (event) => {
+    latestValue = event.answer.toNumber();
+    dataFeed.removeListener(listener);
+  });
+
+  await waitFor((_) => latestValue != 0);
+  return latestValue;
 }

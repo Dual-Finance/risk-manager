@@ -17,6 +17,7 @@ import { getPythPrice, getSwitchboardPrice, readKeypair, sleepExact, sleepRandom
 import { SerumVialClient, SerumVialTradeMessage } from "./serumVial";
 import { DexMarket } from "@project-serum/serum-dev-tools";
 import { cancelOpenBookOrders, fillSize, getDIPDelta, getDIPGamma, getSpotDelta, loadPrices, orderSplice, settleOpenBook } from './scalper_utils';
+import { BN } from "@project-serum/anchor";
 
 export class Scalper {
   client: MangoClient;
@@ -297,7 +298,7 @@ export class Scalper {
           hedgePrice,
           Math.abs(hedgeDeltaClip),
           "limit",
-          deltaOrderId,
+          new BN(deltaOrderId),
           true,
         );
       } else {

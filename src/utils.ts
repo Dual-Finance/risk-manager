@@ -218,13 +218,15 @@ export async function getSwitchboardPrice(splMint: PublicKey) {
     assetAggregator
   );
   if (!accountInfo) {
-    throw new Error(`Failed to fetch Switchboard account info`);
+    console.log(`Failed to fetch Switchboard account info`);
+    return 0;
   }
   
   // Get latest value if its been updated in the last 60 seconds
   const latestResult = sbv2.decodeLatestAggregatorValue(accountInfo, 60);
   if (latestResult === null) {
-    throw new Error(`Failed to fetch latest result for Switchboard aggregator`);
+    console.log (`Failed to fetch latest result for Switchboard aggregator`);
+    return 0;
   }
   const sbPrice = latestResult.toNumber();
   return sbPrice;

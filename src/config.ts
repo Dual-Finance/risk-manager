@@ -1,9 +1,9 @@
 import { PublicKey } from "@solana/web3.js";
 import { DIPDeposit } from "./common";
 
-export const IS_DEV: boolean = true;
+export const IS_DEV: boolean = false;
 export const productStatus = new Map<string, boolean> ([
-  ['BTC', false], ['ETH', false], ['SOL', true], ['MNGO', true]
+  ['BTC', false], ['ETH', false], ['SOL', true], ['MNGO', false]
 ]);
 export const ENVIRONMENT: string = IS_DEV ? "DEVNET" : "MAINNET";
 
@@ -76,6 +76,14 @@ export const TickSize = new Map<string, number> ([
   ['BTC', 0.1], ['ETH', 0.1], ['SOL', 0.001], ['MNGO', 0.000001]
 ]);
 
+export const maxNotional = new Map<string, number> ([
+  ['BTC', 20000], ['ETH', 10000], ['SOL', 10000], ['MNGO', 2500]
+]); // Max hedging $ notional sizes
+
+export const slippageMax = new Map<string, number> ([
+  ['BTC', 0.0010], ['ETH', 0.0010], ['SOL', 0.0015], ['MNGO', 0.0075]
+]); // // Max Allowed xbps above/below FMV on limit orders
+
 // Adjust delta hedges for loans, negative values allow positive spot balances in mango
 // CAUTION! Turn off scalper, send funds to mango & update value before running!
 export const DELTA_OFFSET = new Map<string, number> ([
@@ -102,8 +110,6 @@ export  const treasuryPositions: DIPDeposit[] = [({
 ]
 
 export const rfRate = 0.03; // Risk Free Rate of Return ~ T-Bill Rate
-export const maxNotional = 10000; // Max hedging order size of $10,000
-export const slippageTolerance = 0.0015; // Allow xbps above/below FMV on limit orders
 export const twapInterval = 15; // Number of seconds to space spliced delta orders across
 export const scalperWindow = 600; // Number of seconds for each gamma scalping window
 export const monthAdj = 1; // Adjustment since Date.UTC is zero based
@@ -111,7 +117,7 @@ export const zScore = 1.282; // Corresponds to 80% CI
 export const fillScan = 1; // Number of seconds during twap intervals to check for websocket fills
 export const percentDrift = 0.05; // Percentage of time to allow drift of the timed actions
 export const gammaThreshold = 0.05; // Percentage of gamma to calc delta hedge threshold
-export const maxHedges = 3; // Maximum amount of orders to delta hedge across
+export const maxHedges = 4; // Maximum amount of orders to delta hedge across
 export const gammaCycles = 10; // Maximum amount of cycles to allow scalps
 export const staggerTime = 30; // Seconds to wait between reruns of each product
 export const MANGO_DOWNTIME_THRESHOLD = 15; // Time in Minutes to stop routing transactions to Mango

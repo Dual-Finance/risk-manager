@@ -2,7 +2,7 @@ import { PublicKey } from "@solana/web3.js";
 
 export const IS_DEV: boolean = true;
 export const productStatus = new Map<string, boolean> ([
-  ['BTC', false], ['ETH', false], ['SOL', false], ['MNGO', true]
+  ['BTC', false], ['ETH', false], ['SOL', true], ['MNGO', false]
 ]);
 export const ENVIRONMENT: string = IS_DEV ? "DEVNET" : "MAINNET";
 

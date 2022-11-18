@@ -97,3 +97,4 @@ export const staggerTime = 30; // Seconds to wait between reruns of each product
 export const MANGO_DOWNTIME_THRESHOLD = 15; // Time in Minutes to stop routing transactions to Mango
 export const fundingThreshold = 0.25; // % Funding to switch to openbook orders
 export const openBookLiquidityFactor = 0.2; // Amount of weight to give openbook mid price
+export const periods = 30;

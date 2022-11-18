@@ -55,7 +55,7 @@ export class Router {
       date.getUTCMonth() + 1
     }-${date.getUTCDate()},${dip_deposit.strike * 1_000_000},UPSIDE,E,P`;
     console.log("++++++++++++++++++++++++++++++++++++++++++++++++++++");
-    console.log("Routing for", symbol, "Deposit:", dip_deposit);
+    console.log("Routing for", symbol, "Deposit:", dip_deposit, new Date().toUTCString());
 
     // This happens after sending tokens to a MM. Exit early.
     if (dip_deposit.qty == 0) {
@@ -193,6 +193,7 @@ export class Router {
   }
 
   async refresh_dips() {
+    console.log("Refreshing dips", API_URL);
     const connection: Connection = new Connection(API_URL);
     const programAccountsPromise =
       connection.getProgramAccounts(dualMarketProgramID);
@@ -210,7 +211,7 @@ export class Router {
         const { splMint } = dipState;
 
         const durationMs = expirationSec * 1_000 - Date.now();
-        if (durationMs < 0) {
+        if (durationMs < 0 || durationMs > 1_000 * 60 * 60 * 24 * 30 * 6) {
           continue;
         }
 

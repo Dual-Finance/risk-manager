@@ -5,6 +5,7 @@
     "@pythnetwork/client": "^2.8.0",
     "@solana/spl-token": "^0.1.8",
     "@solana/web3.js": "^1.50.1",
+    "@switchboard-xyz/sbv2-lite": "^0.1.6",
     "black-scholes": "^1.1.0",
     "greeks": "^1.0.0",
     "websocket-ts": "^1.1.1"

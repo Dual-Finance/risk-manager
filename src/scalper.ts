@@ -10,7 +10,7 @@ import {
   networkName, THEO_VOL_MAP, maxNotional, slippageTolerance, twapInterval, scalperWindow,
   zScore, MinContractSize, TickSize, FILLS_URL, IS_DEV, fillScan, gammaThreshold,
   maxHedges, percentDrift, DELTA_OFFSET, MANGO_DOWNTIME_THRESHOLD, fundingThreshold, gammaCycles, 
-  MinOpenBookSize, openBookLiquidityFactor, OPENBOOK_FORK_ID, OPENBOOK_MKT_MAP, OPENBOOK_ACCOUNT_MAP,
+  MinOpenBookSize, openBookLiquidityFactor, OPENBOOK_FORK_ID, OPENBOOK_MKT_MAP, OPENBOOK_ACCOUNT_MAP, treasuryPositions,
 } from "./config";
 import { DIPDeposit } from "./common";
 import { getPythPrice, getSwitchboardPrice, readKeypair, sleepExact, sleepRandom, tokenToSplMint } from "./utils";
@@ -82,6 +82,14 @@ export class Scalper {
       this.perpMarketConfig.baseDecimals,
       this.perpMarketConfig.quoteDecimals
     );
+
+    // Add Any Treasury Positions from Staking Options
+    for (const positions of treasuryPositions){
+      if (this.symbol== positions.splToken){
+        dipProduct.push(positions)
+      }
+    }
+    console.log (this.symbol, "Active Positions", dipProduct)
 
     // Check if Mango is live
     if ((Date.now() - perpMarket.lastUpdated.toNumber() * 1_000) / (1_000 * 60) > MANGO_DOWNTIME_THRESHOLD) {

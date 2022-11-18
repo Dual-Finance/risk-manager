@@ -1,8 +1,9 @@
 import { PublicKey } from "@solana/web3.js";
+import { DIPDeposit } from "./common";
 
 export const IS_DEV: boolean = true;
 export const productStatus = new Map<string, boolean> ([
-  ['BTC', false], ['ETH', false], ['SOL', true], ['MNGO', false]
+  ['BTC', false], ['ETH', false], ['SOL', true], ['MNGO', true]
 ]);
 export const ENVIRONMENT: string = IS_DEV ? "DEVNET" : "MAINNET";
 
@@ -80,6 +81,25 @@ export const TickSize = new Map<string, number> ([
 export const DELTA_OFFSET = new Map<string, number> ([
   ['BTC', 0], ['ETH', 0], ['SOL', -117.7], ['MNGO', -15]
 ]);
+
+// Enter any Staking Options Owned and to be hedged from the treasury
+export  const treasuryPositions: DIPDeposit[] = [({
+  splToken: 'MNGO',
+  premiumAsset:'USDC',
+  expirationMs: 1672502400000,
+  strike: 0.014,
+  type: 'put',
+  qty: 1790 //TODO increase once approved by DAO 17.9M
+}),
+({
+  splToken: 'MNGO',
+  premiumAsset:'USDC',
+  expirationMs: 1672502400000,
+  strike: 0.0117,
+  type: 'put',
+  qty: 2140 // TODO increase once approved by DAO 21.4M
+})
+]
 
 export const rfRate = 0.03; // Risk Free Rate of Return ~ T-Bill Rate
 export const maxNotional = 10000; // Max hedging order size of $10,000

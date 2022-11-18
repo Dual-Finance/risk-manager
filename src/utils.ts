@@ -7,7 +7,7 @@ import {
   Token,
   TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
-import { soBTCPk, soETHPk, wSOLPk, percentDrift, API_URL, IS_DEV } from "./config";
+import { soBTCPk, soETHPk, wSOLPk, percentDrift, API_URL, IS_DEV, mngoPK } from "./config";
 import { PythHttpClient, getPythProgramKeyForCluster } from "@pythnetwork/client";
 
 export function readKeypair() {
@@ -141,6 +141,9 @@ export function splMintToToken(splMint: PublicKey) {
   if (splMint.toBase58() == soETHPk.toBase58()) {
     return "ETH";
   }
+  if (splMint.toBase58() == mngoPK.toBase58()) {
+    return "MNGO";
+  }
   return "UNKNOWN_TOKEN";
 }
 
@@ -153,6 +156,9 @@ export function tokenToSplMint(token: string) {
   }
   if (token == "ETH") {
     return soETHPk;
+  }
+  if (token == "MNGO") {
+    return mngoPK;
   }
   return undefined;
 }
@@ -167,6 +173,9 @@ export function tokenToPythSymbol(token: string) {
   if (token == "ETH") {
     return 'Crypto.ETH/USD';
   }
+  if (token == "MNGO") {
+    return 'Crypto.MNGO/USD';
+  }
   return undefined;
 }
 
@@ -179,8 +188,10 @@ export async function getPythPrice(splMint: PublicKey) {
   for (let symbol of data.symbols) {
     const price = data.productPrice.get(symbol)!;
     if (tokenToPythSymbol(splMintToToken(splMint)) == symbol) {
-      return price.price;
+      return price
     }
   }
-  return 0.0;
+  return;
 }
+
+//TODO Add Switchboard Pricing

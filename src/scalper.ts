@@ -10,7 +10,7 @@ import {
   networkName, THEO_VOL_MAP, maxNotional, slippageTolerance, twapInterval, scalperWindow,
   zScore, MinContractSize, TickSize, FILLS_URL, IS_DEV, fillScan, gammaThreshold,
   maxHedges, percentDrift, DELTA_OFFSET, MANGO_DOWNTIME_THRESHOLD, fundingThreshold, gammaCycles, 
-  MinOpenBookSize, openBookLiquidityFactor, OPENBOOK_FORK_ID, OPENBOOK_MKT_MAP,
+  MinOpenBookSize, openBookLiquidityFactor, OPENBOOK_FORK_ID, OPENBOOK_MKT_MAP, OPENBOOK_ACCOUNT_MAP,
 } from "./config";
 import { DIPDeposit } from "./common";
 import { getPythPrice, readKeypair, sleepExact, sleepRandom, tokenToSplMint } from "./utils";
@@ -32,6 +32,7 @@ export class Scalper {
   perpMarketConfig: MarketConfig;
   marketIndex: number;
   deltaOffset: number;
+  openBookAccount: string;
   serumVialClient: SerumVialClient;
 
   constructor(symbol: string) {
@@ -56,6 +57,7 @@ export class Scalper {
     this.minSpotSize = MinOpenBookSize.get(symbol);
     this.tickSize = TickSize.get(symbol);
     this.deltaOffset = DELTA_OFFSET.get(symbol);
+    this.openBookAccount = OPENBOOK_ACCOUNT_MAP.get(symbol);
 
     this.serumVialClient = new SerumVialClient();
     this.serumVialClient.openSerumVial();
@@ -536,6 +538,7 @@ export class Scalper {
     this.serumVialClient.streamData(
       ['trades'],
       [`${this.symbol}/USDC`],
+      this.openBookAccount,
       (message: SerumVialTradeMessage) => {
         console.log(this.symbol, "Delta Hedge Filled!", hedgeSide, message.size, message.market, message.price, message.timestamp);
         const fillQty = (hedgeSide == 'buy' ? 1 : -1) * message.size;
@@ -546,6 +549,7 @@ export class Scalper {
 
     // Find fair value.
     console.log(this.symbol, "Loading Fair Value...");
+    let fairValue;
     const pythPrice = await getPythPrice(new PublicKey(tokenToSplMint(this.symbol)));
     const bids = await spotMarket.loadBids(this.connection);
     const asks = await spotMarket.loadAsks(this.connection);
@@ -553,13 +557,17 @@ export class Scalper {
     const [askPrice, _askSize] = asks.getL2(1)[0];
     const midValue = (bidPrice + askPrice) / 2.0;
     // Handle when pyth does not have a price
-    let fairValue
-    if (pythPrice > 0) {
-      fairValue = midValue*openBookLiquidityFactor + pythPrice*(1-openBookLiquidityFactor);
-      console.log(this.symbol, "Pyth Price", pythPrice, "OpenBook Mid Value", midValue, "Fair Value", fairValue);
+    if (this.symbol == "MNGO"){
+      fairValue = pythPrice.emaPrice.value;
+      console.log(this.symbol, "Use Pyth EMA Price", pythPrice.emaPrice.value, "OpenBook Mid Value", midValue, "Fair Value", fairValue);
     } else {
-      fairValue = midValue;
-      console.log(this.symbol, "Pyth Price Bad Using OpenBook Mid Value", midValue, "Fair Value", fairValue);
+      if (pythPrice.price > 0) {
+        fairValue = midValue*openBookLiquidityFactor + pythPrice.price*(1-openBookLiquidityFactor);
+        console.log(this.symbol, "Pyth Price", pythPrice.price, "OpenBook Mid Value", midValue, "Fair Value", fairValue);
+      } else {
+        fairValue = midValue;
+        console.log(this.symbol, "Pyth Price Bad Using OpenBook Mid Value", midValue, "Fair Value", fairValue);
+      }
     }
     
 
@@ -596,8 +604,8 @@ export class Scalper {
     const hedgePrice = hedgeDeltaTotal < 0 ? fairValue * (1 + slippageTolerance) : fairValue * (1 - slippageTolerance);
     
     try {
-      const amountDelta = Math.round(Math.abs(hedgeDeltaTotal) * 100) / 100;
-      const priceDelta = Math.floor(Math.abs(hedgePrice) * 1000) / 1000;
+      const amountDelta = Math.round(Math.abs(hedgeDeltaTotal) * (1/this.minSpotSize)) / (1/this.minSpotSize);
+      const priceDelta = Math.floor(Math.abs(hedgePrice) * (1/this.tickSize)) / (1/this.tickSize);
       console.log(this.symbol, hedgeSide, "OpenBook-SPOT", Math.abs(amountDelta), "Limit:", priceDelta, "#", deltaHedgeCount);
       await DexMarket.placeOrder(
         this.connection, 
@@ -667,6 +675,7 @@ export class Scalper {
     this.serumVialClient.streamData(
       ['trades'],
       [`${this.symbol}/USDC`],
+      this.openBookAccount,
       (message: SerumVialTradeMessage) => {
         console.log(this.symbol, "Gamma Scalp Filled!", message.size, message.market, message.price, message.timestamp);
         let fillPrice = Number(message.price);
@@ -687,21 +696,27 @@ export class Scalper {
       fairValue = priorFillPrice;
       console.log(this.symbol, "Fair Value Set to Prior Fill", fairValue);
     } else {
-      const pythPrice = await getPythPrice(new PublicKey(tokenToSplMint(this.symbol)));
-      const bids = await spotMarket.loadBids(this.connection);
-      const asks = await spotMarket.loadAsks(this.connection);
-      const [bidPrice, _bidSize] = bids.getL2(1)[0];
-      const [askPrice, _askSize] = asks.getL2(1)[0];
-      const midValue = (bidPrice + askPrice) / 2.0;
-      // Handle when pyth does not have a price
-      if (pythPrice > 0) {
-        fairValue = midValue*openBookLiquidityFactor + pythPrice*(1-openBookLiquidityFactor);
-        console.log(this.symbol, "Pyth Price", pythPrice, "OpenBook Mid Value", midValue, "Fair Value", fairValue);
+        const pythPrice = await getPythPrice(new PublicKey(tokenToSplMint(this.symbol)));
+        const bids = await spotMarket.loadBids(this.connection);
+        const asks = await spotMarket.loadAsks(this.connection);
+        const [bidPrice, _bidSize] = bids.getL2(1)[0];
+        const [askPrice, _askSize] = asks.getL2(1)[0];
+        const midValue = (bidPrice + askPrice) / 2.0; 
+      if (this.symbol == "MNGO"){
+        fairValue = pythPrice.emaPrice.value;
+        console.log(this.symbol, "Use Pyth EMA Price", pythPrice.emaPrice.value, "OpenBook Mid Value", midValue, "Fair Value", fairValue);
       } else {
-        fairValue = midValue;
-        console.log(this.symbol, "Pyth Price Bad Using OpenBook Mid Value", midValue, "Fair Value", fairValue);
+        // Handle when pyth does not have a price
+        if (pythPrice.price > 0) {
+          fairValue = midValue*openBookLiquidityFactor + pythPrice.price*(1-openBookLiquidityFactor);
+          console.log(this.symbol, "Pyth Price", pythPrice.price, "OpenBook Mid Value", midValue, "Fair Value", fairValue);
+        } else {
+          fairValue = midValue;
+          console.log(this.symbol, "Pyth Price Bad Using OpenBook Mid Value", midValue, "Fair Value", fairValue);
+        }
       }
-  }
+    }
+   
     const dipTotalGamma = getDIPGamma(dipProduct, fairValue, this.symbol);
 
     // Calc scalperWindow std deviation spread from zScore & IV for gamma levels
@@ -719,9 +734,9 @@ export class Scalper {
     // Check again for orders to cancel
     await cancelOpenBookOrders(this.connection, this.owner, spotMarket, this.symbol);
 
-    const amountGamma = Math.round(Math.abs(netGamma) * 100) / 100;
-    const priceBid = Math.floor(Math.abs(gammaBid) * 1000) / 1000;
-    const priceAsk = Math.floor(Math.abs(gammaAsk) * 1000) / 1000;
+    const amountGamma = Math.round(Math.abs(netGamma) * (1/this.minSpotSize)) / (1/this.minSpotSize);
+    const priceBid = Math.floor(Math.abs(gammaBid) * (1/this.tickSize)) / (1/this.tickSize);
+    const priceAsk = Math.floor(Math.abs(gammaAsk) * (1/this.tickSize)) / (1/this.tickSize);
     // TODO send these orders in parallel if possible
     try{
       await DexMarket.placeOrder(

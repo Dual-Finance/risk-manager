@@ -1,5 +1,4 @@
 import WebSocket from "ws";
-import { OPENBOOK_ACCOUNT } from "./config";
 
 const WS_URL = "wss://vial.mngo.cloud/v1/ws";
 
@@ -10,6 +9,7 @@ export class SerumVialClient {
   public streamData(
     channels: string[],
     markets: string[],
+    openBookAccount: string,
     onmessage: (message: any) => void
   ) {
     this._ws.onmessage = (msg) => {
@@ -17,8 +17,8 @@ export class SerumVialClient {
       if (message.type === "trade") {
         const tradeMessage = message as SerumVialTradeMessage;
         if (
-          tradeMessage.makerAccount == OPENBOOK_ACCOUNT ||
-          tradeMessage.takerAccount == OPENBOOK_ACCOUNT
+          tradeMessage.makerAccount == openBookAccount ||
+          tradeMessage.takerAccount == openBookAccount
         )
          {
           onmessage(tradeMessage);
@@ -31,7 +31,7 @@ export class SerumVialClient {
         return;
       }
 
-      this.streamData(channels, markets, onmessage);
+      this.streamData(channels, markets, openBookAccount, onmessage);
     };
 
     const subPayloads = channels.map((channel) => {

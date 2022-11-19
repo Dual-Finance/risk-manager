@@ -90,7 +90,7 @@ export const slippageMax = new Map<string, number> ([
 // Adjust delta hedges for loans, negative values allow positive spot balances in mango
 // CAUTION! Turn off scalper, send funds to mango & update value before running!
 export const DELTA_OFFSET = new Map<string, number> ([
-  ['BTC', 0], ['ETH', 0], ['SOL', -117.7], ['MNGO', -15]
+  ['BTC', 0], ['ETH', 0], ['SOL', -117.7], ['MNGO', 0]
 ]);
 
 // Enter any Staking Options Owned and to be hedged from the treasury

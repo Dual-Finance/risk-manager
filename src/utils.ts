@@ -296,8 +296,10 @@ export async function getChainlinkPrice(splMint: PublicKey) {
   process.env.ANCHOR_WALLET = os.homedir() + "/mango-explorer/id.json";
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
+  if (tokenToChainlinkSymbol(splMintToToken(splMint)) == ""){
+   return 0;
+  }
   const feedAddress = new PublicKey(tokenToChainlinkSymbol(splMintToToken(splMint)));
-
   let dataFeed = await OCR2Feed.load(CHAINLINK_PROGRAM_ID, provider);
   let listener = null;
 

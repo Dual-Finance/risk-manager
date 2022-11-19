@@ -44,6 +44,9 @@ export const riskManagerPk = new PublicKey(
 export const mangoTesterPk = new PublicKey(
   "CkcJx7Uwgxck5zm3DqUp2N1ikkkoPn2wA8zf7oS4tFSZ"
 );
+export const CHAINLINK_PROGRAM_ID = new PublicKey(
+  "cjg3oHmg9uuPsP8D6g29NWvhySJkdYdAo9D25PRbKXJ"
+);
 export const OPENBOOK_FORK_ID = IS_DEV ?  new PublicKey("EoTcMgcDRTJVZDMZWBoU6rhYHZfkNTVEAfz3uUJRcYGj")
  : new PublicKey("srmqPvymJeFKQ4zGQed1GFppgkRHL9kaELCbyksJtPX");
 export const OPENBOOK_MKT_MAP = new Map<string, string> ([

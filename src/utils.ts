@@ -15,6 +15,7 @@ import {
   API_URL,
   IS_DEV,
   mngoPK,
+  CHAINLINK_PROGRAM_ID,
 } from "./config";
 import {
   PythHttpClient,
@@ -293,10 +294,7 @@ export async function getChainlinkPrice(splMint: PublicKey) {
   process.env.ANCHOR_WALLET = os.homedir() + "/mango-explorer/id.json";
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
-  const CHAINLINK_PROGRAM_ID = new anchor.web3.PublicKey(
-    "cjg3oHmg9uuPsP8D6g29NWvhySJkdYdAo9D25PRbKXJ"
-  );
-  const feedAddress = new anchor.web3.PublicKey(tokenToChainlinkSymbol(splMintToToken(splMint)));
+  const feedAddress = new PublicKey(tokenToChainlinkSymbol(splMintToToken(splMint)));
 
   let dataFeed = await OCR2Feed.load(CHAINLINK_PROGRAM_ID, provider);
   let listener = null;

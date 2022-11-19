@@ -11,12 +11,13 @@ import { DIPDeposit } from "./common";
 import {
   ACCOUNT_MAP,
   mangoTesterPk,
+  maxMktSpread,
   optionVaultPk,
   rfRate,
   riskManagerPk,
   THEO_VOL_MAP,
 } from "./config";
-import { getAssociatedTokenAddress, tokenToSplMint } from "./utils";
+import { getAssociatedTokenAddress, getChainlinkPrice, getPythPrice, getSwitchboardPrice, tokenToSplMint } from "./utils";
 import { DexMarket } from "@project-serum/serum-dev-tools";
 
 export async function loadPrices(
@@ -233,4 +234,32 @@ export async function cancelOpenBookOrders(connection, owner, spotMarket, symbol
     }
   }
 }
-  
+
+export async function getFairValue(connection, spotMarket, symbol) {
+  const chainlinkPrice = await getChainlinkPrice(new PublicKey(tokenToSplMint(symbol)));
+  const sbPrice = await getSwitchboardPrice(new PublicKey(tokenToSplMint(symbol)));
+  const pythPrice = await getPythPrice(new PublicKey(tokenToSplMint(symbol)));
+  const bids = await spotMarket.loadBids(connection);
+  const asks = await spotMarket.loadAsks(connection);
+  const [bidPrice, _bidSize] = bids.getL2(1)[0];
+  const [askPrice, _askSize] = asks.getL2(1)[0];
+  const midValue = (bidPrice + askPrice) / 2.0;
+  const mktSpread = (askPrice - bidPrice) / midValue;
+  let fairValue;
+  if (chainlinkPrice > 0){
+    fairValue = chainlinkPrice;
+    console.log(symbol, "Use Chainlink Price", chainlinkPrice);
+  } else if (sbPrice > 0) {
+    fairValue = sbPrice;
+    console.log(symbol, "Using Switchboard", sbPrice);
+  } else if (pythPrice.price > 0) {
+    fairValue = pythPrice.price;
+    console.log(symbol, "Using Pyth", pythPrice.price);
+  } else if (mktSpread < maxMktSpread) {
+    fairValue = midValue;
+    console.log(symbol, "Using OpenBook Mid Value", midValue);
+  } else {
+    fairValue = 0;
+  }
+  return fairValue;
+}

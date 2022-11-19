@@ -10,13 +10,14 @@ import {
   networkName, THEO_VOL_MAP, maxNotional, twapInterval, scalperWindow,
   zScore, MinContractSize, TickSize, FILLS_URL, IS_DEV, gammaThreshold,
   maxHedges, percentDrift, DELTA_OFFSET, MANGO_DOWNTIME_THRESHOLD, fundingThreshold, gammaCycles, 
-  MinOpenBookSize, openBookLiquidityFactor, OPENBOOK_FORK_ID, OPENBOOK_MKT_MAP, OPENBOOK_ACCOUNT_MAP, treasuryPositions, slippageMax,
+  MinOpenBookSize, OPENBOOK_FORK_ID, OPENBOOK_MKT_MAP, OPENBOOK_ACCOUNT_MAP, treasuryPositions, slippageMax,
 } from "./config";
 import { DIPDeposit } from "./common";
-import { getChainlinkPrice, getPythPrice, getSwitchboardPrice, readKeypair, sleepExact, sleepRandom, tokenToSplMint } from "./utils";
+import { readKeypair, sleepExact, sleepRandom } from "./utils";
 import { SerumVialClient, SerumVialTradeMessage } from "./serumVial";
 import { DexMarket } from "@project-serum/serum-dev-tools";
-import { cancelOpenBookOrders, fillSize, getDIPDelta, getDIPGamma, getSpotDelta, loadPrices, orderSpliceMango, orderSpliceOpenBook, settleOpenBook } from './scalper_utils';
+import { cancelOpenBookOrders, getDIPDelta, getDIPGamma, getFairValue, getSpotDelta, loadPrices, 
+  orderSpliceMango, orderSpliceOpenBook, settleOpenBook } from './scalper_utils';
 import { BN } from "@project-serum/anchor";
 
 export class Scalper {
@@ -545,27 +546,14 @@ export class Scalper {
 
     // Find fair value.
     console.log(this.symbol, "Loading Fair Value...");
-    let fairValue;
-    const chainlinkPrice = await getChainlinkPrice(new PublicKey(tokenToSplMint(this.symbol)));
-    const sbPrice = await getSwitchboardPrice(new PublicKey(tokenToSplMint(this.symbol)));
-    const pythPrice = await getPythPrice(new PublicKey(tokenToSplMint(this.symbol)));
-    const bids = await spotMarket.loadBids(this.connection);
-    const asks = await spotMarket.loadAsks(this.connection);
-    const [bidPrice, _bidSize] = bids.getL2(1)[0];
-    const [askPrice, _askSize] = asks.getL2(1)[0];
-    const midValue = (bidPrice + askPrice) / 2.0;
-    if (chainlinkPrice > 0){
-      fairValue = chainlinkPrice;
-      console.log(this.symbol, "Use Chainlink Price", chainlinkPrice);
-    } else if (sbPrice > 0) {
-      fairValue = sbPrice;
-      console.log(this.symbol, "Using Switchboard", sbPrice);
-    } else if (pythPrice.price > 0) {
-      fairValue = midValue*openBookLiquidityFactor + pythPrice.price*(1-openBookLiquidityFactor);
-      console.log(this.symbol, "Using Pyth", pythPrice.price, " & OpenBook Mid Value", midValue);
-    } else {
-      fairValue = midValue;
-      console.log(this.symbol, "Bad Oracle Prices. Using OpenBook Mid Value", midValue);
+    const fairValue = await getFairValue(this.connection, spotMarket, this.symbol)
+    if (fairValue == 0) {
+      console.log(this.symbol, "No Robust Pricing. Delta Refresh", deltaHedgeCount);
+      this.serumVialClient.removeAnyListeners();
+      await this.deltaHedgeOpenBook(
+        dipProduct,
+        deltaHedgeCount + 1,
+      );
     }
 
     // Get the DIP Delta
@@ -600,6 +588,10 @@ export class Scalper {
     const hedgePrice = hedgeDeltaTotal < 0 ? fairValue * (1 + slippageTolerance) : fairValue * (1 - slippageTolerance);
     
     // Splice Order depending on book depth
+    const bids = await spotMarket.loadBids(this.connection);
+    const asks = await spotMarket.loadAsks(this.connection);
+    const [bidTOB, _bidSize] = bids.getL2(1)[0];
+    const [askTOB, _askSize] = asks.getL2(1)[0];
     const spliceFactor = orderSpliceOpenBook(
       hedgeDeltaTotal,
       hedgePrice,
@@ -612,7 +604,7 @@ export class Scalper {
       hedgeDeltaTotal /
       Math.min(spliceFactor, maxHedges);
 
-    const spreadDelta = hedgeDeltaTotal < 0 ? (askPrice - hedgePrice) / hedgePrice * 100 : (bidPrice - hedgePrice) / hedgePrice * 100;
+    const spreadDelta = hedgeDeltaTotal < 0 ? (askTOB - hedgePrice) / hedgePrice * 100 : (bidTOB - hedgePrice) / hedgePrice * 100;
 
     try {
       const amountDelta = Math.round(Math.abs(hedgeDeltaClip) * (1/this.minSpotSize)) / (1/this.minSpotSize);
@@ -687,7 +679,7 @@ export class Scalper {
 
     // Prevent too much recursion.
     if (gammaScalpCount > gammaCycles) {
-      console.log(this.symbol, "Maximum scalps acheived!", gammaScalpCount);
+      console.log(this.symbol, "Maximum scalps acheived!", gammaScalpCount-1, "Wait for Rerun");
       return;
     }
 
@@ -719,29 +711,17 @@ export class Scalper {
       fairValue = priorFillPrice;
       console.log(this.symbol, "Fair Value Set to Prior Fill", fairValue);
     } else {
-      const chainlinkPrice = await getChainlinkPrice(new PublicKey(tokenToSplMint(this.symbol)));
-      const sbPrice = await getSwitchboardPrice(new PublicKey(tokenToSplMint(this.symbol)));
-      const pythPrice = await getPythPrice(new PublicKey(tokenToSplMint(this.symbol)));
-      const bids = await spotMarket.loadBids(this.connection);
-      const asks = await spotMarket.loadAsks(this.connection);
-      const [bidPrice, _bidSize] = bids.getL2(1)[0];
-      const [askPrice, _askSize] = asks.getL2(1)[0];
-      const midValue = (bidPrice + askPrice) / 2.0;
-      if (chainlinkPrice > 0){
-        fairValue = chainlinkPrice;
-        console.log(this.symbol, "Use Chainlink Price", chainlinkPrice);
-      } else if (sbPrice > 0) {
-        fairValue = sbPrice;
-        console.log(this.symbol, "Using Switchboard", sbPrice);
-      } else if (pythPrice.price > 0) {
-        fairValue = midValue*openBookLiquidityFactor + pythPrice.price*(1-openBookLiquidityFactor);
-        console.log(this.symbol, "Using Pyth", pythPrice.price, " & OpenBook Mid Value", midValue);
-      } else {
-        fairValue = midValue;
-        console.log(this.symbol, "Bad Oracle Prices. Using OpenBook Mid Value", midValue);
-      }
+      fairValue = await getFairValue(this.connection, spotMarket, this.symbol) 
     }
-   
+    if (fairValue == 0) {
+      console.log(this.symbol, " No Robust Pricing. Rerun Gamma Scalper");
+      this.gammaScalpOpenBook(
+        dipProduct,
+        gammaScalpCount + 1,
+        0
+      );
+      return;
+    }
     const dipTotalGamma = getDIPGamma(dipProduct, fairValue, this.symbol);
 
     // Calc scalperWindow std deviation spread from zScore & IV for gamma levels

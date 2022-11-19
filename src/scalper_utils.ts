@@ -55,8 +55,8 @@ export function getDIPDelta(
   return deltaSum;
 }
 
-// Splice delta hedge orders if available liquidity not supportive
-export function orderSplice(
+// Splice delta hedge orders if available mango liquidity not supportive
+export function orderSpliceMango(
   qty: number,
   price: number,
   notionalMax: number,
@@ -90,6 +90,36 @@ export function orderSplice(
     console.log("Slippage Tolerable", side.getImpactPriceUi(nativeQty));
   }
   return spliceFactor;
+}
+
+// Splice delta hedge orders if available mango liquidity not supportive
+export function orderSpliceOpenBook(
+  qty: number,
+  price: number,
+  notionalMax: number,
+  hedgeSide: string,
+  bids,
+  asks, 
+  ) {
+  let depth = 0;
+  if (hedgeSide == "sell") {
+    for (const bid of bids) {
+      if (bid.price > price){
+        depth = bid.size + depth
+      }
+    }
+  } else if (hedgeSide == "buy") {
+    for (const ask of asks) {
+      if (ask.price < price){
+        depth = ask.size + depth
+      }
+    }
+  }
+  if (depth > qty){
+    return 1;
+  } else {
+    return Math.max((qty * price) / notionalMax, 1)
+  }
 }
 
 export function getDIPGamma(

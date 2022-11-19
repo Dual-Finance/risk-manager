@@ -7,16 +7,16 @@ import { Keypair, Commitment, Connection, PublicKey } from "@solana/web3.js";
 import { Market } from '@project-serum/serum';
 import configFile from "./ids.json";
 import {
-  networkName, THEO_VOL_MAP, maxNotional, slippageTolerance, twapInterval, scalperWindow,
-  zScore, MinContractSize, TickSize, FILLS_URL, IS_DEV, fillScan, gammaThreshold,
+  networkName, THEO_VOL_MAP, maxNotional, twapInterval, scalperWindow,
+  zScore, MinContractSize, TickSize, FILLS_URL, IS_DEV, gammaThreshold,
   maxHedges, percentDrift, DELTA_OFFSET, MANGO_DOWNTIME_THRESHOLD, fundingThreshold, gammaCycles, 
-  MinOpenBookSize, openBookLiquidityFactor, OPENBOOK_FORK_ID, OPENBOOK_MKT_MAP, OPENBOOK_ACCOUNT_MAP, treasuryPositions,
+  MinOpenBookSize, openBookLiquidityFactor, OPENBOOK_FORK_ID, OPENBOOK_MKT_MAP, OPENBOOK_ACCOUNT_MAP, treasuryPositions, slippageMax,
 } from "./config";
 import { DIPDeposit } from "./common";
 import { getChainlinkPrice, getPythPrice, getSwitchboardPrice, readKeypair, sleepExact, sleepRandom, tokenToSplMint } from "./utils";
 import { SerumVialClient, SerumVialTradeMessage } from "./serumVial";
 import { DexMarket } from "@project-serum/serum-dev-tools";
-import { cancelOpenBookOrders, fillSize, getDIPDelta, getDIPGamma, getSpotDelta, loadPrices, orderSplice, settleOpenBook } from './scalper_utils';
+import { cancelOpenBookOrders, fillSize, getDIPDelta, getDIPGamma, getSpotDelta, loadPrices, orderSpliceMango, orderSpliceOpenBook, settleOpenBook } from './scalper_utils';
 import { BN } from "@project-serum/anchor";
 
 export class Scalper {
@@ -203,6 +203,7 @@ export class Scalper {
     // Check whether we need to hedge.
     const dipTotalGamma = getDIPGamma(dipProduct, fairValue, this.symbol);
     const stdDevSpread = this.impliedVol / Math.sqrt((365 * 24 * 60 * 60) / scalperWindow) * zScore;
+    const slippageTolerance = Math.min(stdDevSpread/ 2, slippageMax.get(this.symbol));
     const deltaThreshold = Math.max(dipTotalGamma * stdDevSpread * fairValue * gammaThreshold, this.minSize);
     if (Math.abs(hedgeDeltaTotal * fairValue) < (deltaThreshold * fairValue)) {
       console.log(this.symbol, "Delta Netural <", deltaThreshold);
@@ -243,10 +244,10 @@ export class Scalper {
     const bookSide = hedgeDeltaTotal < 0 ? askSide : bidSide;
     const hedgeDeltaClip =
       hedgeDeltaTotal /
-      Math.min(orderSplice(
+      Math.min(orderSpliceMango(
         hedgeDeltaTotal,
         fairValue,
-        maxNotional,
+        maxNotional.get(this.symbol),
         slippageTolerance,
         bookSide,
         perpMarket
@@ -273,7 +274,11 @@ export class Scalper {
             "Price", fillPrice, "Remaining", hedgeDeltaTotal, "ID", deltaOrderId,
             new Date().toUTCString()
           );
-          return hedgeDeltaTotal;
+          if (Math.abs(hedgeDeltaTotal * fairValue) < (this.minSize * fairValue)) {
+            fillFeed.removeEventListener('message', deltaFillListener);
+            console.log(this.symbol, "Delta Hedge Complete: Websocket Fill");
+            return;
+          }
         }
       }
     };
@@ -322,23 +327,7 @@ export class Scalper {
 
     // Wait the twapInterval of time to see if the position gets to neutral.
     console.log(this.symbol, "Scan Delta Fills for ~", twapInterval, "seconds");
-    for (let i = 0; i < twapInterval / fillScan; i++) {
-      if (Math.abs(hedgeDeltaTotal * fairValue) < (this.minSize * fairValue)) {
-        fillFeed.removeEventListener('message', deltaFillListener);
-        console.log(this.symbol, "Delta Hedge Complete: Websocket Fill");
-        return;
-      }
-
-      // Use loadFills() in fillSize() as a backup to websocket
-      const filledSize = await fillSize(perpMarket, this.connection, deltaOrderId);
-      const fillDeltaTotal = mangoPerpDelta + dipTotalDelta + spotDelta + mangoSpotDelta + filledSize;
-      if (Math.abs(fillDeltaTotal * fairValue) < (this.minSize * fairValue)) {
-        fillFeed.removeEventListener('message', deltaFillListener);
-        console.log(this.symbol, "Delta Hedge Complete: Loaded Fills");
-        return;
-      }    
-      await sleepRandom(fillScan);
-    }
+    await sleepRandom(twapInterval);
 
     // Cleanup listener.
     fillFeed.removeEventListener('message', deltaFillListener);
@@ -459,7 +448,8 @@ export class Scalper {
     } catch (err) {
       console.log(this.symbol, "Gamma Error", err, err.stack);
     }
-    
+    console.log(this.symbol, "Market Spread %", (gammaAsk-gammaBid)/fairValue * 100, "Liquidity $", netGamma*2*fairValue);
+
     // Sleep for the max time of the reruns then kill thread
     await sleepExact((1 + percentDrift) * scalperWindow);
     console.log(this.symbol, "Remove stale gamma fill listener", gammaBidID, gammaAskID)
@@ -512,9 +502,6 @@ export class Scalper {
     catch (err){
       console.log(this.symbol, "Main Error", err, err.stack)
     }
-
-    // TODO confirm unnecessary caused a crash
-    // this.serumVialClient.closeSerumVial();
   }
 
   async deltaHedgeOpenBook(
@@ -572,13 +559,13 @@ export class Scalper {
       console.log(this.symbol, "Use Chainlink Price", chainlinkPrice);
     } else if (sbPrice > 0) {
       fairValue = sbPrice;
-      console.log(this.symbol, "SB Price", sbPrice, "OpenBook Mid Value", midValue, "Fair Value", fairValue);
+      console.log(this.symbol, "Using Switchboard", sbPrice);
     } else if (pythPrice.price > 0) {
       fairValue = midValue*openBookLiquidityFactor + pythPrice.price*(1-openBookLiquidityFactor);
-      console.log(this.symbol, "Pyth Price", pythPrice.price, "OpenBook Mid Value", midValue, "Fair Value", fairValue);
+      console.log(this.symbol, "Using Pyth", pythPrice.price, " & OpenBook Mid Value", midValue);
     } else {
       fairValue = midValue;
-      console.log(this.symbol, "Oracle Prices Bad Using OpenBook Mid Value", midValue, "Fair Value", fairValue);
+      console.log(this.symbol, "Bad Oracle Prices. Using OpenBook Mid Value", midValue);
     }
 
     // Get the DIP Delta
@@ -600,23 +587,37 @@ export class Scalper {
     // Check whether we need to hedge.
     const dipTotalGamma = getDIPGamma(dipProduct, fairValue, this.symbol);
     const stdDevSpread = this.impliedVol / Math.sqrt((365 * 24 * 60 * 60) / scalperWindow) * zScore;
+    const slippageTolerance = Math.min(stdDevSpread/ 2, slippageMax.get(this.symbol));
     const deltaThreshold = Math.max(dipTotalGamma * stdDevSpread * fairValue * gammaThreshold, this.minSpotSize);
     if (Math.abs(hedgeDeltaTotal * fairValue) < (deltaThreshold * fairValue)) {
       console.log(this.symbol, "Delta Netural <", deltaThreshold);
       return;
     } else {
-      console.log(this.symbol, "Above delta threshold:", hedgeDeltaTotal, deltaThreshold);
+      console.log(this.symbol, "Above delta threshold:", hedgeDeltaTotal, ">", deltaThreshold);
     }
-
-    // TODO: Order splicing if necessary
   
     // Place an order to get delta neutral.
     const hedgePrice = hedgeDeltaTotal < 0 ? fairValue * (1 + slippageTolerance) : fairValue * (1 - slippageTolerance);
     
+    // Splice Order depending on book depth
+    const spliceFactor = orderSpliceOpenBook(
+      hedgeDeltaTotal,
+      hedgePrice,
+      maxNotional.get(this.symbol),
+      hedgeSide,
+      bids,
+      asks
+    );
+    const hedgeDeltaClip =
+      hedgeDeltaTotal /
+      Math.min(spliceFactor, maxHedges);
+
+    const spreadDelta = hedgeDeltaTotal < 0 ? (askPrice - hedgePrice) / hedgePrice * 100 : (bidPrice - hedgePrice) / hedgePrice * 100;
+
     try {
-      const amountDelta = Math.round(Math.abs(hedgeDeltaTotal) * (1/this.minSpotSize)) / (1/this.minSpotSize);
+      const amountDelta = Math.round(Math.abs(hedgeDeltaClip) * (1/this.minSpotSize)) / (1/this.minSpotSize);
       const priceDelta = Math.floor(Math.abs(hedgePrice) * (1/this.tickSize)) / (1/this.tickSize);
-      console.log(this.symbol, hedgeSide, "OpenBook-SPOT", Math.abs(amountDelta), "Limit:", priceDelta, "#", deltaHedgeCount);
+      console.log(this.symbol, hedgeSide, "OpenBook-SPOT", amountDelta, "Limit:", priceDelta, "#", deltaHedgeCount);
       await DexMarket.placeOrder(
         this.connection, 
         this.owner,
@@ -630,23 +631,35 @@ export class Scalper {
       console.log(this.symbol, "Delta Hedge", err, err.stack);
     }
 
-    // Wait the twapInterval of time to see if the position gets to neutral.
-    console.log(this.symbol, "Scan Delta Fills for ~", twapInterval, "seconds");
-    for (let i = 0; i < twapInterval / fillScan; i++) {
+    // Rest single order & do not refresh if the hedge should be completed in a single clip
+    if (spliceFactor == 1){
+      const netHedgePeriod = twapInterval*maxHedges;
+      console.log(this.symbol, "Scan Delta Fills for ~", netHedgePeriod, "seconds");
+      for (let i = 0; i < maxHedges; i++) {
+        await waitForFill(() => Math.abs(hedgeDeltaTotal * fairValue) < (this.minSpotSize * fairValue));
+        if (Math.abs(hedgeDeltaTotal * fairValue) < (this.minSpotSize * fairValue)) {
+          this.serumVialClient.removeAnyListeners();
+          console.log(this.symbol, "Delta Hedge Complete: SerumVial");
+          return;
+        }
+      }
+      console.log(this.symbol, "OpenBook Delta Hedge Timeout. Spread %", spreadDelta, "> Slippage %", slippageTolerance*100);
+    } else {
+      // Wait the twapInterval of time to see if the position gets to neutral.
+      console.log(this.symbol, "Scan Delta Fills for ~", twapInterval, "seconds");
+      await waitForFill((_) => Math.abs(hedgeDeltaTotal * fairValue) < (this.minSpotSize * fairValue));
       if (Math.abs(hedgeDeltaTotal * fairValue) < (this.minSpotSize * fairValue)) {
         this.serumVialClient.removeAnyListeners();
         console.log(this.symbol, "Delta Hedge Complete: SerumVial");
         return;
       }
-      await sleepRandom(fillScan);
+      console.log(this.symbol, "OpenBook Delta Hedge Refresh", deltaHedgeCount);
+      this.serumVialClient.removeAnyListeners();
+      await this.deltaHedgeOpenBook(
+        dipProduct,
+        deltaHedgeCount + 1,
+      );
     }
-
-    console.log(this.symbol, "OpenBook Delta Hedge Refresh", deltaHedgeCount);
-    this.serumVialClient.removeAnyListeners();
-    await this.deltaHedgeOpenBook(
-      dipProduct,
-      deltaHedgeCount + 1,
-    );
   }
 
   async gammaScalpOpenBook(
@@ -719,13 +732,13 @@ export class Scalper {
         console.log(this.symbol, "Use Chainlink Price", chainlinkPrice);
       } else if (sbPrice > 0) {
         fairValue = sbPrice;
-        console.log(this.symbol, "SB Price", sbPrice, "OpenBook Mid Value", midValue, "Fair Value", fairValue);
+        console.log(this.symbol, "Using Switchboard", sbPrice);
       } else if (pythPrice.price > 0) {
         fairValue = midValue*openBookLiquidityFactor + pythPrice.price*(1-openBookLiquidityFactor);
-        console.log(this.symbol, "Pyth Price", pythPrice.price, "OpenBook Mid Value", midValue, "Fair Value", fairValue);
+        console.log(this.symbol, "Using Pyth", pythPrice.price, " & OpenBook Mid Value", midValue);
       } else {
         fairValue = midValue;
-        console.log(this.symbol, "Oracle Prices Bad Using OpenBook Mid Value", midValue, "Fair Value", fairValue);
+        console.log(this.symbol, "Bad Oracle Prices. Using OpenBook Mid Value", midValue);
       }
     }
    
@@ -778,7 +791,19 @@ export class Scalper {
     } catch (err) {
       console.log(this.symbol, "Gamma Ask", err, err.stack);
     }
-
+    console.log(this.symbol, "Market Spread %", (priceAsk-priceBid)/fairValue * 100, "Liquidity $", amountGamma*2*fairValue);
     await sleepExact((1 + percentDrift) * scalperWindow);
   }
+}
+
+function waitForFill(conditionFunction) {
+  let pollCount = 0;
+  const resolvePeriodMs = 100;
+  const poll = (resolve) => {
+    pollCount = pollCount+1;
+    if (pollCount > twapInterval*resolvePeriodMs/10) resolve();
+    else if (conditionFunction()) resolve();
+    else setTimeout((_) => poll(resolve), resolvePeriodMs); 
+  };
+  return new Promise(poll);
 }

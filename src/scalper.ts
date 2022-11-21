@@ -733,8 +733,10 @@ export class Scalper {
     // Calc scalperWindow std deviation spread from zScore & IV for gamma levels
     const stdDevSpread = this.impliedVol / Math.sqrt((365 * 24 * 60 * 60) / scalperWindow) * zScore;
     const netGamma = IS_DEV ? Math.max(0.01, dipTotalGamma * stdDevSpread * fairValue) : dipTotalGamma * stdDevSpread * fairValue;
-    const gammaBid = fairValue * (1 - stdDevSpread-stdDevSpread*(gammaScalpCount-1)/gammaCycles);
-    const gammaAsk = fairValue * (1 + stdDevSpread+stdDevSpread*(gammaScalpCount-1)/gammaCycles);
+
+    const widenSpread = (gammaScalpCount-1)/gammaCycles;
+    const gammaBid = fairValue * (1 - stdDevSpread - stdDevSpread * widenSpread);
+    const gammaAsk = fairValue * (1 + stdDevSpread + stdDevSpread * widenSpread);
 
     console.log(this.symbol, "Position Gamma Γ:", netGamma, "Fair Value", fairValue);
     if ((netGamma * fairValue) < (this.minSpotSize * fairValue)){

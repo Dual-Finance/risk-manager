@@ -16,7 +16,7 @@ import { DIPDeposit } from "./common";
 import { readKeypair, sleepExact, sleepRandom } from "./utils";
 import { SerumVialClient, SerumVialTradeMessage } from "./serumVial";
 import { DexMarket } from "@project-serum/serum-dev-tools";
-import { cancelOpenBookOrders, getDIPDelta, getDIPGamma, getFairValue, getSpotDelta, loadPrices, 
+import { cancelOpenBookOrders, getDIPDelta, getDIPGamma, getDIPTheta, getFairValue, getSpotDelta, loadPrices, 
   orderSpliceMango, orderSpliceOpenBook, settleOpenBook } from './scalper_utils';
 import { BN } from "@project-serum/anchor";
 
@@ -362,7 +362,7 @@ export class Scalper {
 
     // Avoid unsafe recursion.
     if (gammaScalpCount > gammaCycles) {
-      console.log(this.symbol, "Max Hedges exceeded without getting to neutral");
+      console.log(this.symbol, "Maximum scalps acheived!", gammaScalpCount-1, "Wait for Rerun");
       return;
     }
 
@@ -377,7 +377,7 @@ export class Scalper {
     console.log(this.symbol, "Position Gamma Γ:", netGamma, "Fair Value", fairValue);
     if ((netGamma * fairValue) < (this.minSize * fairValue)){
       console.log(this.symbol, 'Gamma Hedge Too Small')
-      return
+      return;
     }
 
     const orderIdGamma = new Date().getTime() * 2;
@@ -493,6 +493,13 @@ export class Scalper {
         dipProduct,
         1,
       );
+    }
+    catch (err){
+        console.log(this.symbol, "Main Delta Error", err, err.stack)
+      }
+    this.serumVialClient.removeAnyListeners();
+
+    try{
       await this.gammaScalpOpenBook(
         dipProduct,
         1,
@@ -501,8 +508,10 @@ export class Scalper {
       // TODO: OpenBook settlement to move to mango if needed
     }
     catch (err){
-      console.log(this.symbol, "Main Error", err, err.stack)
+      console.log(this.symbol, "Main Gamma Error", err, err.stack)
     }
+    console.log(this.symbol, "Scalper Cycle completed", new Date().toUTCString())
+    console.log("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
   }
 
   async deltaHedgeOpenBook(
@@ -540,20 +549,22 @@ export class Scalper {
         console.log(this.symbol, "Delta Hedge Filled!", hedgeSide, message.size, message.market, message.price, message.timestamp);
         const fillQty = (hedgeSide == 'buy' ? 1 : -1) * message.size;
         hedgeDeltaTotal = hedgeDeltaTotal + fillQty;
-        this.serumVialClient.removeAnyListeners();
       }
     );
 
     // Find fair value.
     console.log(this.symbol, "Loading Fair Value...");
-    const fairValue = await getFairValue(this.connection, spotMarket, this.symbol)
+    let fairValue = await getFairValue(this.connection, spotMarket, this.symbol)
+    for (let i = 0; i < maxHedges; i++){
+      if (fairValue == 0) {
+        console.log(this.symbol, "No Prices Refreshing Delta Hedge", i+1, "After", twapInterval, "Seconds");
+        await sleepExact(twapInterval);
+        fairValue = await getFairValue(this.connection, spotMarket, this.symbol)
+      }
+    }
     if (fairValue == 0) {
-      console.log(this.symbol, "No Robust Pricing. Delta Refresh", deltaHedgeCount);
-      this.serumVialClient.removeAnyListeners();
-      await this.deltaHedgeOpenBook(
-        dipProduct,
-        deltaHedgeCount + 1,
-      );
+      console.log(this.symbol, "No Robust Pricing. Exiting Delta Hedge", deltaHedgeCount);
+      return;
     }
 
     // Get the DIP Delta
@@ -630,7 +641,6 @@ export class Scalper {
       for (let i = 0; i < maxHedges; i++) {
         await waitForFill(() => Math.abs(hedgeDeltaTotal * fairValue) < (this.minSpotSize * fairValue));
         if (Math.abs(hedgeDeltaTotal * fairValue) < (this.minSpotSize * fairValue)) {
-          this.serumVialClient.removeAnyListeners();
           console.log(this.symbol, "Delta Hedge Complete: SerumVial");
           return;
         }
@@ -641,7 +651,6 @@ export class Scalper {
       console.log(this.symbol, "Scan Delta Fills for ~", twapInterval, "seconds");
       await waitForFill((_) => Math.abs(hedgeDeltaTotal * fairValue) < (this.minSpotSize * fairValue));
       if (Math.abs(hedgeDeltaTotal * fairValue) < (this.minSpotSize * fairValue)) {
-        this.serumVialClient.removeAnyListeners();
         console.log(this.symbol, "Delta Hedge Complete: SerumVial");
         return;
       }
@@ -665,8 +674,26 @@ export class Scalper {
       undefined,
       OPENBOOK_FORK_ID,
     );
-    this.serumVialClient.removeAnyListeners();
+    
+    if (this.serumVialClient.checkSerumVial() != WebSocket.OPEN) {
+      this.serumVialClient.openSerumVial();
+    }
 
+    this.serumVialClient.streamData(
+      ['trades'],
+      [`${this.symbol}/USDC`],
+      this.openBookAccount,
+      (message: SerumVialTradeMessage) => {
+        console.log(this.symbol, "Gamma Scalp Filled!", message.size, message.market, message.price, message.timestamp);
+        let fillPrice = Number(message.price);
+        gammaScalpCount = gammaScalpCount + 1;
+        this.gammaScalpOpenBook(
+          dipProduct,
+          gammaScalpCount,
+          fillPrice
+        );
+      }
+    );
     // Clean the state by cancelling all existing open orders.
     await cancelOpenBookOrders(this.connection, this.owner, spotMarket, this.symbol);
 
@@ -683,27 +710,6 @@ export class Scalper {
       return;
     }
 
-    if (this.serumVialClient.checkSerumVial() != WebSocket.OPEN) {
-      this.serumVialClient.openSerumVial();
-    }
-
-    this.serumVialClient.streamData(
-      ['trades'],
-      [`${this.symbol}/USDC`],
-      this.openBookAccount,
-      (message: SerumVialTradeMessage) => {
-        console.log(this.symbol, "Gamma Scalp Filled!", message.size, message.market, message.price, message.timestamp);
-        let fillPrice = Number(message.price);
-        this.serumVialClient.removeAnyListeners();
-        this.serumVialClient.closeSerumVial();
-        this.gammaScalpOpenBook(
-          dipProduct,
-          gammaScalpCount + 1,
-          fillPrice
-        );
-      }
-    );
-
     // Find fair value.
     console.log(this.symbol, "Loading Fair Value For Scalp", gammaScalpCount);
     let fairValue;
@@ -713,13 +719,15 @@ export class Scalper {
     } else {
       fairValue = await getFairValue(this.connection, spotMarket, this.symbol) 
     }
-    if (fairValue == 0) {
-      console.log(this.symbol, " No Robust Pricing. Rerun Gamma Scalper");
-      this.gammaScalpOpenBook(
-        dipProduct,
-        gammaScalpCount + 1,
-        0
-      );
+    for (let i = 0; i < gammaCycles; i++){
+      if (fairValue == 0) {
+        console.log(this.symbol, "No Prices. Refreshing Gamma Scalp", i+1, "After", twapInterval, "Seconds");
+        await sleepExact(twapInterval);
+        fairValue = await getFairValue(this.connection, spotMarket, this.symbol)
+      }
+    }
+    if (fairValue == 0) { 
+      console.log(this.symbol, "No Robust Pricing. Exiting Gamma Scalp", gammaScalpCount);
       return;
     }
     const dipTotalGamma = getDIPGamma(dipProduct, fairValue, this.symbol);
@@ -727,6 +735,7 @@ export class Scalper {
     // Calc scalperWindow std deviation spread from zScore & IV for gamma levels
     const stdDevSpread = this.impliedVol / Math.sqrt((365 * 24 * 60 * 60) / scalperWindow) * zScore;
     const netGamma = IS_DEV ? Math.max(0.01, dipTotalGamma * stdDevSpread * fairValue) : dipTotalGamma * stdDevSpread * fairValue;
+
     const widenSpread = (gammaScalpCount-1)/gammaCycles;
     const gammaBid = fairValue * (1 - stdDevSpread - stdDevSpread * widenSpread);
     const gammaAsk = fairValue * (1 + stdDevSpread + stdDevSpread * widenSpread);
@@ -734,7 +743,7 @@ export class Scalper {
     console.log(this.symbol, "Position Gamma Γ:", netGamma, "Fair Value", fairValue);
     if ((netGamma * fairValue) < (this.minSpotSize * fairValue)){
       console.log(this.symbol, 'Gamma Hedge Too Small')
-      return
+      return;
     }
 
     // Check again for orders to cancel
@@ -773,7 +782,13 @@ export class Scalper {
       console.log(this.symbol, "Gamma Ask", err, err.stack);
     }
     console.log(this.symbol, "Market Spread %", (priceAsk-priceBid)/fairValue * 100, "Liquidity $", amountGamma*2*fairValue);
-    await sleepExact((1 + percentDrift) * scalperWindow);
+    if (gammaScalpCount == 1){
+      await waitForGamma((_) => gammaScalpCount == gammaCycles);
+      const scalpPnL = (1 + 1/(2*gammaCycles)) * (gammaScalpCount-1) * stdDevSpread * fairValue;
+      const thetaPnL = getDIPTheta(dipProduct, fairValue, this.symbol);
+      const estTotalPnL = scalpPnL + thetaPnL;
+      console.log(this.symbol, "Estimated Total PnL", estTotalPnL, "Scalp PnL", scalpPnL, "Theta PnL", thetaPnL, "Total Scalps", gammaScalpCount - 1)
+    }
   }
 }
 
@@ -783,6 +798,20 @@ function waitForFill(conditionFunction) {
   const poll = (resolve) => {
     pollCount = pollCount+1;
     if (pollCount > twapInterval*resolvePeriodMs/10) resolve();
+    else if (conditionFunction()) resolve();
+    else setTimeout((_) => poll(resolve), resolvePeriodMs); 
+  };
+  return new Promise(poll);
+}
+
+// Wait for enough scalps or scalper window to expire
+function waitForGamma(conditionFunction) {
+  let pollCount = 0;
+  const resolvePeriodMs = 100;
+  const maxScalpWindow = (1 + percentDrift) * scalperWindow;
+  const poll = (resolve) => {
+    pollCount = pollCount+1;
+    if (pollCount > maxScalpWindow*resolvePeriodMs/10) resolve();
     else if (conditionFunction()) resolve();
     else setTimeout((_) => poll(resolve), resolvePeriodMs); 
   };

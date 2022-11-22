@@ -16,7 +16,7 @@ import { DIPDeposit } from "./common";
 import { readKeypair, sleepExact, sleepRandom } from "./utils";
 import { SerumVialClient, SerumVialTradeMessage } from "./serumVial";
 import { DexMarket } from "@project-serum/serum-dev-tools";
-import { cancelOpenBookOrders, getDIPDelta, getDIPGamma, getFairValue, getSpotDelta, loadPrices, 
+import { cancelOpenBookOrders, getDIPDelta, getDIPGamma, getDIPTheta, getFairValue, getSpotDelta, loadPrices, 
   orderSpliceMango, orderSpliceOpenBook, settleOpenBook } from './scalper_utils';
 import { BN } from "@project-serum/anchor";
 
@@ -510,7 +510,8 @@ export class Scalper {
     catch (err){
       console.log(this.symbol, "Main Gamma Error", err, err.stack)
     }
-    this.serumVialClient.removeAnyListeners();
+    console.log(this.symbol, "Scalper Cycle completed", new Date().toUTCString())
+    console.log("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
   }
 
   async deltaHedgeOpenBook(
@@ -685,9 +686,10 @@ export class Scalper {
       (message: SerumVialTradeMessage) => {
         console.log(this.symbol, "Gamma Scalp Filled!", message.size, message.market, message.price, message.timestamp);
         let fillPrice = Number(message.price);
+        gammaScalpCount = gammaScalpCount + 1;
         this.gammaScalpOpenBook(
           dipProduct,
-          gammaScalpCount + 1,
+          gammaScalpCount,
           fillPrice
         );
       }
@@ -778,7 +780,13 @@ export class Scalper {
       console.log(this.symbol, "Gamma Ask", err, err.stack);
     }
     console.log(this.symbol, "Market Spread %", (priceAsk-priceBid)/fairValue * 100, "Liquidity $", amountGamma*2*fairValue);
-    await sleepExact((1 + percentDrift) * scalperWindow);
+    if (gammaScalpCount == 1){
+      await waitForGamma((_) => gammaScalpCount == gammaCycles);
+      const scalpPnL = (1 + 1/(2*gammaCycles)) * (gammaScalpCount-1) * stdDevSpread * fairValue;
+      const thetaPnL = getDIPTheta(dipProduct, fairValue, this.symbol);
+      const estTotalPnL = scalpPnL + thetaPnL;
+      console.log(this.symbol, "Estimated Total PnL", estTotalPnL, "Scalp PnL", scalpPnL, "Theta PnL", thetaPnL, "Total Scalps", gammaScalpCount - 1)
+    }
   }
 }
 
@@ -788,6 +796,19 @@ function waitForFill(conditionFunction) {
   const poll = (resolve) => {
     pollCount = pollCount+1;
     if (pollCount > twapInterval*resolvePeriodMs/10) resolve();
+    else if (conditionFunction()) resolve();
+    else setTimeout((_) => poll(resolve), resolvePeriodMs); 
+  };
+  return new Promise(poll);
+}
+
+function waitForGamma(conditionFunction) {
+  let pollCount = 0;
+  const resolvePeriodMs = 100;
+  const maxScalpWindow = (1 + percentDrift) * scalperWindow;
+  const poll = (resolve) => {
+    pollCount = pollCount+1;
+    if (pollCount > maxScalpWindow*resolvePeriodMs/10) resolve();
     else if (conditionFunction()) resolve();
     else setTimeout((_) => poll(resolve), resolvePeriodMs); 
   };

@@ -150,6 +150,33 @@ export function getDIPGamma(
   return gammaSum;
 }
 
+export function getDIPTheta(
+  dipProduct: DIPDeposit[],
+  fairValue: number,
+  symbol: string
+) {
+  const impliedVol = THEO_VOL_MAP.get(symbol);
+  let yearsUntilMaturity: number;
+  let thetaSum = 0;
+  for (const dip of dipProduct) {
+    yearsUntilMaturity =
+      (dip.expirationMs - Date.now()) / (365 * 60 * 60 * 24 * 1_000);
+    thetaSum =
+      greeks.getTheta(
+        fairValue,
+        dip.strike,
+        yearsUntilMaturity,
+        impliedVol,
+        rfRate,
+        dip.type
+      ) *
+        dip.qty +
+        thetaSum;
+        thetaSum = thetaSum;
+  }
+  return thetaSum;
+}
+
 // Fill Size from any perp orders
 export async function fillSize(
   perpMarket: PerpMarket,

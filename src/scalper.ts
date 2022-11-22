@@ -803,7 +803,6 @@ function waitForFill(conditionFunction) {
   };
   return new Promise(poll);
 }
-<<<<<<< HEAD
 
 function waitForGamma(conditionFunction) {
   let pollCount = 0;
@@ -817,5 +816,3 @@ function waitForGamma(conditionFunction) {
   };
   return new Promise(poll);
 }
-=======
->>>>>>> 7a1826277a044d2ea9a2aaa55a569e0aba6a895e

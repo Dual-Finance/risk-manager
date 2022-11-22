@@ -145,7 +145,6 @@ export function getDIPGamma(
       ) *
         dip.qty +
       gammaSum;
-    gammaSum = gammaSum;
   }
   return gammaSum;
 }
@@ -172,7 +171,6 @@ export function getDIPTheta(
       ) *
         dip.qty +
         thetaSum;
-        thetaSum = thetaSum;
   }
   return thetaSum;
 }

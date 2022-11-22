@@ -804,6 +804,7 @@ function waitForFill(conditionFunction) {
   return new Promise(poll);
 }
 
+// Wait for enough scalps or scalper window to expire
 function waitForGamma(conditionFunction) {
   let pollCount = 0;
   const resolvePeriodMs = 100;

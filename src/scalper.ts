@@ -495,7 +495,7 @@ export class Scalper {
       );
     }
     catch (err){
-        console.log(this.symbol, "Main Delta Error", err, err.stack)
+        console.log(this.symbol, "Main Delta Error", err.stack)
       }
     this.serumVialClient.removeAnyListeners();
 
@@ -508,7 +508,7 @@ export class Scalper {
       // TODO: OpenBook settlement to move to mango if needed
     }
     catch (err){
-      console.log(this.symbol, "Main Gamma Error", err, err.stack)
+      console.log(this.symbol, "Main Gamma Error", err.stack)
     }
     console.log(this.symbol, "Scalper Cycle completed", new Date().toUTCString())
     console.log("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
@@ -785,7 +785,7 @@ export class Scalper {
     if (gammaScalpCount == 1){
       await waitForGamma((_) => gammaScalpCount == gammaCycles);
       const scalpPnL = (1 + 1/(2*gammaCycles)) * (gammaScalpCount-1) * stdDevSpread * fairValue;
-      const thetaPnL = getDIPTheta(dipProduct, fairValue, this.symbol);
+      const thetaPnL = getDIPTheta(dipProduct, fairValue, this.symbol)/(24*60*60/scalperWindow);
       const estTotalPnL = scalpPnL + thetaPnL;
       console.log(this.symbol, "Estimated Total PnL", estTotalPnL, "Scalp PnL", scalpPnL, "Theta PnL", thetaPnL, "Total Scalps", gammaScalpCount - 1)
     }

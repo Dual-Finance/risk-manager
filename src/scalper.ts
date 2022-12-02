@@ -196,10 +196,10 @@ export class Scalper {
       .toNumber() / Math.pow(10, this.perpMarketConfig.baseDecimals);
 
     // Get all spot positions Option Vault, Risk Manager, Mango Tester
-    const spotDelta = await getSpotDelta(this.connection, this.symbol) + this.deltaOffset;
+    const spotDelta = await getSpotDelta(this.connection, this.symbol);
 
     // Get Total Delta Position to hedge
-    let hedgeDeltaTotal = IS_DEV ? 0.1 : mangoPerpDelta + dipTotalDelta + spotDelta + mangoSpotDelta;
+    let hedgeDeltaTotal = IS_DEV ? 0.1 : mangoPerpDelta + dipTotalDelta + spotDelta + mangoSpotDelta + this.deltaOffset;
  
     // Check whether we need to hedge.
     const dipTotalGamma = getDIPGamma(dipProduct, fairValue, this.symbol);
@@ -232,7 +232,7 @@ export class Scalper {
     console.log(
       this.symbol, "Target Delta Hedge:", hedgeSide, hedgeProduct, -hedgeDeltaTotal, "DIP Δ:",
       dipTotalDelta, "Mango Perp Δ:", mangoPerpDelta, "Mango Spot Δ:", mangoSpotDelta,
-      "Spot Δ:", spotDelta, "Fair Value:",  fairValue
+      "Spot Δ:", spotDelta, "Offset Δ", this.deltaOffset, "Fair Value:",  fairValue
     );
 
     // Determine what price to use for hedging depending on allowable slippage.
@@ -571,16 +571,16 @@ export class Scalper {
     const dipTotalDelta = getDIPDelta(dipProduct, fairValue, this.symbol);
   
     // Get all spot positions Option Vault, Risk Manager, Mango Tester
-    const spotDelta = await getSpotDelta(this.connection, this.symbol) + this.deltaOffset;
+    const spotDelta = await getSpotDelta(this.connection, this.symbol);
   
     // Get Total Delta Position to hedge. Use .1 for DEV to force that it does something.
-    let hedgeDeltaTotal = IS_DEV ? 0.1 : dipTotalDelta + spotDelta;
+    let hedgeDeltaTotal = IS_DEV ? 0.1 : dipTotalDelta + spotDelta + this.deltaOffset;
     const hedgeSide = hedgeDeltaTotal < 0 ? 'buy' : 'sell';
     // TODO: Mango delta positions
     console.log(
       this.symbol, "Target Delta Hedge:", hedgeSide, "SPOT", -hedgeDeltaTotal, "DIP Δ:",
       dipTotalDelta, "Mango Perp Δ:", 0, "Mango Spot Δ:", 0,
-      "Spot Δ:", spotDelta, "Fair Value:",  fairValue
+      "Spot Δ:", spotDelta, "Offset Δ", this.deltaOffset, "Fair Value:",  fairValue
     );
 
     // Check whether we need to hedge.

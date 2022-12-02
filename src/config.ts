@@ -1,7 +1,7 @@
 import { PublicKey } from "@solana/web3.js";
 import { DIPDeposit } from "./common";
 
-export const IS_DEV = process.env.DEV == "true" ? true : false;
+export const IS_DEV = process.env.DEV == "false" ? false : true;
 export const API_URL = process.env.RPC;
 export const sol_vars = process.env.SOL.split(",");
 export const btc_vars = process.env.BTC.split(",");

@@ -15,3 +15,9 @@ Trading events per event:
 3. Buy or Sell delta to 0 via TWAP if necessary
 4. Place bid & ask at gamma levels
 5. Start Scalper Window timer
+
+Environment Variables
+DEV=true || DEV=false
+RPC=[Enter RPC url]
+SOL, BTC, ETH, MNGO = [OFF || ON,DELTA_OFFSET,THEO_VOL]
+Example: DEV=false RPC=https://api.mainnet-beta.solana.com SOL=ON,-117.7,0.84 BTC=OFF ETH=OFF MNGO=ON,0,1.6 yarn run main

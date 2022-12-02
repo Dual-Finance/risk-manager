@@ -1,15 +1,39 @@
 import { PublicKey } from "@solana/web3.js";
 import { DIPDeposit } from "./common";
 
-export const IS_DEV: boolean = true;
+export const IS_DEV = process.env.DEV == "true" ? true : false;
+export const API_URL = process.env.RPC;
+export const sol_vars = process.env.SOL.split(",");
+export const btc_vars = process.env.BTC.split(",");
+export const eth_vars = process.env.ETH.split(",");
+export const mngo_vars = process.env.MNGO.split(",");
+
 export const productStatus = new Map<string, boolean> ([
-  ['BTC', false], ['ETH', false], ['SOL', true], ['MNGO', false]
+  ['BTC', btc_vars[0] == "ON" ? true : false], 
+  ['ETH', eth_vars[0] == "ON" ? true : false], 
+  ['SOL', sol_vars[0] == "ON" ? true : false], 
+  ['MNGO', mngo_vars[0] == "ON" ? true : false]
 ]);
+// Adjust delta hedges for loans, negative values allow positive spot balances in mango
+// CAUTION! Turn off scalper, send funds to mango & update value before running!
+export const DELTA_OFFSET = new Map<string, number> ([
+  ['BTC', btc_vars[1] == null ? 0 : parseFloat(btc_vars[1])], 
+  ['ETH', eth_vars[1] == null ? 0 : parseFloat(eth_vars[1])], 
+  ['SOL', sol_vars[1] == null ? 0 : parseFloat(sol_vars[1])], 
+  ['MNGO', mngo_vars[1] == null ? 0 : parseFloat(mngo_vars[1])]
+]);
+
+export const THEO_VOL_MAP = new Map<string, number> ([
+  ['BTC', parseFloat(btc_vars[2]) > 0 ? parseFloat(btc_vars[2]) : 0.60], 
+  ['ETH', parseFloat(eth_vars[2]) > 0 ? parseFloat(eth_vars[2]) : 0.72], 
+  ['SOL', parseFloat(sol_vars[2]) > 0 ? parseFloat(sol_vars[2]) : 0.84], 
+  ['MNGO', parseFloat(mngo_vars[2]) > 0 ? parseFloat(mngo_vars[2]) : 1.6]
+]);
+
 export const ENVIRONMENT: string = IS_DEV ? "DEVNET" : "MAINNET";
 
 export const networkName = IS_DEV ? 'devnet.2' : 'mainnet.1';
 export const cluster = IS_DEV ? 'devnet' : 'mainnet-beta';
-export const API_URL = IS_DEV ? 'https://solana-devnet.g.alchemy.com/v2/e5EQixWHc-n0F3JTe-ueWzKZIJDMYXTi' : 'https://floral-skilled-borough.solana-mainnet.discover.quiknode.pro/38cf24edefbebeb60eb7516eff40f076ac0823af/';
 export const DUAL_API = IS_DEV ? 'https://dev.api.dual.finance' : 'https://api.dual.finance';
 export const WEBSOCKET_URL = IS_DEV ? 'https://api.devnet.solana.com' : 'https://api.mainnet-beta.solana.com';
 export const FILLS_URL = IS_DEV ? 'ws://api.mngo.cloud:2082' : 'ws://v3.mngo.cloud:8080';
@@ -63,10 +87,6 @@ export const OPENBOOK_ACCOUNT_MAP = new Map<string, string> ([
 
 export const OPTION_MINT_ADDRESS_SEED = "option-mint";
 
-export const THEO_VOL_MAP = new Map<string, number> ([
-  ['BTC', 0.60], ['ETH', 0.72], ['SOL', 0.84], ['MNGO', 1.6]
-]);
-
 export const MinContractSize = new Map<string, number> ([
   ['BTC', 0.0001], ['ETH', 0.001], ['SOL', 0.01], ['MNGO', 0.01]
 ]);
@@ -84,14 +104,8 @@ export const maxNotional = new Map<string, number> ([
 ]); // Max hedging $ notional sizes
 
 export const slippageMax = new Map<string, number> ([
-  ['BTC', 0.0010], ['ETH', 0.0010], ['SOL', 0.0015], ['MNGO', 0.0075]
+  ['BTC', 0.0010], ['ETH', 0.0010], ['SOL', 0.0015], ['MNGO', 0.0050]
 ]); // // Max Allowed xbps above/below FMV on limit orders
-
-// Adjust delta hedges for loans, negative values allow positive spot balances in mango
-// CAUTION! Turn off scalper, send funds to mango & update value before running!
-export const DELTA_OFFSET = new Map<string, number> ([
-  ['BTC', 0], ['ETH', 0], ['SOL', -117.7], ['MNGO', 0]
-]);
 
 // Enter any Staking Options Owned and to be hedged from the treasury
 export  const treasuryPositions: DIPDeposit[] = [({

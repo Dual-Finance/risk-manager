@@ -17,7 +17,7 @@ Trading events per event:
 5. Start Scalper Window timer
 
 Environment Variables
-DEV=true || DEV=false
+DEV=true || DEV=false (Defaults to true)
 RPC=[Enter RPC url]
-SOL, BTC, ETH, MNGO = [OFF || ON,DELTA_OFFSET,THEO_VOL]
+SOL, BTC, ETH, MNGO = [OFF || ON,DELTA_OFFSET,THEO_VOL] (Defaults to OFF,0,120%*BVE)
 Example: DEV=false RPC=https://api.mainnet-beta.solana.com SOL=ON,-117.7,0.84 BTC=OFF ETH=OFF MNGO=ON,0,1.6 yarn run main

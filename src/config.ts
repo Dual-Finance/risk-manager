@@ -104,25 +104,25 @@ export const maxNotional = new Map<string, number> ([
 ]); // Max hedging $ notional sizes
 
 export const slippageMax = new Map<string, number> ([
-  ['BTC', 0.0010], ['ETH', 0.0010], ['SOL', 0.0015], ['MNGO', 0.0050]
+  ['BTC', 0.0010], ['ETH', 0.0010], ['SOL', 0.0015], ['MNGO', 0.0025]
 ]); // // Max Allowed xbps above/below FMV on limit orders
 
 // Enter any Staking Options Owned and to be hedged from the treasury
 export  const treasuryPositions: DIPDeposit[] = [({
   splToken: 'MNGO',
   premiumAsset:'USDC',
-  expirationMs: 1672502400000,
-  strike: 0.014,
+  expirationMs: 1672747200000,
+  strike: 0.016,
   type: 'put',
-  qty: 1790 //TODO increase once approved by DAO 17.9M
+  qty: 7812500
 }),
 ({
   splToken: 'MNGO',
   premiumAsset:'USDC',
-  expirationMs: 1672502400000,
-  strike: 0.0117,
+  expirationMs: 1672747200000,
+  strike: 0.019,
   type: 'put',
-  qty: 2140 // TODO increase once approved by DAO 21.4M
+  qty: 6578947
 })
 ]
 

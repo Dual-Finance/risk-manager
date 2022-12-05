@@ -116,10 +116,11 @@ export function orderSpliceOpenBook(
       }
     }
   }
-  if (depth > qty){
+  if (depth > Math.abs(qty)){
     return 1;
   } else {
-    return Math.max((qty * price) / notionalMax, 1)
+    console.log("Order Splice Factor!", Math.max((Math.abs(qty) * price) / notionalMax, 1));
+    return Math.max((Math.abs(qty) * price) / notionalMax, 1)
   }
 }
 

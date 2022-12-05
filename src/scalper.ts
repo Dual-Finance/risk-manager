@@ -245,14 +245,14 @@ export class Scalper {
     const bookSide = hedgeDeltaTotal < 0 ? askSide : bidSide;
     const hedgeDeltaClip =
       hedgeDeltaTotal /
-      Math.min(orderSpliceMango(
+      orderSpliceMango(
         hedgeDeltaTotal,
         fairValue,
         maxNotional.get(this.symbol),
         slippageTolerance,
         bookSide,
         perpMarket
-      ), maxHedges);
+      );
 
     // Unique identifier for delta order.
     const deltaOrderId = new Date().getTime() * 2;
@@ -611,9 +611,7 @@ export class Scalper {
       bids,
       asks
     );
-    const hedgeDeltaClip =
-      hedgeDeltaTotal /
-      Math.min(spliceFactor, maxHedges);
+    const hedgeDeltaClip = hedgeDeltaTotal / spliceFactor;
 
     const spreadDelta = hedgeDeltaTotal < 0 ? (askTOB - hedgePrice) / hedgePrice * 100 : (bidTOB - hedgePrice) / hedgePrice * 100;
 

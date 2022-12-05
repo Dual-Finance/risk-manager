@@ -249,6 +249,17 @@ export async function settleOpenBook(connection, owner, market, base, quote) {
   }
 }
 
+export function getPayerAccount(hedgeSide, base, quote) {
+    // spl-token accounts to which to use for trading
+    let baseTokenAccount = new PublicKey (ACCOUNT_MAP.get(base));
+    let quoteTokenAccount = new PublicKey (ACCOUNT_MAP.get(quote));
+    if (hedgeSide == "buy"){
+      return quoteTokenAccount
+    } else{
+      return baseTokenAccount
+    };
+  }
+
 export async function cancelOpenBookOrders(connection, owner, spotMarket, symbol) {
   let myOrders = await spotMarket.loadOrdersForOwner(connection, owner.publicKey);
   for (let order of myOrders) {

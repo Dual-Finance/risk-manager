@@ -3,7 +3,7 @@ import {
   Config, getMarketByBaseSymbolAndKind, GroupConfig, MangoAccount, MangoClient, MangoCache,
   PerpMarket, MangoGroup, PerpEventLayout, FillEvent, MarketConfig,
 } from "@blockworks-foundation/mango-client";
-import { Keypair, Commitment, Connection, PublicKey } from "@solana/web3.js";
+import { Keypair, Commitment, Connection, PublicKey, Account } from "@solana/web3.js";
 import { Market } from '@project-serum/serum';
 import configFile from "./ids.json";
 import {
@@ -15,8 +15,7 @@ import {
 import { DIPDeposit } from "./common";
 import { readKeypair, sleepExact, sleepRandom } from "./utils";
 import { SerumVialClient, SerumVialTradeMessage } from "./serumVial";
-import { DexMarket } from "@project-serum/serum-dev-tools";
-import { cancelOpenBookOrders, getDIPDelta, getDIPGamma, getDIPTheta, getFairValue, getSpotDelta, loadPrices, 
+import { cancelOpenBookOrders, getDIPDelta, getDIPGamma, getDIPTheta, getFairValue, getPayerAccount, getSpotDelta, loadPrices, 
   orderSpliceMango, orderSpliceOpenBook, settleOpenBook } from './scalper_utils';
 import { BN } from "@project-serum/anchor";
 
@@ -618,16 +617,19 @@ export class Scalper {
     try {
       const amountDelta = Math.round(Math.abs(hedgeDeltaClip) * (1/this.minSpotSize)) / (1/this.minSpotSize);
       const priceDelta = Math.floor(Math.abs(hedgePrice) * (1/this.tickSize)) / (1/this.tickSize);
-      console.log(this.symbol, hedgeSide, "OpenBook-SPOT", amountDelta, "Limit:", priceDelta, "#", deltaHedgeCount);
-      await DexMarket.placeOrder(
-        this.connection, 
-        this.owner,
-        spotMarket,
-        hedgeSide,
-        'limit',
-        amountDelta,
-        priceDelta,
-      );
+      const payerAccount = getPayerAccount(hedgeSide, this.symbol, "USDC");
+      const deltaID = new BN(new Date().getTime());
+      console.log(this.symbol, hedgeSide, "OpenBook-SPOT", amountDelta, "Limit:", priceDelta, "#", deltaHedgeCount, "ID", deltaID.toString());
+      await spotMarket.placeOrder(this.connection, {
+        owner: new Account(this.owner.secretKey),
+        payer: payerAccount,
+        side: hedgeSide,
+        price: priceDelta,
+        size: amountDelta,
+        orderType: 'limit',
+        clientId: deltaID,
+        selfTradeBehavior: 'abortTransaction',
+      });
     } catch (err) {
       console.log(this.symbol, "Delta Hedge", err, err.stack);
     }
@@ -750,32 +752,39 @@ export class Scalper {
     const amountGamma = Math.round(Math.abs(netGamma) * (1/this.minSpotSize)) / (1/this.minSpotSize);
     const priceBid = Math.floor(Math.abs(gammaBid) * (1/this.tickSize)) / (1/this.tickSize);
     const priceAsk = Math.floor(Math.abs(gammaAsk) * (1/this.tickSize)) / (1/this.tickSize);
+    const orderIDBase = new Date().getTime() * 2;
+    const bidID = new BN(orderIDBase);
+    const askID = new BN(orderIDBase + 1);
+    const bidAccount = getPayerAccount("buy", this.symbol, "USDC");
+    const askAccount = getPayerAccount("sell", this.symbol, "USDC");
     // TODO send these orders in parallel if possible
     try{
-      await DexMarket.placeOrder(
-        this.connection, 
-        this.owner,
-        spotMarket,
-        'buy',
-        'limit',
-        amountGamma,
-        priceBid,
-      );
-      console.log(this.symbol, "Gamma", amountGamma, "Bid", priceBid);
+      await spotMarket.placeOrder(this.connection, {
+        owner: new Account(this.owner.secretKey),
+        payer: bidAccount,
+        side: 'buy',
+        price: priceBid,
+        size: amountGamma,
+        orderType: 'limit',
+        clientId: bidID,
+        selfTradeBehavior: 'abortTransaction',
+      });
+      console.log(this.symbol, "Gamma", amountGamma, "Bid", priceBid, "BidID", bidID.toString());
     } catch (err) {
       console.log(this.symbol, "Gamma Bid", err, err.stack);
     }
     try{
-      await DexMarket.placeOrder(
-      this.connection, 
-      this.owner,
-      spotMarket,
-      'sell',
-      'limit',
-      amountGamma,
-      priceAsk,
-    );
-    console.log(this.symbol, "Gamma", amountGamma, "Ask", priceAsk);
+      await spotMarket.placeOrder(this.connection, {
+        owner: new Account(this.owner.secretKey),
+        payer: askAccount,
+        side: 'sell',
+        price: priceAsk,
+        size: amountGamma,
+        orderType: 'limit',
+        clientId: askID,
+        selfTradeBehavior: 'abortTransaction',
+      });
+    console.log(this.symbol, "Gamma", amountGamma, "Ask", priceAsk, "AskID", askID.toString());
     } catch (err) {
       console.log(this.symbol, "Gamma Ask", err, err.stack);
     }

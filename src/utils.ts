@@ -227,27 +227,33 @@ export function tokenToSBSymbol(token: string) {
 }
 
 export async function getSwitchboardPrice(splMint: PublicKey) {
-  const sbv2 = await SwitchboardProgram.loadMainnet();
-  const assetAggregator = new PublicKey(
-    tokenToSBSymbol(splMintToToken(splMint))
-  );
+  try{
+    const sbv2 = await SwitchboardProgram.loadMainnet();
+    const assetAggregator = new PublicKey(
+      tokenToSBSymbol(splMintToToken(splMint))
+    );
 
-  const accountInfo = await sbv2.program.provider.connection.getAccountInfo(
-    assetAggregator
-  );
-  if (!accountInfo) {
-    console.log(`Failed to fetch Switchboard account info`);
+    const accountInfo = await sbv2.program.provider.connection.getAccountInfo(
+      assetAggregator
+    );
+    if (!accountInfo) {
+      console.log(`Failed to fetch Switchboard account info`);
+      return 0;
+    }
+
+    // Get latest value if its been updated in the last 60 seconds
+    const latestResult = sbv2.decodeLatestAggregatorValue(accountInfo, 60);
+    if (latestResult === null) {
+      console.log (`Failed to fetch latest result for Switchboard aggregator`);
+      return 0;
+    }
+    const sbPrice = latestResult.toNumber();
+
+    return sbPrice;
+  } catch (err) {
+    console.log("Switchboard Price Error", err);
     return 0;
   }
-
-  // Get latest value if its been updated in the last 60 seconds
-  const latestResult = sbv2.decodeLatestAggregatorValue(accountInfo, 60);
-  if (latestResult === null) {
-    console.log (`Failed to fetch latest result for Switchboard aggregator`);
-    return 0;
-  }
-  const sbPrice = latestResult.toNumber();
-  return sbPrice;
 }
 
 // TODO: Fail after a few tries if chainlink is stuck

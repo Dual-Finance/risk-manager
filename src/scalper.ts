@@ -3,8 +3,8 @@ import {
   Config, getMarketByBaseSymbolAndKind, GroupConfig, MangoAccount, MangoClient, MangoCache,
   PerpMarket, MangoGroup, PerpEventLayout, FillEvent, MarketConfig,
 } from "@blockworks-foundation/mango-client";
-import { Keypair, Commitment, Connection, PublicKey } from "@solana/web3.js";
-import { Market } from '@project-serum/serum';
+import { Keypair, Commitment, Connection, PublicKey, Account, Transaction, sendAndConfirmTransaction, Signer } from "@solana/web3.js";
+import { Market, OpenOrders} from '@project-serum/serum';
 import configFile from "./ids.json";
 import {
   networkName, THEO_VOL_MAP, maxNotional, twapInterval, scalperWindow,
@@ -15,8 +15,7 @@ import {
 import { DIPDeposit } from "./common";
 import { readKeypair, sleepExact, sleepRandom } from "./utils";
 import { SerumVialClient, SerumVialTradeMessage } from "./serumVial";
-import { DexMarket } from "@project-serum/serum-dev-tools";
-import { cancelOpenBookOrders, getDIPDelta, getDIPGamma, getDIPTheta, getFairValue, getSpotDelta, loadPrices, 
+import { cancelOpenBookOrders, getDIPDelta, getDIPGamma, getDIPTheta, getFairValue, getPayerAccount, getSpotDelta, loadPrices, 
   orderSpliceMango, orderSpliceOpenBook, settleOpenBook } from './scalper_utils';
 import { BN } from "@project-serum/anchor";
 
@@ -540,13 +539,20 @@ export class Scalper {
       console.log(this.symbol, "Max OpenBook Hedges exceeded!");
       return;
     }
-
+    const deltaID = new BN(new Date().getTime());
+    
     this.serumVialClient.streamData(
       ['trades'],
       [`${this.symbol}/USDC`],
-      this.openBookAccount,
+      [deltaID.toString()],
       (message: SerumVialTradeMessage) => {
-        console.log(this.symbol, "Delta Hedge Filled!", hedgeSide, message.size, message.market, message.price, message.timestamp);
+        if (message.makerClientId == deltaID.toString()){
+        console.log(this.symbol, "Delta Fill Maker!", hedgeSide, message.size, message.market, 
+        message.price, message.makerClientId, message.timestamp);
+        } else if (message.takerClientId == deltaID.toString()){
+          console.log(this.symbol, "Delta Fill Taker!", hedgeSide, message.size, message.market, 
+          message.price, message.takerClientId, message.timestamp);
+        }
         const fillQty = (hedgeSide == 'buy' ? 1 : -1) * message.size;
         hedgeDeltaTotal = hedgeDeltaTotal + fillQty;
       }
@@ -618,16 +624,18 @@ export class Scalper {
     try {
       const amountDelta = Math.round(Math.abs(hedgeDeltaClip) * (1/this.minSpotSize)) / (1/this.minSpotSize);
       const priceDelta = Math.floor(Math.abs(hedgePrice) * (1/this.tickSize)) / (1/this.tickSize);
-      console.log(this.symbol, hedgeSide, "OpenBook-SPOT", amountDelta, "Limit:", priceDelta, "#", deltaHedgeCount);
-      await DexMarket.placeOrder(
-        this.connection, 
-        this.owner,
-        spotMarket,
-        hedgeSide,
-        'limit',
-        amountDelta,
-        priceDelta,
-      );
+      const payerAccount = getPayerAccount(hedgeSide, this.symbol, "USDC");
+      console.log(this.symbol, hedgeSide, "OpenBook-SPOT", amountDelta, "Limit:", priceDelta, "#", deltaHedgeCount, "ID", deltaID.toString());
+      await spotMarket.placeOrder(this.connection, {
+        owner: new Account(this.owner.secretKey),
+        payer: payerAccount,
+        side: hedgeSide,
+        price: priceDelta,
+        size: amountDelta,
+        orderType: 'limit',
+        clientId: deltaID,
+        selfTradeBehavior: 'abortTransaction',
+      });
     } catch (err) {
       console.log(this.symbol, "Delta Hedge", err, err.stack);
     }
@@ -672,7 +680,11 @@ export class Scalper {
       undefined,
       OPENBOOK_FORK_ID,
     );
-    
+    const orderIDBase = new Date().getTime() * 2;
+    const bidID = new BN(orderIDBase);
+    const askID = new BN(orderIDBase + 1);
+    const gammaIds = [bidID.toString(), askID.toString()]
+
     if (this.serumVialClient.checkSerumVial() != WebSocket.OPEN) {
       this.serumVialClient.openSerumVial();
     }
@@ -680,10 +692,16 @@ export class Scalper {
     this.serumVialClient.streamData(
       ['trades'],
       [`${this.symbol}/USDC`],
-      this.openBookAccount,
+      gammaIds,
       (message: SerumVialTradeMessage) => {
-        console.log(this.symbol, "Gamma Scalp Filled!", message.size, message.market, message.price, message.timestamp);
-        let fillPrice = Number(message.price);
+        if (message.makerClientId == bidID.toString()){
+          console.log(this.symbol, "Gamma Bid Fill!", message.size, message.market, message.price, message.makerClientId, message.timestamp);
+        } else if(message.makerClientId == askID.toString()){
+          console.log(this.symbol, "Gamma Ask Fill!", message.size, message.market, message.price, message.makerClientId, message.timestamp);
+        } else{
+          console.log(this.symbol, "Gamma Scalp Fill From Taker?!", message.size, message.market, message.price, message.takerClientId, message.timestamp);
+        }
+          let fillPrice = Number(message.price);
         gammaScalpCount = gammaScalpCount + 1;
         this.gammaScalpOpenBook(
           dipProduct,
@@ -750,35 +768,38 @@ export class Scalper {
     const amountGamma = Math.round(Math.abs(netGamma) * (1/this.minSpotSize)) / (1/this.minSpotSize);
     const priceBid = Math.floor(Math.abs(gammaBid) * (1/this.tickSize)) / (1/this.tickSize);
     const priceAsk = Math.floor(Math.abs(gammaAsk) * (1/this.tickSize)) / (1/this.tickSize);
-    // TODO send these orders in parallel if possible
+    const bidAccount = getPayerAccount("buy", this.symbol, "USDC");
+    const askAccount = getPayerAccount("sell", this.symbol, "USDC");
+    const gammaOrders = new Transaction();
+    const gammaBidTx = await spotMarket.makePlaceOrderTransaction(this.connection, {
+      owner: this.owner.publicKey,
+      payer: bidAccount,
+      side: 'buy',
+      price: priceBid,
+      size: amountGamma,
+      orderType: 'limit',
+      clientId: bidID,
+      selfTradeBehavior: 'abortTransaction',
+    });
+    gammaOrders.add(gammaBidTx.transaction);
+    const gammaAskTx = await spotMarket.makePlaceOrderTransaction(this.connection, {
+      owner: this.owner.publicKey,
+      payer: askAccount,
+      side: 'sell',
+      price: priceAsk,
+      size: amountGamma,
+      orderType: 'limit',
+      clientId: askID,
+      selfTradeBehavior: 'abortTransaction',
+    });
+    gammaOrders.add(gammaAskTx.transaction);
     try{
-      await DexMarket.placeOrder(
-        this.connection, 
-        this.owner,
-        spotMarket,
-        'buy',
-        'limit',
-        amountGamma,
-        priceBid,
-      );
-      console.log(this.symbol, "Gamma", amountGamma, "Bid", priceBid);
+      await sendAndConfirmTransaction(this.connection, gammaOrders, [this.owner])
     } catch (err) {
-      console.log(this.symbol, "Gamma Bid", err, err.stack);
+      console.log(this.symbol, "Gamma Order", err, err.stack);
     }
-    try{
-      await DexMarket.placeOrder(
-      this.connection, 
-      this.owner,
-      spotMarket,
-      'sell',
-      'limit',
-      amountGamma,
-      priceAsk,
-    );
-    console.log(this.symbol, "Gamma", amountGamma, "Ask", priceAsk);
-    } catch (err) {
-      console.log(this.symbol, "Gamma Ask", err, err.stack);
-    }
+    console.log(this.symbol, "Gamma", amountGamma, "Bid", priceBid, "BidID", bidID.toString());
+    console.log(this.symbol, "Gamma", amountGamma, "Ask", priceAsk, "AskID", askID.toString());
     console.log(this.symbol, "Market Spread %", (priceAsk-priceBid)/fairValue * 100, "Liquidity $", amountGamma*2*fairValue);
     if (gammaScalpCount == 1){
       await waitForGamma((_) => gammaScalpCount == gammaCycles);

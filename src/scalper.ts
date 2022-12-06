@@ -547,10 +547,10 @@ export class Scalper {
       [deltaID.toString()],
       (message: SerumVialTradeMessage) => {
         if (message.makerClientId == deltaID.toString()){
-        console.log(this.symbol, "Delta Hedge Maker!", hedgeSide, message.size, message.market, 
+        console.log(this.symbol, "Delta Fill Maker!", hedgeSide, message.size, message.market, 
         message.price, message.makerClientId, message.timestamp);
         } else if (message.takerClientId == deltaID.toString()){
-          console.log(this.symbol, "Delta Hedge Taker!", hedgeSide, message.size, message.market, 
+          console.log(this.symbol, "Delta Fill Taker!", hedgeSide, message.size, message.market, 
           message.price, message.takerClientId, message.timestamp);
         }
         const fillQty = (hedgeSide == 'buy' ? 1 : -1) * message.size;
@@ -695,11 +695,11 @@ export class Scalper {
       gammaIds,
       (message: SerumVialTradeMessage) => {
         if (message.makerClientId == bidID.toString()){
-          console.log(this.symbol, "Gamma Bid Filled!", message.size, message.market, message.price, message.makerClientId, message.timestamp);
+          console.log(this.symbol, "Gamma Bid Fill!", message.size, message.market, message.price, message.makerClientId, message.timestamp);
         } else if(message.makerClientId == askID.toString()){
-          console.log(this.symbol, "Gamma Ask Filled!", message.size, message.market, message.price, message.makerClientId, message.timestamp);
+          console.log(this.symbol, "Gamma Ask Fill!", message.size, message.market, message.price, message.makerClientId, message.timestamp);
         } else{
-          console.log(this.symbol, "Gamma Scalp Filled From Taker?!", message.size, message.market, message.price, message.takerClientId, message.timestamp);
+          console.log(this.symbol, "Gamma Scalp Fill From Taker?!", message.size, message.market, message.price, message.takerClientId, message.timestamp);
         }
           let fillPrice = Number(message.price);
         gammaScalpCount = gammaScalpCount + 1;
@@ -770,12 +770,9 @@ export class Scalper {
     const priceAsk = Math.floor(Math.abs(gammaAsk) * (1/this.tickSize)) / (1/this.tickSize);
     const bidAccount = getPayerAccount("buy", this.symbol, "USDC");
     const askAccount = getPayerAccount("sell", this.symbol, "USDC");
-    // TODO send these orders in parallel if possible
     const gammaOrders = new Transaction();
-    const provider = new AnchorProvider(this.connection, new Wallet(this.owner), AnchorProvider.defaultOptions());
-    console.log(this.connection.rpcEndpoint)
-    const gammaBidTx = spotMarket.makePlaceOrderInstruction(this.connection, {
-      owner: new Account(this.owner.secretKey),
+    const gammaBidTx = await spotMarket.makePlaceOrderTransaction(this.connection, {
+      owner: this.owner.publicKey,
       payer: bidAccount,
       side: 'buy',
       price: priceBid,
@@ -784,9 +781,9 @@ export class Scalper {
       clientId: bidID,
       selfTradeBehavior: 'abortTransaction',
     });
-    gammaOrders.add(gammaBidTx);
-    const gammaAskTx = spotMarket.makePlaceOrderInstruction(this.connection, {
-      owner: new Account(this.owner.secretKey),
+    gammaOrders.add(gammaBidTx.transaction);
+    const gammaAskTx = await spotMarket.makePlaceOrderTransaction(this.connection, {
+      owner: this.owner.publicKey,
       payer: askAccount,
       side: 'sell',
       price: priceAsk,
@@ -795,10 +792,9 @@ export class Scalper {
       clientId: askID,
       selfTradeBehavior: 'abortTransaction',
     });
-    gammaOrders.add(gammaAskTx);
-    console.log(gammaOrders)
+    gammaOrders.add(gammaAskTx.transaction);
     try{
-      await provider.sendAndConfirm(gammaOrders, [this.owner])
+      await sendAndConfirmTransaction(this.connection, gammaOrders, [this.owner])
     } catch (err) {
       console.log(this.symbol, "Gamma Order", err, err.stack);
     }

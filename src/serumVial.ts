@@ -22,7 +22,6 @@ export class SerumVialClient {
             tradeMessage.takerClientId == orderIds[i]
           )
           {
-            console.log(tradeMessage)
             onmessage(tradeMessage);
           }
         }

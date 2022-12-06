@@ -6,7 +6,7 @@ import {
   MangoGroup,
   PerpMarket,
 } from "@blockworks-foundation/mango-client";
-import { Connection, LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
+import { Account, Connection, LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
 import { DIPDeposit } from "./common";
 import {
   ACCOUNT_MAP,
@@ -18,7 +18,6 @@ import {
   THEO_VOL_MAP,
 } from "./config";
 import { getAssociatedTokenAddress, getChainlinkPrice, getPythPrice, getSwitchboardPrice, tokenToSplMint } from "./utils";
-import { DexMarket } from "@project-serum/serum-dev-tools";
 
 export async function loadPrices(
   mangoGroup: MangoGroup,
@@ -250,22 +249,22 @@ export async function settleOpenBook(connection, owner, market, base, quote) {
 }
 
 export function getPayerAccount(hedgeSide, base, quote) {
-    // spl-token accounts to which to use for trading
-    let baseTokenAccount = new PublicKey (ACCOUNT_MAP.get(base));
-    let quoteTokenAccount = new PublicKey (ACCOUNT_MAP.get(quote));
-    if (hedgeSide == "buy"){
-      return quoteTokenAccount
-    } else{
-      return baseTokenAccount
-    };
-  }
+  // spl-token accounts to which to use for trading
+  let baseTokenAccount = new PublicKey (ACCOUNT_MAP.get(base));
+  let quoteTokenAccount = new PublicKey (ACCOUNT_MAP.get(quote));
+  if (hedgeSide == "buy"){
+    return quoteTokenAccount
+  } else{
+    return baseTokenAccount
+  };
+}
 
 export async function cancelOpenBookOrders(connection, owner, spotMarket, symbol) {
   let myOrders = await spotMarket.loadOrdersForOwner(connection, owner.publicKey);
   for (let order of myOrders) {
     try {
       console.log(symbol, "Cancelling OpenBook Orders", order.size, symbol, "@", order.price, order.clientId.toString());
-      await DexMarket.cancelOrder(connection, owner, spotMarket, order);
+      await spotMarket.cancelOrder(connection, new Account(owner.secretKey), order)
     } catch (err) {
       console.log(symbol, "Cancel OpenBook Orders", err, err.stack);
     }
@@ -273,30 +272,36 @@ export async function cancelOpenBookOrders(connection, owner, spotMarket, symbol
 }
 
 export async function getFairValue(connection, spotMarket, symbol) {
+  let fairValue: number;
   const chainlinkPrice = await getChainlinkPrice(new PublicKey(tokenToSplMint(symbol)));
-  const sbPrice = await getSwitchboardPrice(new PublicKey(tokenToSplMint(symbol)));
-  const pythPrice = await getPythPrice(new PublicKey(tokenToSplMint(symbol)));
-  const bids = await spotMarket.loadBids(connection);
-  const asks = await spotMarket.loadAsks(connection);
-  const [bidPrice, _bidSize] = bids.getL2(1)[0];
-  const [askPrice, _askSize] = asks.getL2(1)[0];
-  const midValue = (bidPrice + askPrice) / 2.0;
-  const mktSpread = (askPrice - bidPrice) / midValue;
-  let fairValue;
   if (chainlinkPrice > 0){
     fairValue = chainlinkPrice;
     console.log(symbol, "Use Chainlink Price", chainlinkPrice);
-  } else if (sbPrice > 0) {
-    fairValue = sbPrice;
-    console.log(symbol, "Using Switchboard", sbPrice);
-  } else if (pythPrice.price > 0) {
-    fairValue = pythPrice.price;
-    console.log(symbol, "Using Pyth", pythPrice.price);
-  } else if (mktSpread < maxMktSpread) {
-    fairValue = midValue;
-    console.log(symbol, "Using OpenBook Mid Value", midValue);
   } else {
-    fairValue = 0;
+    const sbPrice = await getSwitchboardPrice(new PublicKey(tokenToSplMint(symbol)));
+    if (sbPrice > 0) {
+      fairValue = sbPrice;
+      console.log(symbol, "Using Switchboard", sbPrice);
+    } else {
+      const pythPrice = await getPythPrice(new PublicKey(tokenToSplMint(symbol)));
+      if (pythPrice.price > 0) {
+        fairValue = pythPrice.price;
+        console.log(symbol, "Using Pyth", pythPrice.price);
+      } else {
+        const bids = await spotMarket.loadBids(connection);
+        const asks = await spotMarket.loadAsks(connection);
+        const [bidPrice, _bidSize] = bids.getL2(1)[0];
+        const [askPrice, _askSize] = asks.getL2(1)[0];
+        const midValue = (bidPrice + askPrice) / 2.0;
+        const mktSpread = (askPrice - bidPrice) / midValue;
+        if (mktSpread < maxMktSpread) {
+          fairValue = midValue;
+          console.log(symbol, "Using OpenBook Mid Value", midValue);
+        } else {
+          fairValue = 0;
+        }
+      }
+    }
   }
   return fairValue;
 }

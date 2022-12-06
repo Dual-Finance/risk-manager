@@ -3,8 +3,8 @@ import {
   Config, getMarketByBaseSymbolAndKind, GroupConfig, MangoAccount, MangoClient, MangoCache,
   PerpMarket, MangoGroup, PerpEventLayout, FillEvent, MarketConfig,
 } from "@blockworks-foundation/mango-client";
-import { Keypair, Commitment, Connection, PublicKey, Account } from "@solana/web3.js";
-import { Market } from '@project-serum/serum';
+import { Keypair, Commitment, Connection, PublicKey, Account, Transaction, sendAndConfirmTransaction, Signer } from "@solana/web3.js";
+import { Market, OpenOrders} from '@project-serum/serum';
 import configFile from "./ids.json";
 import {
   networkName, THEO_VOL_MAP, maxNotional, twapInterval, scalperWindow,
@@ -17,7 +17,7 @@ import { readKeypair, sleepExact, sleepRandom } from "./utils";
 import { SerumVialClient, SerumVialTradeMessage } from "./serumVial";
 import { cancelOpenBookOrders, getDIPDelta, getDIPGamma, getDIPTheta, getFairValue, getPayerAccount, getSpotDelta, loadPrices, 
   orderSpliceMango, orderSpliceOpenBook, settleOpenBook } from './scalper_utils';
-import { BN } from "@project-serum/anchor";
+import { AnchorProvider, BN, Wallet } from "@project-serum/anchor";
 
 export class Scalper {
   client: MangoClient;
@@ -771,36 +771,39 @@ export class Scalper {
     const bidAccount = getPayerAccount("buy", this.symbol, "USDC");
     const askAccount = getPayerAccount("sell", this.symbol, "USDC");
     // TODO send these orders in parallel if possible
+    const gammaOrders = new Transaction();
+    const provider = new AnchorProvider(this.connection, new Wallet(this.owner), AnchorProvider.defaultOptions());
+    console.log(this.connection.rpcEndpoint)
+    const gammaBidTx = spotMarket.makePlaceOrderInstruction(this.connection, {
+      owner: new Account(this.owner.secretKey),
+      payer: bidAccount,
+      side: 'buy',
+      price: priceBid,
+      size: amountGamma,
+      orderType: 'limit',
+      clientId: bidID,
+      selfTradeBehavior: 'abortTransaction',
+    });
+    gammaOrders.add(gammaBidTx);
+    const gammaAskTx = spotMarket.makePlaceOrderInstruction(this.connection, {
+      owner: new Account(this.owner.secretKey),
+      payer: askAccount,
+      side: 'sell',
+      price: priceAsk,
+      size: amountGamma,
+      orderType: 'limit',
+      clientId: askID,
+      selfTradeBehavior: 'abortTransaction',
+    });
+    gammaOrders.add(gammaAskTx);
+    console.log(gammaOrders)
     try{
-      await spotMarket.placeOrder(this.connection, {
-        owner: new Account(this.owner.secretKey),
-        payer: bidAccount,
-        side: 'buy',
-        price: priceBid,
-        size: amountGamma,
-        orderType: 'limit',
-        clientId: bidID,
-        selfTradeBehavior: 'abortTransaction',
-      });
-      console.log(this.symbol, "Gamma", amountGamma, "Bid", priceBid, "BidID", bidID.toString());
+      await provider.sendAndConfirm(gammaOrders, [this.owner])
     } catch (err) {
-      console.log(this.symbol, "Gamma Bid", err, err.stack);
+      console.log(this.symbol, "Gamma Order", err, err.stack);
     }
-    try{
-      await spotMarket.placeOrder(this.connection, {
-        owner: new Account(this.owner.secretKey),
-        payer: askAccount,
-        side: 'sell',
-        price: priceAsk,
-        size: amountGamma,
-        orderType: 'limit',
-        clientId: askID,
-        selfTradeBehavior: 'abortTransaction',
-      });
+    console.log(this.symbol, "Gamma", amountGamma, "Bid", priceBid, "BidID", bidID.toString());
     console.log(this.symbol, "Gamma", amountGamma, "Ask", priceAsk, "AskID", askID.toString());
-    } catch (err) {
-      console.log(this.symbol, "Gamma Ask", err, err.stack);
-    }
     console.log(this.symbol, "Market Spread %", (priceAsk-priceBid)/fairValue * 100, "Liquidity $", amountGamma*2*fairValue);
     if (gammaScalpCount == 1){
       await waitForGamma((_) => gammaScalpCount == gammaCycles);

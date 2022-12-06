@@ -264,7 +264,7 @@ export async function cancelOpenBookOrders(connection, owner, spotMarket, symbol
   let myOrders = await spotMarket.loadOrdersForOwner(connection, owner.publicKey);
   for (let order of myOrders) {
     try {
-      console.log(symbol, "Cancelling OpenBook Orders", order.size, symbol, "@", order.price, order.orderId.toString());
+      console.log(symbol, "Cancelling OpenBook Orders", order.size, symbol, "@", order.price, order.clientId.toString());
       await DexMarket.cancelOrder(connection, owner, spotMarket, order);
     } catch (err) {
       console.log(symbol, "Cancel OpenBook Orders", err, err.stack);

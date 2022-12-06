@@ -539,13 +539,20 @@ export class Scalper {
       console.log(this.symbol, "Max OpenBook Hedges exceeded!");
       return;
     }
-
+    const deltaID = new BN(new Date().getTime());
+    
     this.serumVialClient.streamData(
       ['trades'],
       [`${this.symbol}/USDC`],
-      this.openBookAccount,
+      [deltaID.toString()],
       (message: SerumVialTradeMessage) => {
-        console.log(this.symbol, "Delta Hedge Filled!", hedgeSide, message.size, message.market, message.price, message.timestamp);
+        if (message.makerClientId == deltaID.toString()){
+        console.log(this.symbol, "Delta Hedge Maker!", hedgeSide, message.size, message.market, 
+        message.price, message.makerClientId, message.timestamp);
+        } else if (message.takerClientId == deltaID.toString()){
+          console.log(this.symbol, "Delta Hedge Taker!", hedgeSide, message.size, message.market, 
+          message.price, message.takerClientId, message.timestamp);
+        }
         const fillQty = (hedgeSide == 'buy' ? 1 : -1) * message.size;
         hedgeDeltaTotal = hedgeDeltaTotal + fillQty;
       }
@@ -618,7 +625,6 @@ export class Scalper {
       const amountDelta = Math.round(Math.abs(hedgeDeltaClip) * (1/this.minSpotSize)) / (1/this.minSpotSize);
       const priceDelta = Math.floor(Math.abs(hedgePrice) * (1/this.tickSize)) / (1/this.tickSize);
       const payerAccount = getPayerAccount(hedgeSide, this.symbol, "USDC");
-      const deltaID = new BN(new Date().getTime());
       console.log(this.symbol, hedgeSide, "OpenBook-SPOT", amountDelta, "Limit:", priceDelta, "#", deltaHedgeCount, "ID", deltaID.toString());
       await spotMarket.placeOrder(this.connection, {
         owner: new Account(this.owner.secretKey),
@@ -674,7 +680,11 @@ export class Scalper {
       undefined,
       OPENBOOK_FORK_ID,
     );
-    
+    const orderIDBase = new Date().getTime() * 2;
+    const bidID = new BN(orderIDBase);
+    const askID = new BN(orderIDBase + 1);
+    const gammaIds = [bidID.toString(), askID.toString()]
+
     if (this.serumVialClient.checkSerumVial() != WebSocket.OPEN) {
       this.serumVialClient.openSerumVial();
     }
@@ -682,10 +692,16 @@ export class Scalper {
     this.serumVialClient.streamData(
       ['trades'],
       [`${this.symbol}/USDC`],
-      this.openBookAccount,
+      gammaIds,
       (message: SerumVialTradeMessage) => {
-        console.log(this.symbol, "Gamma Scalp Filled!", message.size, message.market, message.price, message.timestamp);
-        let fillPrice = Number(message.price);
+        if (message.makerClientId == bidID.toString()){
+          console.log(this.symbol, "Gamma Bid Filled!", message.size, message.market, message.price, message.makerClientId, message.timestamp);
+        } else if(message.makerClientId == askID.toString()){
+          console.log(this.symbol, "Gamma Ask Filled!", message.size, message.market, message.price, message.makerClientId, message.timestamp);
+        } else{
+          console.log(this.symbol, "Gamma Scalp Filled From Taker?!", message.size, message.market, message.price, message.takerClientId, message.timestamp);
+        }
+          let fillPrice = Number(message.price);
         gammaScalpCount = gammaScalpCount + 1;
         this.gammaScalpOpenBook(
           dipProduct,
@@ -752,9 +768,6 @@ export class Scalper {
     const amountGamma = Math.round(Math.abs(netGamma) * (1/this.minSpotSize)) / (1/this.minSpotSize);
     const priceBid = Math.floor(Math.abs(gammaBid) * (1/this.tickSize)) / (1/this.tickSize);
     const priceAsk = Math.floor(Math.abs(gammaAsk) * (1/this.tickSize)) / (1/this.tickSize);
-    const orderIDBase = new Date().getTime() * 2;
-    const bidID = new BN(orderIDBase);
-    const askID = new BN(orderIDBase + 1);
     const bidAccount = getPayerAccount("buy", this.symbol, "USDC");
     const askAccount = getPayerAccount("sell", this.symbol, "USDC");
     // TODO send these orders in parallel if possible

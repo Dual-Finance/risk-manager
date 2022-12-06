@@ -9,19 +9,22 @@ export class SerumVialClient {
   public streamData(
     channels: string[],
     markets: string[],
-    openBookAccount: string,
+    orderIds: string[],
     onmessage: (message: any) => void
   ) {
     this._ws.onmessage = (msg) => {
       const message = JSON.parse(msg.data as string);
       if (message.type === "trade") {
         const tradeMessage = message as SerumVialTradeMessage;
-        if (
-          tradeMessage.makerAccount == openBookAccount ||
-          tradeMessage.takerAccount == openBookAccount
-        )
-         {
-          onmessage(tradeMessage);
+        for (let i = 0; i< orderIds.length; i++){
+          if (
+            tradeMessage.makerClientId == orderIds[i] ||
+            tradeMessage.takerClientId == orderIds[i]
+          )
+          {
+            console.log(tradeMessage)
+            onmessage(tradeMessage);
+          }
         }
       }
     };
@@ -31,7 +34,7 @@ export class SerumVialClient {
         return;
       }
 
-      this.streamData(channels, markets, openBookAccount, onmessage);
+      this.streamData(channels, markets, orderIds, onmessage);
     };
 
     const subPayloads = channels.map((channel) => {

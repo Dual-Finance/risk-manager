@@ -17,7 +17,7 @@ import { readKeypair, sleepExact, sleepRandom } from "./utils";
 import { SerumVialClient, SerumVialTradeMessage } from "./serumVial";
 import { cancelOpenBookOrders, getDIPDelta, getDIPGamma, getDIPTheta, getFairValue, getPayerAccount, getSpotDelta, loadPrices, 
   orderSpliceMango, orderSpliceOpenBook, settleOpenBook } from './scalper_utils';
-import { AnchorProvider, BN, Wallet } from "@project-serum/anchor";
+import { BN } from "@project-serum/anchor";
 
 export class Scalper {
   client: MangoClient;

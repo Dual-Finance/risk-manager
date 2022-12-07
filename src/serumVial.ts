@@ -22,6 +22,7 @@ export class SerumVialClient {
             tradeMessage.takerClientId == orderIds[i]
           )
           {
+            orderIds = undefined;
             onmessage(tradeMessage);
           }
         }

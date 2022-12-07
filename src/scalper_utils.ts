@@ -260,7 +260,7 @@ export function getPayerAccount(hedgeSide, base, quote) {
   };
 }
 
-export async function cancelOpenBookOrders(connection: Connection, owner: Keypair, 
+export async function cancelTxOpenBookOrders(connection: Connection, owner: Keypair, 
   spotMarket: Market, symbol: string):Promise<Transaction | undefined> {
   let myOrders = await spotMarket.loadOrdersForOwner(connection, owner.publicKey);
   if (myOrders.length == 0){

@@ -15,7 +15,7 @@ import {
 import { DIPDeposit } from "./common";
 import { readKeypair, sleepExact, sleepRandom } from "./utils";
 import { SerumVialClient, SerumVialTradeMessage } from "./serumVial";
-import { cancelOpenBookOrders, getDIPDelta, getDIPGamma, getDIPTheta, getFairValue, getPayerAccount, getSpotDelta, loadPrices, 
+import { cancelTxOpenBookOrders, getDIPDelta, getDIPGamma, getDIPTheta, getFairValue, getPayerAccount, getSpotDelta, loadPrices, 
   orderSpliceMango, orderSpliceOpenBook, settleOpenBook } from './scalper_utils';
 import { BN } from "@project-serum/anchor";
 
@@ -525,7 +525,7 @@ export class Scalper {
     );
 
     // Clean the state by cancelling all existing open orders.
-    const cancelDelta = await cancelOpenBookOrders(this.connection, this.owner, spotMarket, this.symbol);
+    const cancelDelta = await cancelTxOpenBookOrders(this.connection, this.owner, spotMarket, this.symbol);
     if (cancelDelta != undefined) {
       try {
         await sendAndConfirmTransaction(this.connection, cancelDelta, [this.owner])
@@ -718,7 +718,7 @@ export class Scalper {
       }
     );
     // Clean the state by cancelling all existing open orders.
-    const cancelGammaStart = await cancelOpenBookOrders(this.connection, this.owner, spotMarket, this.symbol);
+    const cancelGammaStart = await cancelTxOpenBookOrders(this.connection, this.owner, spotMarket, this.symbol);
     if (cancelGammaStart != undefined) {
       try {
         await sendAndConfirmTransaction(this.connection, cancelGammaStart, [this.owner])

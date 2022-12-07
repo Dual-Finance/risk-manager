@@ -6,7 +6,7 @@ import {
   MangoGroup,
   PerpMarket,
 } from "@blockworks-foundation/mango-client";
-import { Account, Connection, LAMPORTS_PER_SOL, PublicKey } from "@solana/web3.js";
+import { Account, Connection, Keypair, LAMPORTS_PER_SOL, PublicKey, sendAndConfirmTransaction, Transaction } from "@solana/web3.js";
 import { DIPDeposit } from "./common";
 import {
   ACCOUNT_MAP,
@@ -18,6 +18,7 @@ import {
   THEO_VOL_MAP,
 } from "./config";
 import { getAssociatedTokenAddress, getChainlinkPrice, getPythPrice, getSwitchboardPrice, tokenToSplMint } from "./utils";
+import { Market } from "@project-serum/serum";
 
 export async function loadPrices(
   mangoGroup: MangoGroup,
@@ -259,16 +260,18 @@ export function getPayerAccount(hedgeSide, base, quote) {
   };
 }
 
-export async function cancelOpenBookOrders(connection, owner, spotMarket, symbol) {
+export async function cancelTxOpenBookOrders(connection: Connection, owner: Keypair, 
+  spotMarket: Market, symbol: string):Promise<Transaction | undefined> {
   let myOrders = await spotMarket.loadOrdersForOwner(connection, owner.publicKey);
-  for (let order of myOrders) {
-    try {
-      console.log(symbol, "Cancelling OpenBook Orders", order.size, symbol, "@", order.price, order.clientId.toString());
-      await spotMarket.cancelOrder(connection, new Account(owner.secretKey), order)
-    } catch (err) {
-      console.log(symbol, "Cancel OpenBook Orders", err, err.stack);
-    }
+  if (myOrders.length == 0){
+    return undefined;
   }
+  const cancelTx = new Transaction();
+  for (let order of myOrders) {
+    console.log(symbol, "Cancelling OpenBook Orders", order.size, symbol, "@", order.price, order.clientId.toString());
+    cancelTx.add(await spotMarket.makeCancelOrderTransaction(connection, owner.publicKey, order))
+  }
+  return cancelTx;
 }
 
 export async function getFairValue(connection, spotMarket, symbol) {

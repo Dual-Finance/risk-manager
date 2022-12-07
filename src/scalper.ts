@@ -3,8 +3,8 @@ import {
   Config, getMarketByBaseSymbolAndKind, GroupConfig, MangoAccount, MangoClient, MangoCache,
   PerpMarket, MangoGroup, PerpEventLayout, FillEvent, MarketConfig,
 } from "@blockworks-foundation/mango-client";
-import { Keypair, Commitment, Connection, PublicKey, Account, Transaction, sendAndConfirmTransaction, Signer } from "@solana/web3.js";
-import { Market, OpenOrders} from '@project-serum/serum';
+import { Keypair, Commitment, Connection, PublicKey, Account, Transaction, sendAndConfirmTransaction } from "@solana/web3.js";
+import { Market} from '@project-serum/serum';
 import configFile from "./ids.json";
 import {
   networkName, THEO_VOL_MAP, maxNotional, twapInterval, scalperWindow,
@@ -15,7 +15,7 @@ import {
 import { DIPDeposit } from "./common";
 import { readKeypair, sleepExact, sleepRandom } from "./utils";
 import { SerumVialClient, SerumVialTradeMessage } from "./serumVial";
-import { cancelOpenBookOrders, getDIPDelta, getDIPGamma, getDIPTheta, getFairValue, getPayerAccount, getSpotDelta, loadPrices, 
+import { cancelTxOpenBookOrders, getDIPDelta, getDIPGamma, getDIPTheta, getFairValue, getPayerAccount, getSpotDelta, loadPrices, 
   orderSpliceMango, orderSpliceOpenBook, settleOpenBook } from './scalper_utils';
 import { BN } from "@project-serum/anchor";
 
@@ -525,7 +525,14 @@ export class Scalper {
     );
 
     // Clean the state by cancelling all existing open orders.
-    await cancelOpenBookOrders(this.connection, this.owner, spotMarket, this.symbol);
+    const cancelDelta = await cancelTxOpenBookOrders(this.connection, this.owner, spotMarket, this.symbol);
+    if (cancelDelta != undefined) {
+      try {
+        await sendAndConfirmTransaction(this.connection, cancelDelta, [this.owner])
+      } catch (err) {
+        console.log(this.symbol, "Cancel OpenBook Orders", err, err.stack);
+      }
+    }
 
     // Settle Funds
     try{
@@ -711,7 +718,14 @@ export class Scalper {
       }
     );
     // Clean the state by cancelling all existing open orders.
-    await cancelOpenBookOrders(this.connection, this.owner, spotMarket, this.symbol);
+    const cancelGammaStart = await cancelTxOpenBookOrders(this.connection, this.owner, spotMarket, this.symbol);
+    if (cancelGammaStart != undefined) {
+      try {
+        await sendAndConfirmTransaction(this.connection, cancelGammaStart, [this.owner])
+      } catch (err) {
+        console.log(this.symbol, "Cancel OpenBook Orders", err, err.stack);
+      }
+    }
 
     // Settle Funds
     try {
@@ -762,8 +776,6 @@ export class Scalper {
       return;
     }
 
-    // Check again for orders to cancel
-    await cancelOpenBookOrders(this.connection, this.owner, spotMarket, this.symbol);
 
     const amountGamma = Math.round(Math.abs(netGamma) * (1/this.minSpotSize)) / (1/this.minSpotSize);
     const priceBid = Math.floor(Math.abs(gammaBid) * (1/this.tickSize)) / (1/this.tickSize);
@@ -795,11 +807,11 @@ export class Scalper {
     gammaOrders.add(gammaAskTx.transaction);
     try{
       await sendAndConfirmTransaction(this.connection, gammaOrders, [this.owner])
+      console.log(this.symbol, "Gamma", amountGamma, "Bid", priceBid, "BidID", bidID.toString());
+      console.log(this.symbol, "Gamma", amountGamma, "Ask", priceAsk, "AskID", askID.toString());
     } catch (err) {
       console.log(this.symbol, "Gamma Order", err, err.stack);
     }
-    console.log(this.symbol, "Gamma", amountGamma, "Bid", priceBid, "BidID", bidID.toString());
-    console.log(this.symbol, "Gamma", amountGamma, "Ask", priceAsk, "AskID", askID.toString());
     console.log(this.symbol, "Market Spread %", (priceAsk-priceBid)/fairValue * 100, "Liquidity $", amountGamma*2*fairValue);
     if (gammaScalpCount == 1){
       await waitForGamma((_) => gammaScalpCount == gammaCycles);

@@ -139,3 +139,4 @@ export const staggerTime = 30; // Seconds to wait between reruns of each product
 export const MANGO_DOWNTIME_THRESHOLD = 15; // Time in Minutes to stop routing transactions to Mango
 export const fundingThreshold = 0.25; // % Funding to switch to openbook orders
 export const maxMktSpread = 0.01; // Max % allowable spread to use midvalue as accurate price
+export const gammaCompleteThreshold = 0.90 // Move on to new gamma cycle when 90% filled

@@ -815,7 +815,7 @@ export class Scalper {
     console.log(this.symbol, "Market Spread %", (priceAsk-priceBid)/fairValue * 100, "Liquidity $", amountGamma*2*fairValue);
     if (gammaScalpCount == 1){
       await waitForGamma((_) => gammaScalpCount == gammaCycles);
-      const scalpPnL = (1 + 1/(2*gammaCycles)) * (gammaScalpCount-1) * stdDevSpread * fairValue;
+      const scalpPnL = ((1 + 1/(2*gammaCycles)) * (gammaScalpCount-1) * stdDevSpread * fairValue) * netGamma * gammaScalpCount;
       const thetaPnL = getDIPTheta(dipProduct, fairValue, this.symbol)/(24*60*60/scalperWindow);
       const estTotalPnL = scalpPnL + thetaPnL;
       console.log(this.symbol, "Estimated Total PnL", estTotalPnL, "Scalp PnL", scalpPnL, "Theta PnL", thetaPnL, "Total Scalps", gammaScalpCount - 1)

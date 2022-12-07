@@ -10,7 +10,7 @@ import {
   networkName, THEO_VOL_MAP, maxNotional, twapInterval, scalperWindow,
   zScore, MinContractSize, TickSize, FILLS_URL, IS_DEV, gammaThreshold,
   maxHedges, percentDrift, DELTA_OFFSET, MANGO_DOWNTIME_THRESHOLD, fundingThreshold, gammaCycles, 
-  MinOpenBookSize, OPENBOOK_FORK_ID, OPENBOOK_MKT_MAP, OPENBOOK_ACCOUNT_MAP, treasuryPositions, slippageMax,
+  MinOpenBookSize, OPENBOOK_FORK_ID, OPENBOOK_MKT_MAP, OPENBOOK_ACCOUNT_MAP, treasuryPositions, slippageMax, gammaCompleteThreshold,
 } from "./config";
 import { DIPDeposit } from "./common";
 import { readKeypair, sleepExact, sleepRandom } from "./utils";
@@ -696,11 +696,13 @@ export class Scalper {
       this.serumVialClient.openSerumVial();
     }
 
+    let gammaFills = 0;
     this.serumVialClient.streamData(
       ['trades'],
       [`${this.symbol}/USDC`],
       gammaIds,
       (message: SerumVialTradeMessage) => {
+        gammaFills = gammaFills + Math.abs(message.size);
         if (message.makerClientId == bidID.toString()){
           console.log(this.symbol, "Gamma Bid Fill!", message.size, message.market, message.price, message.makerClientId, message.timestamp);
         } else if(message.makerClientId == askID.toString()){
@@ -708,13 +710,15 @@ export class Scalper {
         } else{
           console.log(this.symbol, "Gamma Scalp Fill From Taker?!", message.size, message.market, message.price, message.takerClientId, message.timestamp);
         }
-          let fillPrice = Number(message.price);
-        gammaScalpCount = gammaScalpCount + 1;
-        this.gammaScalpOpenBook(
-          dipProduct,
-          gammaScalpCount,
-          fillPrice
-        );
+        if (gammaFills > netGamma * gammaCompleteThreshold) {
+          const fillPrice = Number(message.price);
+          gammaScalpCount = gammaScalpCount + 1;
+          this.gammaScalpOpenBook(
+            dipProduct,
+            gammaScalpCount,
+            fillPrice
+          );
+        }
       }
     );
     // Clean the state by cancelling all existing open orders.

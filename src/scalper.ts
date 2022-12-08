@@ -3,14 +3,15 @@ import {
   Config, getMarketByBaseSymbolAndKind, GroupConfig, MangoAccount, MangoClient, MangoCache,
   PerpMarket, MangoGroup, PerpEventLayout, FillEvent, MarketConfig,
 } from "@blockworks-foundation/mango-client";
-import { Keypair, Commitment, Connection, PublicKey, Account, Transaction, sendAndConfirmTransaction } from "@solana/web3.js";
+import { Keypair, Commitment, Connection, PublicKey, Account, Transaction, sendAndConfirmTransaction, AccountMeta } from "@solana/web3.js";
 import { Market} from '@project-serum/serum';
+import { PhoenixClient} from '@many-exchange/phoenix-sdk';
 import configFile from "./ids.json";
 import {
   networkName, THEO_VOL_MAP, maxNotional, twapInterval, scalperWindow,
   zScore, MinContractSize, TickSize, FILLS_URL, IS_DEV, gammaThreshold,
   maxHedges, percentDrift, DELTA_OFFSET, MANGO_DOWNTIME_THRESHOLD, fundingThreshold, gammaCycles, 
-  MinOpenBookSize, OPENBOOK_FORK_ID, OPENBOOK_MKT_MAP, OPENBOOK_ACCOUNT_MAP, treasuryPositions, slippageMax, gammaCompleteThreshold,
+  MinOpenBookSize, OPENBOOK_FORK_ID, OPENBOOK_MKT_MAP, OPENBOOK_ACCOUNT_MAP, treasuryPositions, slippageMax, gammaCompleteThreshold, OPB, cluster,
 } from "./config";
 import { DIPDeposit } from "./common";
 import { readKeypair, sleepExact, sleepRandom } from "./utils";
@@ -95,7 +96,11 @@ export class Scalper {
     // Check if Mango is live
     if ((Date.now() - perpMarket.lastUpdated.toNumber() * 1_000) / (1_000 * 60) > MANGO_DOWNTIME_THRESHOLD) {
       console.log(this.symbol, "Mango Down! Last Updated:", new Date(perpMarket.lastUpdated.toNumber() * 1_000))
-      await this.scalperOpenBook(dipProduct);
+      if (OPB){
+       await this.scalperOpenBook(dipProduct);
+      } else {
+        await this.scalperPhoenix(dipProduct);
+      }
     } else {
       await this.scalperMango(dipProduct);
     }
@@ -509,7 +514,7 @@ export class Scalper {
     catch (err){
       console.log(this.symbol, "Main Gamma Error", err.stack)
     }
-    console.log(this.symbol, "Scalper Cycle completed", new Date().toUTCString())
+    console.log(this.symbol, "OpenBook Scalper Cycle completed", new Date().toUTCString())
     console.log("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
   }
 
@@ -827,6 +832,80 @@ export class Scalper {
       const estTotalPnL = scalpPnL + thetaPnL;
       console.log(this.symbol, "Estimated Total PnL", estTotalPnL, "Scalp PnL", scalpPnL, "Theta PnL", thetaPnL, "Total Scalps", gammaScalpCount - 1)
     }
+  }
+
+  async scalperPhoenix(dipProduct: DIPDeposit[]): Promise<void> {
+    console.log(this.symbol, "Hedging on Phoenix");
+    PhoenixClient
+
+    try {
+      await this.deltaHedgePhoenix(
+        dipProduct,
+        1,
+      );
+    }
+    catch (err){
+        console.log(this.symbol, "Main Delta Error", err.stack)
+      }
+
+    try{
+      await this.gammaScalpPhoenix(
+        dipProduct,
+        1,
+        0
+      );
+    }
+    catch (err){
+      console.log(this.symbol, "Main Gamma Error", err.stack)
+    }
+    console.log(this.symbol, "Phoenix Scalper Cycle completed", new Date().toUTCString())
+    console.log("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+  }
+
+  async deltaHedgePhoenix(
+    dipProduct: DIPDeposit[],
+    deltaHedgeCount: number,
+  ): Promise<void> {
+    const phoenixClient = await PhoenixClient.create(cluster, this.connection, this.owner.publicKey, {skipPreflight: true});
+    const phoenixMarket = phoenixClient.getMarket("TEST", "USDC");
+    const phBid = phoenixMarket.market.getBidPrice();
+    // const phTxs = await phoenixClient.fetchRecentTransactions(0);
+    const phTxs = 0 ;
+    console.log("PHOENIX START", phBid, phTxs);
+    
+    const phTestOrder = phoenixClient.makeSwapTransaction("TEST", 1, "USDC", 0);
+    
+    const keyEdit: string[] = ["EtQ3RgX2ds9VUkq8Buse8UifN2irHVjCqBnoeRCkGkMe",
+    "CkcJx7Uwgxck5zm3DqUp2N1ikkkoPn2wA8zf7oS4tFSZ",
+    "5v5A5drhYS59hECzjFyGdJFgcwAVjALEPUE1m5ydoLew",
+    "phnxNHfGNVjpVVuHkceK3MgwZ1bW25ijfWACKhVFbBH",
+    "BhgbPjbXca7G2BhaFFSxdGDjdaLTUre1QRZYeBtWbePN",
+    "Gk5LKFFGNxEcQTmSyK5iXDVVKxeqASPAJE1UhmVGEcuf",
+    "FnnXtQHcjc28sPyNPC2Aq1dbqR9339c3P6fgJ8ckSH5P",
+    "2iLRgouNckn85Qk4ToA1n1HnQKp9bphLyrUiCpYxPzGc",
+    "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"];
+
+    for(let i = 0; i <8; i++){
+      //console.log(phTestOrder.instructions[0].keys[i].pubkey.toBase58())
+      phTestOrder.instructions[0].keys[i].pubkey = new PublicKey(keyEdit[i]);
+    }
+    const finalPubkey = new PublicKey(keyEdit[8]);
+    const finalKey: AccountMeta = {pubkey: finalPubkey, isSigner: false, isWritable: false};
+    phTestOrder.instructions[0].keys.push(finalKey);
+    for(let i = 0; i <9; i++){
+      console.log(phTestOrder.instructions[0].keys[i].pubkey.toBase58())
+    }
+    await phoenixClient.sendAndConfirmTransaction(phTestOrder, [this.owner])
+    console.log("PHOENIX END", phBid, phTxs);
+  }
+
+async gammaScalpPhoenix(
+    dipProduct: DIPDeposit[],
+    gammaScalpCount: number,
+    priorFillPrice: number
+  ): Promise<void> {
+    const orderIDBase = new Date().getTime() * 2;
+    console.log("Gamma Scalping Phoenix", orderIDBase)
   }
 }
 

@@ -287,9 +287,9 @@ export async function getFairValue(connection, spotMarket, symbol) {
       console.log(symbol, "Using Switchboard", sbPrice);
     } else {
       const pythPrice = await getPythPrice(new PublicKey(tokenToSplMint(symbol)));
-      if (pythPrice.price > 0) {
-        fairValue = pythPrice.price;
-        console.log(symbol, "Using Pyth", pythPrice.price);
+      if (pythPrice > 0) {
+        fairValue = pythPrice;
+        console.log(symbol, "Using Pyth", pythPrice);
       } else {
         const bids = await spotMarket.loadBids(connection);
         const asks = await spotMarket.loadAsks(connection);

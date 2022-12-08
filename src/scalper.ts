@@ -718,6 +718,8 @@ export class Scalper {
             gammaScalpCount,
             fillPrice
           );
+        } else{
+          console.log("Gamma Partially Filled", gammaFills, "of", netGamma)
         }
       }
     );

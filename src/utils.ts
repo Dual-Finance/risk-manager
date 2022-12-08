@@ -201,11 +201,10 @@ export async function getPythPrice(splMint: PublicKey) {
   );
   const pythClient = new PythHttpClient(connection, pythPublicKey);
   const data = await pythClient.getData();
-
   for (let symbol of data.symbols) {
     const price = data.productPrice.get(symbol)!;
     if (tokenToPythSymbol(splMintToToken(splMint)) == symbol) {
-      return price;
+      return price.price;
     }
   }
   return;

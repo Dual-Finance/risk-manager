@@ -866,35 +866,40 @@ export class Scalper {
     dipProduct: DIPDeposit[],
     deltaHedgeCount: number,
   ): Promise<void> {
-    const phoenixClient = await PhoenixClient.create(cluster, this.connection, this.owner.publicKey, {skipPreflight: true});
-    const phoenixMarket = phoenixClient.getMarket("TEST", "USDC");
-    const phBid = phoenixMarket.market.getBidPrice();
+    const phoenixClient = await PhoenixClient.create(cluster, this.connection, this.owner.publicKey);
+    //console.log(phoenixClient);
+    //const phoenixMarket = phoenixClient.getMarket("TEST", "USDC");
+    const phBid = 0; // phoenixMarket.market.getBidPrice();
     // const phTxs = await phoenixClient.fetchRecentTransactions(0);
     const phTxs = 0 ;
     console.log("PHOENIX START", phBid, phTxs);
     
     const phTestOrder = phoenixClient.makeSwapTransaction("TEST", 1, "USDC", 0);
     
-    const keyEdit: string[] = ["EtQ3RgX2ds9VUkq8Buse8UifN2irHVjCqBnoeRCkGkMe",
+    const keyEdit: string[] = ["5iLqmcg8vifdnnw6wEpVtQxFE4Few5uiceDWzi3jvzH8",
     "CkcJx7Uwgxck5zm3DqUp2N1ikkkoPn2wA8zf7oS4tFSZ",
     "5v5A5drhYS59hECzjFyGdJFgcwAVjALEPUE1m5ydoLew",
     "phnxNHfGNVjpVVuHkceK3MgwZ1bW25ijfWACKhVFbBH",
     "BhgbPjbXca7G2BhaFFSxdGDjdaLTUre1QRZYeBtWbePN",
     "Gk5LKFFGNxEcQTmSyK5iXDVVKxeqASPAJE1UhmVGEcuf",
-    "FnnXtQHcjc28sPyNPC2Aq1dbqR9339c3P6fgJ8ckSH5P",
-    "2iLRgouNckn85Qk4ToA1n1HnQKp9bphLyrUiCpYxPzGc",
+    "AdecmbS66ofdSMbNB6hnpbJV1dA9DntaUf6TmPmrhPRo",
+    "2CtLMMmjKSbdy5T7A79fSYfxn5AjwPuHcCnACfx9ZK5u",
     "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"];
+
+    const signerEdit: boolean[] = []
 
     for(let i = 0; i <8; i++){
       //console.log(phTestOrder.instructions[0].keys[i].pubkey.toBase58())
       phTestOrder.instructions[0].keys[i].pubkey = new PublicKey(keyEdit[i]);
     }
+    phTestOrder.instructions[0].keys[7].isWritable = true;
     const finalPubkey = new PublicKey(keyEdit[8]);
-    const finalKey: AccountMeta = {pubkey: finalPubkey, isSigner: false, isWritable: false};
+    const finalKey: AccountMeta = {isSigner: false, isWritable: false, pubkey: finalPubkey};
     phTestOrder.instructions[0].keys.push(finalKey);
     for(let i = 0; i <9; i++){
-      console.log(phTestOrder.instructions[0].keys[i].pubkey.toBase58())
+      console.log(phTestOrder.instructions[0].keys[i])
     }
+    console.log(phTestOrder.instructions[0])
     await phoenixClient.sendAndConfirmTransaction(phTestOrder, [this.owner])
     console.log("PHOENIX END", phBid, phTxs);
   }

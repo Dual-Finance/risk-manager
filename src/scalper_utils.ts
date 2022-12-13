@@ -6,19 +6,23 @@ import {
   MangoGroup,
   PerpMarket,
 } from "@blockworks-foundation/mango-client";
-import { Account, Connection, Keypair, LAMPORTS_PER_SOL, PublicKey, sendAndConfirmTransaction, Transaction } from "@solana/web3.js";
+import { Account, Connection, Keypair, LAMPORTS_PER_SOL, PublicKey, Transaction } from "@solana/web3.js";
 import { DIPDeposit } from "./common";
 import {
   ACCOUNT_MAP,
+  cluster,
   mangoTesterPk,
   maxMktSpread,
   optionVaultPk,
   rfRate,
   riskManagerPk,
+  slippageMax,
   THEO_VOL_MAP,
 } from "./config";
-import { getAssociatedTokenAddress, getChainlinkPrice, getPythPrice, getSwitchboardPrice, tokenToSplMint } from "./utils";
+import { decimalsBaseSPL, getAssociatedTokenAddress, getChainlinkPrice, getPythPrice, getSwitchboardPrice, splMintToToken, tokenToSplMint } from "./utils";
 import { Market } from "@project-serum/serum";
+import { Jupiter } from "@jup-ag/core";
+import JSBI from "jsbi";
 
 export async function loadPrices(
   mangoGroup: MangoGroup,
@@ -307,4 +311,65 @@ export async function getFairValue(connection, spotMarket, symbol) {
     }
   }
   return fairValue;
+}
+
+export async function arbProtection(connection: Connection, owner: Keypair, hedgeSide: string, 
+    base: string, quote: string, hedgeDelta: number, hedgePrice: number) {
+  const jupiter = await Jupiter.load({
+    connection: connection,
+    cluster: cluster,
+    user: owner, 
+    wrapUnwrapSOL: false, 
+  });
+  let inputToken: PublicKey;
+  let outputToken: PublicKey;
+  let hedgeAmount: number;
+  if (hedgeSide == "sell"){
+    inputToken = new PublicKey(tokenToSplMint(base));
+    outputToken = new PublicKey(tokenToSplMint(quote));
+    hedgeAmount = Math.abs(hedgeDelta);
+  } else {
+    inputToken = new PublicKey(tokenToSplMint(quote));
+    outputToken = new PublicKey(tokenToSplMint(base));
+    hedgeAmount = Math.abs(hedgeDelta) * hedgePrice;
+  }
+  const inputQty = Math.round(hedgeAmount * (10 ** decimalsBaseSPL(splMintToToken(inputToken)))) // Amount to send to Jupiter
+  // Find arbitrage qty & price
+  let arbQty: number;
+  let arbValue: number[];
+  for (let i=0; i < 10; i++){
+    arbQty = Math.round((1 - i/10) * inputQty);
+    const routes = await jupiter.computeRoutes({
+      inputMint: inputToken, 
+      outputMint: outputToken, 
+      amount: JSBI.BigInt(arbQty), // 1000000 => 1 USDC if inputToken.address is USDC mint
+      slippageBps: slippageMax.get(base) * 100 * 100,  // 1 bps = 0.01%
+      onlyDirectRoutes: true,
+    });
+    const bestRoute = routes.routesInfos[0];
+    const inQty = JSBI.toNumber(bestRoute.marketInfos[0].inAmount) / (10 ** decimalsBaseSPL(splMintToToken(inputToken)));
+    const outQty = JSBI.toNumber(bestRoute.marketInfos[0].outAmount) / (10 ** decimalsBaseSPL(splMintToToken(outputToken)));
+    if (hedgeSide == "sell"){
+      const netPrice = outQty / inQty;
+      if (netPrice > hedgePrice){
+        arbQty = arbQty / (10 ** decimalsBaseSPL(splMintToToken(inputToken)));
+        console.log(base, "Arb Sell Route", bestRoute.marketInfos[0].amm.label, "In", inQty , "Out", outQty, "Price", netPrice, "Arb Qty", arbQty);
+        arbValue = [netPrice, arbQty];
+        return arbValue;
+      }
+    } else {
+      const netPrice = inQty / outQty;
+      if (netPrice < hedgePrice){
+        arbQty = arbQty / (10 ** decimalsBaseSPL(splMintToToken(inputToken))) / hedgePrice;
+        console.log(base, "Arb Buy Route", bestRoute.marketInfos[0].amm.label, "In", inQty , "Out", outQty, "Price", netPrice, "Arb Qty", arbQty)
+        arbValue = [netPrice, arbQty];
+        return arbValue;
+      }
+    }
+  }
+
+  console.log(base, "No Arb Route Found!")
+  return;
+  
+  // TODO fct to send arb tx to jupiter
 }

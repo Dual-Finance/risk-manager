@@ -4,7 +4,7 @@ import {
   PerpMarket, MangoGroup, PerpEventLayout, FillEvent, MarketConfig,
 } from "@blockworks-foundation/mango-client";
 import { Keypair, Commitment, Connection, PublicKey, Account, Transaction, sendAndConfirmTransaction } from "@solana/web3.js";
-import { Market} from '@project-serum/serum';
+import { Market } from '@project-serum/serum';
 import configFile from "./ids.json";
 import {
   networkName, THEO_VOL_MAP, maxNotional, twapInterval, scalperWindow,
@@ -15,7 +15,7 @@ import {
 import { DIPDeposit } from "./common";
 import { readKeypair, sleepExact, sleepRandom } from "./utils";
 import { SerumVialClient, SerumVialTradeMessage } from "./serumVial";
-import { cancelTxOpenBookOrders, getDIPDelta, getDIPGamma, getDIPTheta, getFairValue, getPayerAccount, getSpotDelta, loadPrices, 
+import { arbProtection, cancelTxOpenBookOrders, getDIPDelta, getDIPGamma, getDIPTheta, getFairValue, getPayerAccount, getSpotDelta, loadPrices, 
   orderSpliceMango, orderSpliceOpenBook, settleOpenBook } from './scalper_utils';
 import { BN } from "@project-serum/anchor";
 
@@ -610,7 +610,8 @@ export class Scalper {
   
     // Place an order to get delta neutral.
     const hedgePrice = hedgeDeltaTotal < 0 ? fairValue * (1 + slippageTolerance) : fairValue * (1 - slippageTolerance);
-    
+    // TODO Check on jupiter and sweep price
+    const arbValues = await arbProtection(this.connection, this.owner, hedgeSide, this.symbol, "USDC", hedgeDeltaTotal, hedgePrice);
     // Splice Order depending on book depth
     const bids = await spotMarket.loadBids(this.connection);
     const asks = await spotMarket.loadAsks(this.connection);

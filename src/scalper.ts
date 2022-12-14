@@ -10,7 +10,7 @@ import {
   networkName, THEO_VOL_MAP, maxNotional, twapInterval, scalperWindow,
   zScore, MinContractSize, TickSize, FILLS_URL, IS_DEV, gammaThreshold,
   maxHedges, percentDrift, DELTA_OFFSET, MANGO_DOWNTIME_THRESHOLD, fundingThreshold, gammaCycles, 
-  MinOpenBookSize, OPENBOOK_FORK_ID, OPENBOOK_MKT_MAP, OPENBOOK_ACCOUNT_MAP, treasuryPositions, slippageMax, gammaCompleteThreshold,
+  MinOpenBookSize, OPENBOOK_FORK_ID, OPENBOOK_MKT_MAP, OPENBOOK_ACCOUNT_MAP, treasuryPositions, slippageMax, gammaCompleteThreshold, cluster,
 } from "./config";
 import { DIPDeposit } from "./common";
 import { readKeypair, sleepExact, sleepRandom } from "./utils";
@@ -268,7 +268,7 @@ export class Scalper {
         ) {
           const fillQty = (hedgeSide == 'buy' ? 1 : -1) * fillEvent.quantity.toNumber() * this.minSize;
           const fillPrice = fillEvent.price.toNumber() * this.tickSize;
-          hedgeDeltaTotal = hedgeDeltaTotal + fillQty;
+          hedgeDeltaTotal += fillQty;
           console.log(
             this.symbol, 'Delta Filled', hedgeSide, hedgeProduct, "Qty", fillQty,
             "Price", fillPrice, "Remaining", hedgeDeltaTotal, "ID", deltaOrderId,
@@ -561,7 +561,7 @@ export class Scalper {
           message.price, message.takerClientId, message.timestamp);
         }
         const fillQty = (hedgeSide == 'buy' ? 1 : -1) * message.size;
-        hedgeDeltaTotal = hedgeDeltaTotal + fillQty;
+        hedgeDeltaTotal += fillQty;
       }
     );
 
@@ -607,10 +607,10 @@ export class Scalper {
       return;
     } else {
       // Adjust delta for slippage allowed
-      const slipapgeDelta = getDIPDelta(dipProduct, hedgePrice, this.symbol);
-      const dipDeltaDiff = slipapgeDelta - dipTotalDelta;
-      hedgeDeltaTotal = hedgeDeltaTotal + dipDeltaDiff;
-      console.log(this.symbol, "Adjust Slippage Delta by", dipDeltaDiff, "to", hedgeDeltaTotal);
+      const slippageDIPDelta = getDIPDelta(dipProduct, hedgePrice, this.symbol);
+      const dipDeltaDiff = slippageDIPDelta - dipTotalDelta;
+      hedgeDeltaTotal += dipDeltaDiff;
+      console.log(this.symbol, "Adjust Slippage Delta by", dipDeltaDiff, "to", -hedgeDeltaTotal);
       if (Math.abs(hedgeDeltaTotal * fairValue) < (deltaThreshold * fairValue)) {
         console.log(this.symbol, "Delta Netural: Slippage <", deltaThreshold);
         return;
@@ -618,13 +618,13 @@ export class Scalper {
       console.log(this.symbol, "Outside delta threshold:", Math.abs(hedgeDeltaTotal), "vs.", deltaThreshold);
     }
     
-    // Check order book depth
+    // Load order book data
     const bids = await spotMarket.loadBids(this.connection);
     const asks = await spotMarket.loadAsks(this.connection);
     const [bidTOB, _bidSize] = bids.getL2(1)[0];
     const [askTOB, _askSize] = asks.getL2(1)[0];
     const spreadDelta = hedgeDeltaTotal < 0 ? (askTOB - hedgePrice) / hedgePrice * 100 : (bidTOB - hedgePrice) / hedgePrice * 100;
-
+    // Check order book depth and splice order
     const spliceFactor = liquidityCheckSplice(
       hedgeDeltaTotal,
       hedgePrice,
@@ -649,8 +649,9 @@ export class Scalper {
             const txid = await sendAndConfirmTransaction(this.connection, jupTx, [this.owner])
             if(swapTransaction){
               const spotDeltaUpdate = jupValues[1];
-              hedgeDeltaTotal = hedgeDeltaTotal + spotDeltaUpdate;
-              console.log(this.symbol, "Jupiter Hedge on", jupValues[2], "Price", jupValues[0], "Qty", jupValues[1], `https://solscan.io/tx/${txid}`)
+              hedgeDeltaTotal += spotDeltaUpdate;
+              console.log(this.symbol, "Jupiter Hedge on", jupValues[2], "Price", jupValues[0], "Qty", jupValues[1],
+               `https://solana.fm/tx/${txid}${cluster?.includes('devnet') ? '?cluster=devnet' : ''}`)
             }
           }
           if (Math.abs(hedgeDeltaTotal * fairValue) < (deltaThreshold * fairValue)) {
@@ -738,13 +739,13 @@ export class Scalper {
       this.serumVialClient.openSerumVial();
     }
 
-    let gammaFills = 0;
+    let gammaFillQty = 0;
     this.serumVialClient.streamData(
       ['trades'],
       [`${this.symbol}/USDC`],
       gammaIds,
       (message: SerumVialTradeMessage) => {
-        gammaFills = gammaFills + Math.abs(message.size);
+        gammaFillQty += Math.abs(message.size);
         if (message.makerClientId == bidID.toString()){
           console.log(this.symbol, "Gamma Bid Fill!", message.size, message.market, message.price, message.makerClientId, message.timestamp);
         } else if(message.makerClientId == askID.toString()){
@@ -752,8 +753,8 @@ export class Scalper {
         } else{
           console.log(this.symbol, "Gamma Scalp Fill From Taker?!", message.size, message.market, message.price, message.takerClientId, message.timestamp);
         }
-        if (gammaFills > netGamma * gammaCompleteThreshold) {
-          gammaFills = 0;
+        if (gammaFillQty > netGamma * gammaCompleteThreshold) {
+          gammaFillQty = 0;
           const fillPrice = Number(message.price);
           gammaScalpCount = gammaScalpCount + 1;
           this.gammaScalpOpenBook(
@@ -762,7 +763,7 @@ export class Scalper {
             fillPrice
           );
         } else{
-          console.log("Gamma Partially Filled", gammaFills, "of", netGamma)
+          console.log("Gamma Partially Filled", gammaFillQty, "of", netGamma)
         }
       }
     );
@@ -865,7 +866,7 @@ export class Scalper {
     if (gammaScalpCount == 1){
       await waitForGamma((_) => gammaScalpCount == gammaCycles);
       const scalpPnL = ((1 + 1/(2*gammaCycles)) * (gammaScalpCount-1) * stdDevSpread * fairValue) * netGamma * gammaScalpCount
-        + ((1 + 1/(2*gammaCycles)) * (gammaScalpCount-1) * stdDevSpread * fairValue) * gammaFills;
+        + ((1 + 1/(2*gammaCycles)) * (gammaScalpCount-1) * stdDevSpread * fairValue) * gammaFillQty;
       const thetaPnL = getDIPTheta(dipProduct, fairValue, this.symbol)/(24*60*60/scalperWindow);
       const estTotalPnL = scalpPnL + thetaPnL;
       console.log(this.symbol, "Estimated Total PnL", estTotalPnL, "Scalp PnL", scalpPnL, "Theta PnL", thetaPnL, "Total Scalps", gammaScalpCount - 1)

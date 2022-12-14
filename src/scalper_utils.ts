@@ -14,6 +14,7 @@ import {
   mangoTesterPk,
   maxMktSpread,
   optionVaultPk,
+  reductionSteps,
   rfRate,
   riskManagerPk,
   slippageMax,
@@ -334,14 +335,14 @@ export async function jupiterHedge(connection: Connection, owner: Keypair, hedge
   }
   const inputQty = Math.round(hedgeAmount * (10 ** decimalsBaseSPL(splMintToToken(inputToken)))) // Amount to send to Jupiter
   // Find best route, qty & price
-  let arbQty: number;
-  let arbValue:[number, number, string, {setupTransaction?: Transaction, swapTransaction: Transaction, cleanupTransaction?: Transaction}];
-  for (let i=0; i < 10; i++){
-    arbQty = Math.round((1 - i/10) * inputQty);
+  let swapQty: number;
+  let routeDetails:[number, number, string, {setupTransaction?: Transaction, swapTransaction: Transaction, cleanupTransaction?: Transaction}];
+  for (let i=0; i < reductionSteps; i++){
+    swapQty = Math.round((1 - i/reductionSteps) * inputQty);
     const routes = await jupiter.computeRoutes({
       inputMint: inputToken, 
       outputMint: outputToken, 
-      amount: JSBI.BigInt(arbQty), // 1000000 => 1 USDC if inputToken.address is USDC mint
+      amount: JSBI.BigInt(swapQty), // 1000000 => 1 USDC if inputToken.address is USDC mint
       slippageBps: slippageMax.get(base) * 100 * 100,  // 1 bps = 0.01%
       onlyDirectRoutes: true,
     });
@@ -351,26 +352,26 @@ export async function jupiterHedge(connection: Connection, owner: Keypair, hedge
     if (hedgeSide == "sell"){
       const netPrice = outQty / inQty;
       if (netPrice > hedgePrice){
-        arbQty = arbQty / (10 ** decimalsBaseSPL(splMintToToken(inputToken))) * -1;
+        swapQty = swapQty / (10 ** decimalsBaseSPL(splMintToToken(inputToken))) * -1;
         const venue = bestRoute.marketInfos[0].amm.label;
         const { transactions } = await jupiter.exchange({
           routeInfo:routes.routesInfos[0],
         });
-        arbValue = [netPrice, arbQty, venue, transactions];
+        routeDetails = [netPrice, swapQty, venue, transactions];
         break;
       }
     } else {
       const netPrice = inQty / outQty;
       if (netPrice < hedgePrice){
-        arbQty = arbQty / (10 ** decimalsBaseSPL(splMintToToken(inputToken))) / hedgePrice;
+        swapQty = swapQty / (10 ** decimalsBaseSPL(splMintToToken(inputToken))) / hedgePrice;
         const venue = bestRoute.marketInfos[0].amm.label;
         const { transactions } = await jupiter.exchange({
           routeInfo:routes.routesInfos[0],
         });
-        arbValue = [netPrice, arbQty, venue, transactions];
+        routeDetails = [netPrice, swapQty, venue, transactions];
         break;
       }
     }
   }
-  return arbValue;
+  return routeDetails;
 }

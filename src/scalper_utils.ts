@@ -7,7 +7,7 @@ import {
   PerpMarket,
 } from "@blockworks-foundation/mango-client";
 import { Account, Connection, Keypair, LAMPORTS_PER_SOL, PublicKey, Transaction } from "@solana/web3.js";
-import { DIPDeposit } from "./common";
+import { DIPDeposit, RouteDetails } from "./common";
 import {
   ACCOUNT_MAP,
   cluster,
@@ -99,7 +99,7 @@ export function orderSpliceMango(
 }
 
 // Check if liquidity is supportive & splice order
-export function liquidityCheckSplice(
+export function liquidityCheckAndNumSplices(
   qty: number,
   price: number,
   notionalMax: number,
@@ -324,6 +324,7 @@ export async function jupiterHedge(connection: Connection, owner: Keypair, hedge
   let inputToken: PublicKey;
   let outputToken: PublicKey;
   let hedgeAmount: number;
+  // TODO Make Enum everywhere
   if (hedgeSide == "sell"){
     inputToken = new PublicKey(tokenToSplMint(base));
     outputToken = new PublicKey(tokenToSplMint(quote));
@@ -336,7 +337,7 @@ export async function jupiterHedge(connection: Connection, owner: Keypair, hedge
   const inputQty = Math.round(hedgeAmount * (10 ** decimalsBaseSPL(splMintToToken(inputToken)))) // Amount to send to Jupiter
   // Find best route, qty & price
   let swapQty: number;
-  let routeDetails:[number, number, string, {setupTransaction?: Transaction, swapTransaction: Transaction, cleanupTransaction?: Transaction}];
+  let routeDetails: RouteDetails;
   for (let i=0; i < reductionSteps; i++){
     swapQty = Math.round((1 - i/reductionSteps) * inputQty);
     const routes = await jupiter.computeRoutes({
@@ -357,7 +358,7 @@ export async function jupiterHedge(connection: Connection, owner: Keypair, hedge
         const { transactions } = await jupiter.exchange({
           routeInfo:routes.routesInfos[0],
         });
-        routeDetails = [netPrice, swapQty, venue, transactions];
+        routeDetails = {price: netPrice, qty: swapQty, venue: venue, txs: transactions};
         break;
       }
     } else {
@@ -368,7 +369,7 @@ export async function jupiterHedge(connection: Connection, owner: Keypair, hedge
         const { transactions } = await jupiter.exchange({
           routeInfo:routes.routesInfos[0],
         });
-        routeDetails = [netPrice, swapQty, venue, transactions];
+        routeDetails = {price: netPrice, qty: swapQty, venue: venue, txs: transactions};
         break;
       }
     }

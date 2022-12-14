@@ -1,4 +1,4 @@
-import { PublicKey } from "@solana/web3.js";
+import { Transaction } from "@solana/web3.js";
 
 export interface DIPDeposit {
   splToken: string;
@@ -7,4 +7,11 @@ export interface DIPDeposit {
   strike: number;
   type: string;
   qty: number;
+}
+
+export interface RouteDetails {
+  price: number;
+  qty: number;
+  venue: string;
+  txs: {setupTransaction?: Transaction, swapTransaction: Transaction, cleanupTransaction?: Transaction};
 }

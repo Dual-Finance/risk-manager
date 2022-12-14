@@ -16,7 +16,7 @@ import { DIPDeposit } from "./common";
 import { readKeypair, sleepExact, sleepRandom } from "./utils";
 import { SerumVialClient, SerumVialTradeMessage } from "./serumVial";
 import { jupiterHedge, cancelTxOpenBookOrders, getDIPDelta, getDIPGamma, getDIPTheta, getFairValue, getPayerAccount, getSpotDelta, loadPrices, 
-  orderSpliceMango, liquidityCheckSplice, settleOpenBook } from './scalper_utils';
+  orderSpliceMango, liquidityCheckAndNumSplices, settleOpenBook } from './scalper_utils';
 import { BN } from "@project-serum/anchor";
 
 export class Scalper {
@@ -218,7 +218,7 @@ export class Scalper {
     const fundingRate = 24 * 365 * perpMarket.getCurrentFundingRate(mangoGroup, mangoCache, this.marketIndex, bidSide, askSide)
     const buySpot = fundingRate > fundingThreshold;
     const sellSpot = -fundingRate < fundingThreshold; 
-    const hedgeSide = hedgeDeltaTotal < 0 ? "buy" : "sell";
+    const hedgeSide = hedgeDeltaTotal < 0 ? "buy" : "sell"; // TODO Make Enum everywhere
     let hedgeProduct: string;
     if (hedgeSide == "buy" && buySpot) {
       hedgeProduct = "-SPOT";
@@ -625,7 +625,7 @@ export class Scalper {
     const [askTOB, _askSize] = asks.getL2(1)[0];
     const spreadDelta = hedgeDeltaTotal < 0 ? (askTOB - hedgePrice) / hedgePrice * 100 : (bidTOB - hedgePrice) / hedgePrice * 100;
     // Check order book depth and splice order
-    const spliceFactor = liquidityCheckSplice(
+    const spliceFactor = liquidityCheckAndNumSplices(
       hedgeDeltaTotal,
       hedgePrice,
       maxNotional.get(this.symbol),
@@ -641,16 +641,16 @@ export class Scalper {
         // Check on jupiter and sweep price
         const jupValues = await jupiterHedge(this.connection, this.owner, hedgeSide, this.symbol, "USDC", hedgeDeltaTotal, hedgePrice);
         if (jupValues !== undefined){
-          const { setupTransaction, swapTransaction, cleanupTransaction } = jupValues[3];
+          const { setupTransaction, swapTransaction, cleanupTransaction } = jupValues.txs;
           for (let jupTx of [setupTransaction, swapTransaction, cleanupTransaction].filter(Boolean)) {
               if (!jupTx) {
                 continue;
               }
             const txid = await sendAndConfirmTransaction(this.connection, jupTx, [this.owner])
             if(swapTransaction){
-              const spotDeltaUpdate = jupValues[1];
+              const spotDeltaUpdate = jupValues.qty;
               hedgeDeltaTotal += spotDeltaUpdate;
-              console.log(this.symbol, "Jupiter Hedge on", jupValues[2], "Price", jupValues[0], "Qty", jupValues[1],
+              console.log(this.symbol, "Jupiter Hedge on", jupValues.venue, "Price", jupValues.price, "Qty", jupValues.qty,
                `https://solana.fm/tx/${txid}${cluster?.includes('devnet') ? '?cluster=devnet' : ''}`)
             }
           }
@@ -658,8 +658,8 @@ export class Scalper {
             console.log(this.symbol, "Delta Netural: Jupiter Hedge");
             return;
           }
-          console.log(this.symbol, "Adjust", hedgeSide, "Price", hedgePrice, "to", jupValues[0], "Remaining Qty", hedgeDeltaTotal)
-          hedgePrice = jupValues[0];
+          console.log(this.symbol, "Adjust", hedgeSide, "Price", hedgePrice, "to", jupValues.price, "Remaining Qty", hedgeDeltaTotal)
+          hedgePrice = jupValues.price;
         } else {
           console.log(this.symbol, "No Jupiter Route Found Better than", hedgePrice)
         }

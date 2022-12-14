@@ -104,7 +104,7 @@ export const maxNotional = new Map<string, number> ([
 ]); // Max hedging $ notional sizes
 
 export const slippageMax = new Map<string, number> ([
-  ['BTC', 0.005], ['ETH', 0.005], ['SOL', 0.0010], ['MNGO', 0.0015]
+  ['BTC', 0.0005], ['ETH', 0.0005], ['SOL', 0.0010], ['MNGO', 0.0015]
 ]); // // Max Allowed xbps above/below FMV on limit orders
 
 // Enter any Staking Options Owned and to be hedged from the treasury

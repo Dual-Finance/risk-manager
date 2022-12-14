@@ -15,8 +15,8 @@ import {
 import { DIPDeposit } from "./common";
 import { readKeypair, sleepExact, sleepRandom } from "./utils";
 import { SerumVialClient, SerumVialTradeMessage } from "./serumVial";
-import { arbProtection, cancelTxOpenBookOrders, getDIPDelta, getDIPGamma, getDIPTheta, getFairValue, getPayerAccount, getSpotDelta, loadPrices, 
-  orderSpliceMango, orderSpliceOpenBook, settleOpenBook } from './scalper_utils';
+import { jupiterHedge, cancelTxOpenBookOrders, getDIPDelta, getDIPGamma, getDIPTheta, getFairValue, getPayerAccount, getSpotDelta, loadPrices, 
+  orderSpliceMango, liquidityCheckSplice, settleOpenBook } from './scalper_utils';
 import { BN } from "@project-serum/anchor";
 
 export class Scalper {
@@ -601,23 +601,31 @@ export class Scalper {
     const stdDevSpread = this.impliedVol / Math.sqrt((365 * 24 * 60 * 60) / scalperWindow) * zScore;
     const slippageTolerance = Math.min(stdDevSpread/ 2, slippageMax.get(this.symbol));
     const deltaThreshold = Math.max(dipTotalGamma * stdDevSpread * fairValue * gammaThreshold, this.minSpotSize);
+    let hedgePrice = hedgeDeltaTotal < 0 ? fairValue * (1 + slippageTolerance) : fairValue * (1 - slippageTolerance);
     if (Math.abs(hedgeDeltaTotal * fairValue) < (deltaThreshold * fairValue)) {
       console.log(this.symbol, "Delta Netural <", deltaThreshold);
       return;
     } else {
-      console.log(this.symbol, "Above delta threshold:", hedgeDeltaTotal, ">", deltaThreshold);
+      // Adjust delta for slippage allowed
+      const slipapgeDelta = getDIPDelta(dipProduct, hedgePrice, this.symbol);
+      const dipDeltaDiff = slipapgeDelta - dipTotalDelta;
+      hedgeDeltaTotal = hedgeDeltaTotal + dipDeltaDiff;
+      console.log(this.symbol, "Adjust Slippage Delta by", dipDeltaDiff, "to", hedgeDeltaTotal);
+      if (Math.abs(hedgeDeltaTotal * fairValue) < (deltaThreshold * fairValue)) {
+        console.log(this.symbol, "Delta Netural: Slippage <", deltaThreshold);
+        return;
+      }
+      console.log(this.symbol, "Outside delta threshold:", Math.abs(hedgeDeltaTotal), "vs.", deltaThreshold);
     }
-  
-    // Place an order to get delta neutral.
-    const hedgePrice = hedgeDeltaTotal < 0 ? fairValue * (1 + slippageTolerance) : fairValue * (1 - slippageTolerance);
-    // TODO Check on jupiter and sweep price
-    const arbValues = await arbProtection(this.connection, this.owner, hedgeSide, this.symbol, "USDC", hedgeDeltaTotal, hedgePrice);
-    // Splice Order depending on book depth
+    
+    // Check order book depth
     const bids = await spotMarket.loadBids(this.connection);
     const asks = await spotMarket.loadAsks(this.connection);
     const [bidTOB, _bidSize] = bids.getL2(1)[0];
     const [askTOB, _askSize] = asks.getL2(1)[0];
-    const spliceFactor = orderSpliceOpenBook(
+    const spreadDelta = hedgeDeltaTotal < 0 ? (askTOB - hedgePrice) / hedgePrice * 100 : (bidTOB - hedgePrice) / hedgePrice * 100;
+
+    const spliceFactor = liquidityCheckSplice(
       hedgeDeltaTotal,
       hedgePrice,
       maxNotional.get(this.symbol),
@@ -625,9 +633,42 @@ export class Scalper {
       bids,
       asks
     );
-    const hedgeDeltaClip = hedgeDeltaTotal / spliceFactor;
-
-    const spreadDelta = hedgeDeltaTotal < 0 ? (askTOB - hedgePrice) / hedgePrice * 100 : (bidTOB - hedgePrice) / hedgePrice * 100;
+  
+    let hedgeDeltaClip = hedgeDeltaTotal;
+    try{
+      if (spliceFactor > 0) {
+        console.log(this.symbol, "Not enough liquidity! Try Jupiter. Adjust Price", hedgePrice, "Splice", spliceFactor)
+        // Check on jupiter and sweep price
+        const jupValues = await jupiterHedge(this.connection, this.owner, hedgeSide, this.symbol, "USDC", hedgeDeltaTotal, hedgePrice);
+        if (jupValues !== undefined){
+          const { setupTransaction, swapTransaction, cleanupTransaction } = jupValues[3];
+          for (let jupTx of [setupTransaction, swapTransaction, cleanupTransaction].filter(Boolean)) {
+              if (!jupTx) {
+                continue;
+              }
+            const txid = await sendAndConfirmTransaction(this.connection, jupTx, [this.owner])
+            if(swapTransaction){
+              const spotDeltaUpdate = jupValues[1];
+              hedgeDeltaTotal = hedgeDeltaTotal + spotDeltaUpdate;
+              console.log(this.symbol, "Jupiter Hedge on", jupValues[2], "Price", jupValues[0], "Qty", jupValues[1], `https://solscan.io/tx/${txid}`)
+            }
+          }
+          if (Math.abs(hedgeDeltaTotal * fairValue) < (deltaThreshold * fairValue)) {
+            console.log(this.symbol, "Delta Netural: Jupiter Hedge");
+            return;
+          }
+          console.log(this.symbol, "Adjust", hedgeSide, "Price", hedgePrice, "to", jupValues[0], "Remaining Qty", hedgeDeltaTotal)
+          hedgePrice = jupValues[0];
+        } else {
+          console.log(this.symbol, "No Jupiter Route Found Better than", hedgePrice)
+        }
+        hedgeDeltaClip = hedgeDeltaTotal / spliceFactor;
+      } else{
+        console.log(this.symbol, "Sufficient liquidity. Sweep OpenBook", spliceFactor)
+      }
+    } catch (err) {
+      console.log(this.symbol, "Jupiter Route", err, err.stack);
+    }
 
     try {
       const amountDelta = Math.round(Math.abs(hedgeDeltaClip) * (1/this.minSpotSize)) / (1/this.minSpotSize);
@@ -712,6 +753,7 @@ export class Scalper {
           console.log(this.symbol, "Gamma Scalp Fill From Taker?!", message.size, message.market, message.price, message.takerClientId, message.timestamp);
         }
         if (gammaFills > netGamma * gammaCompleteThreshold) {
+          gammaFills = 0;
           const fillPrice = Number(message.price);
           gammaScalpCount = gammaScalpCount + 1;
           this.gammaScalpOpenBook(

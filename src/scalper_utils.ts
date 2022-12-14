@@ -97,8 +97,8 @@ export function orderSpliceMango(
   return spliceFactor;
 }
 
-// Splice delta hedge orders if available mango liquidity not supportive
-export function orderSpliceOpenBook(
+// Check if liquidity is supportive & splice order
+export function liquidityCheckSplice(
   qty: number,
   price: number,
   notionalMax: number,
@@ -121,9 +121,8 @@ export function orderSpliceOpenBook(
     }
   }
   if (depth > Math.abs(qty)){
-    return 1;
+    return 0;
   } else {
-    console.log("Order Splice Factor!", Math.max((Math.abs(qty) * price) / notionalMax, 1));
     return Math.max((Math.abs(qty) * price) / notionalMax, 1)
   }
 }
@@ -313,7 +312,7 @@ export async function getFairValue(connection, spotMarket, symbol) {
   return fairValue;
 }
 
-export async function arbProtection(connection: Connection, owner: Keypair, hedgeSide: string, 
+export async function jupiterHedge(connection: Connection, owner: Keypair, hedgeSide: string, 
     base: string, quote: string, hedgeDelta: number, hedgePrice: number) {
   const jupiter = await Jupiter.load({
     connection: connection,
@@ -334,9 +333,9 @@ export async function arbProtection(connection: Connection, owner: Keypair, hedg
     hedgeAmount = Math.abs(hedgeDelta) * hedgePrice;
   }
   const inputQty = Math.round(hedgeAmount * (10 ** decimalsBaseSPL(splMintToToken(inputToken)))) // Amount to send to Jupiter
-  // Find arbitrage qty & price
+  // Find best route, qty & price
   let arbQty: number;
-  let arbValue: number[];
+  let arbValue:[number, number, string, {setupTransaction?: Transaction, swapTransaction: Transaction, cleanupTransaction?: Transaction}];
   for (let i=0; i < 10; i++){
     arbQty = Math.round((1 - i/10) * inputQty);
     const routes = await jupiter.computeRoutes({
@@ -352,24 +351,26 @@ export async function arbProtection(connection: Connection, owner: Keypair, hedg
     if (hedgeSide == "sell"){
       const netPrice = outQty / inQty;
       if (netPrice > hedgePrice){
-        arbQty = arbQty / (10 ** decimalsBaseSPL(splMintToToken(inputToken)));
-        console.log(base, "Arb Sell Route", bestRoute.marketInfos[0].amm.label, "In", inQty , "Out", outQty, "Price", netPrice, "Arb Qty", arbQty);
-        arbValue = [netPrice, arbQty];
-        return arbValue;
+        arbQty = arbQty / (10 ** decimalsBaseSPL(splMintToToken(inputToken))) * -1;
+        const venue = bestRoute.marketInfos[0].amm.label;
+        const { transactions } = await jupiter.exchange({
+          routeInfo:routes.routesInfos[0],
+        });
+        arbValue = [netPrice, arbQty, venue, transactions];
+        break;
       }
     } else {
       const netPrice = inQty / outQty;
       if (netPrice < hedgePrice){
         arbQty = arbQty / (10 ** decimalsBaseSPL(splMintToToken(inputToken))) / hedgePrice;
-        console.log(base, "Arb Buy Route", bestRoute.marketInfos[0].amm.label, "In", inQty , "Out", outQty, "Price", netPrice, "Arb Qty", arbQty)
-        arbValue = [netPrice, arbQty];
-        return arbValue;
+        const venue = bestRoute.marketInfos[0].amm.label;
+        const { transactions } = await jupiter.exchange({
+          routeInfo:routes.routesInfos[0],
+        });
+        arbValue = [netPrice, arbQty, venue, transactions];
+        break;
       }
     }
   }
-
-  console.log(base, "No Arb Route Found!")
-  return;
-  
-  // TODO fct to send arb tx to jupiter
+  return arbValue;
 }

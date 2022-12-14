@@ -6,19 +6,24 @@ import {
   MangoGroup,
   PerpMarket,
 } from "@blockworks-foundation/mango-client";
-import { Account, Connection, Keypair, LAMPORTS_PER_SOL, PublicKey, sendAndConfirmTransaction, Transaction } from "@solana/web3.js";
-import { DIPDeposit } from "./common";
+import { Account, Connection, Keypair, LAMPORTS_PER_SOL, PublicKey, Transaction } from "@solana/web3.js";
+import { DIPDeposit, RouteDetails } from "./common";
 import {
   ACCOUNT_MAP,
+  cluster,
   mangoTesterPk,
   maxMktSpread,
   optionVaultPk,
+  reductionSteps,
   rfRate,
   riskManagerPk,
+  slippageMax,
   THEO_VOL_MAP,
 } from "./config";
-import { getAssociatedTokenAddress, getChainlinkPrice, getPythPrice, getSwitchboardPrice, tokenToSplMint } from "./utils";
+import { decimalsBaseSPL, getAssociatedTokenAddress, getChainlinkPrice, getPythPrice, getSwitchboardPrice, splMintToToken, tokenToSplMint } from "./utils";
 import { Market } from "@project-serum/serum";
+import { Jupiter } from "@jup-ag/core";
+import JSBI from "jsbi";
 
 export async function loadPrices(
   mangoGroup: MangoGroup,
@@ -93,8 +98,8 @@ export function orderSpliceMango(
   return spliceFactor;
 }
 
-// Splice delta hedge orders if available mango liquidity not supportive
-export function orderSpliceOpenBook(
+// Check if liquidity is supportive & splice order
+export function liquidityCheckAndNumSplices(
   qty: number,
   price: number,
   notionalMax: number,
@@ -117,9 +122,8 @@ export function orderSpliceOpenBook(
     }
   }
   if (depth > Math.abs(qty)){
-    return 1;
+    return 0;
   } else {
-    console.log("Order Splice Factor!", Math.max((Math.abs(qty) * price) / notionalMax, 1));
     return Math.max((Math.abs(qty) * price) / notionalMax, 1)
   }
 }
@@ -307,4 +311,68 @@ export async function getFairValue(connection, spotMarket, symbol) {
     }
   }
   return fairValue;
+}
+
+export async function jupiterHedge(connection: Connection, owner: Keypair, hedgeSide: string, 
+    base: string, quote: string, hedgeDelta: number, hedgePrice: number) {
+  const jupiter = await Jupiter.load({
+    connection: connection,
+    cluster: cluster,
+    user: owner, 
+    wrapUnwrapSOL: false, 
+  });
+  let inputToken: PublicKey;
+  let outputToken: PublicKey;
+  let hedgeAmount: number;
+  // TODO Make Enum everywhere
+  if (hedgeSide == "sell"){
+    inputToken = new PublicKey(tokenToSplMint(base));
+    outputToken = new PublicKey(tokenToSplMint(quote));
+    hedgeAmount = Math.abs(hedgeDelta);
+  } else {
+    inputToken = new PublicKey(tokenToSplMint(quote));
+    outputToken = new PublicKey(tokenToSplMint(base));
+    hedgeAmount = Math.abs(hedgeDelta) * hedgePrice;
+  }
+  const inputQty = Math.round(hedgeAmount * (10 ** decimalsBaseSPL(splMintToToken(inputToken)))) // Amount to send to Jupiter
+  // Find best route, qty & price
+  let swapQty: number;
+  let routeDetails: RouteDetails;
+  for (let i=0; i < reductionSteps; i++){
+    swapQty = Math.round((1 - i/reductionSteps) * inputQty);
+    const routes = await jupiter.computeRoutes({
+      inputMint: inputToken, 
+      outputMint: outputToken, 
+      amount: JSBI.BigInt(swapQty), // 1000000 => 1 USDC if inputToken.address is USDC mint
+      slippageBps: slippageMax.get(base) * 100 * 100,  // 1 bps = 0.01%
+      onlyDirectRoutes: true,
+    });
+    const bestRoute = routes.routesInfos[0];
+    const inQty = JSBI.toNumber(bestRoute.marketInfos[0].inAmount) / (10 ** decimalsBaseSPL(splMintToToken(inputToken)));
+    const outQty = JSBI.toNumber(bestRoute.marketInfos[0].outAmount) / (10 ** decimalsBaseSPL(splMintToToken(outputToken)));
+    if (hedgeSide == "sell"){
+      const netPrice = outQty / inQty;
+      if (netPrice > hedgePrice){
+        swapQty = swapQty / (10 ** decimalsBaseSPL(splMintToToken(inputToken))) * -1;
+        const venue = bestRoute.marketInfos[0].amm.label;
+        const { transactions } = await jupiter.exchange({
+          routeInfo:routes.routesInfos[0],
+        });
+        routeDetails = {price: netPrice, qty: swapQty, venue: venue, txs: transactions};
+        break;
+      }
+    } else {
+      const netPrice = inQty / outQty;
+      if (netPrice < hedgePrice){
+        swapQty = swapQty / (10 ** decimalsBaseSPL(splMintToToken(inputToken))) / hedgePrice;
+        const venue = bestRoute.marketInfos[0].amm.label;
+        const { transactions } = await jupiter.exchange({
+          routeInfo:routes.routesInfos[0],
+        });
+        routeDetails = {price: netPrice, qty: swapQty, venue: venue, txs: transactions};
+        break;
+      }
+    }
+  }
+  return routeDetails;
 }

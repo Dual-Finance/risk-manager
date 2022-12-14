@@ -16,6 +16,7 @@ import {
   IS_DEV,
   mngoPK,
   CHAINLINK_PROGRAM_ID,
+  usdcMintPk,
 } from "./config";
 import {
   PythHttpClient,
@@ -159,6 +160,9 @@ export function splMintToToken(splMint: PublicKey) {
   if (splMint.toBase58() == mngoPK.toBase58()) {
     return "MNGO";
   }
+  if (splMint.toBase58() == usdcMintPk.toBase58()) {
+    return "USDC";
+  }
   return "UNKNOWN_TOKEN";
 }
 
@@ -174,6 +178,9 @@ export function tokenToSplMint(token: string) {
   }
   if (token == "MNGO") {
     return mngoPK;
+  }
+  if (token == "USDC") {
+    return usdcMintPk;
   }
   return undefined;
 }
@@ -282,7 +289,7 @@ export function tokenToChainlinkSymbol(token: string) {
 
 export function decimalsBaseSPL(token: string) {
   if (token == "SOL") {
-    return 8;
+    return 9;
   }
   if (token == "BTC") {
     return 8;
@@ -291,6 +298,9 @@ export function decimalsBaseSPL(token: string) {
     return 8;
   }
   if (token == "MNGO") {
+    return 6;
+  }
+  if (token == "USDC") {
     return 6;
   }
   return undefined;
@@ -316,5 +326,9 @@ export async function getChainlinkPrice(splMint: PublicKey) {
 
   await waitFor((_) => latestValue != 0);
   const prettyLatestValue = latestValue / Math.pow(10, decimalsBaseSPL(splMintToToken(splMint)));
+  // Chainlink SOL off by a factor of 10
+  if (splMintToToken(splMint)=="SOL"){
+    return prettyLatestValue * 10;
+  }
   return prettyLatestValue;
 }

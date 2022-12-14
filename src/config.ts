@@ -104,7 +104,7 @@ export const maxNotional = new Map<string, number> ([
 ]); // Max hedging $ notional sizes
 
 export const slippageMax = new Map<string, number> ([
-  ['BTC', 0.0010], ['ETH', 0.0010], ['SOL', 0.0015], ['MNGO', 0.0025]
+  ['BTC', 0.0005], ['ETH', 0.0005], ['SOL', 0.0010], ['MNGO', 0.0015]
 ]); // // Max Allowed xbps above/below FMV on limit orders
 
 // Enter any Staking Options Owned and to be hedged from the treasury
@@ -139,4 +139,5 @@ export const staggerTime = 30; // Seconds to wait between reruns of each product
 export const MANGO_DOWNTIME_THRESHOLD = 15; // Time in Minutes to stop routing transactions to Mango
 export const fundingThreshold = 0.25; // % Funding to switch to openbook orders
 export const maxMktSpread = 0.01; // Max % allowable spread to use midvalue as accurate price
-export const gammaCompleteThreshold = 0.90 // Move on to new gamma cycle when 90% filled
+export const gammaCompleteThreshold = 0.90; // Move on to new gamma cycle when 90% filled
+export const reductionSteps = 10; // Number of times to reduce the jupiter qty to check for routes

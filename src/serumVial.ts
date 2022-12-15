@@ -1,27 +1,27 @@
-import WebSocket from "ws";
+import WebSocket from 'ws';
 
-const WS_URL = "wss://vial.mngo.cloud/v1/ws";
+const WS_URL = 'wss://vial.mngo.cloud/v1/ws';
 
 export class SerumVialClient {
   private _ws: WebSocket | undefined = undefined;
+
   private _disposed = false;
 
   public streamData(
     channels: string[],
     markets: string[],
     orderIds: string[],
-    onmessage: (message: any) => void
+    onmessage: (message: any) => void,
   ) {
     this._ws.onmessage = (msg) => {
       const message = JSON.parse(msg.data as string);
-      if (message.type === "trade") {
+      if (message.type === 'trade') {
         const tradeMessage = message as SerumVialTradeMessage;
-        for (let i = 0; i< orderIds.length; i++){
+        for (let i = 0; i < orderIds.length; i++) {
           if (
-            tradeMessage.makerClientId == orderIds[i] ||
-            tradeMessage.takerClientId == orderIds[i]
-          )
-          {
+            tradeMessage.makerClientId == orderIds[i]
+            || tradeMessage.takerClientId == orderIds[i]
+          ) {
             onmessage(tradeMessage);
           }
         }
@@ -36,13 +36,11 @@ export class SerumVialClient {
       this.streamData(channels, markets, orderIds, onmessage);
     };
 
-    const subPayloads = channels.map((channel) => {
-      return JSON.stringify({
-        op: "subscribe",
-        channel,
-        markets,
-      });
-    });
+    const subPayloads = channels.map((channel) => JSON.stringify({
+      op: 'subscribe',
+      channel,
+      markets,
+    }));
 
     if (this._ws.readyState !== WebSocket.OPEN) {
       this._ws.onopen = () => {
@@ -63,7 +61,7 @@ export class SerumVialClient {
   }
 
   public openSerumVial() {
-      this._ws = new WebSocket(WS_URL);
+    this._ws = new WebSocket(WS_URL);
   }
 
   public closeSerumVial() {
@@ -75,17 +73,17 @@ export class SerumVialClient {
   }
 
   public checkSerumVial() {
-      let state: number;
-      state = this._ws.readyState;
-      return state;
+    let state: number;
+    state = this._ws.readyState;
+    return state;
   }
 }
 
 export type SerumVialTradeMessage = {
-  readonly type: "trade";
+  readonly type: 'trade';
   readonly price: string;
   readonly size: number;
-  readonly side: "buy" | "sell";
+  readonly side: 'buy' | 'sell';
   readonly id: number;
   readonly market: string;
   readonly version: number;

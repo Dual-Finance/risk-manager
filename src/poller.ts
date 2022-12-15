@@ -1,21 +1,27 @@
-import { DIPDeposit } from "./common";
 import {
   Connection,
   AccountChangeCallback,
   PublicKey,
   AccountInfo as solanaAccountInfo,
   Context,
-} from "@solana/web3.js";
-import { AccountInfo, AccountLayout, u64 } from "@solana/spl-token";
-import { WEBSOCKET_URL } from "./config";
+} from '@solana/web3.js';
+import { AccountInfo, AccountLayout, u64 } from '@solana/spl-token';
+import { DIPDeposit } from './common';
+import { WEBSOCKET_URL } from './config';
 
 export class Poller {
   cluster: string;
+
   callback: (deposit: DIPDeposit) => void;
+
   splToken: string;
+
   premiumAsset: string;
+
   expirationSec: number;
+
   strike: number;
+
   type: string;
 
   constructor(
@@ -25,7 +31,7 @@ export class Poller {
     expirationSec: number,
     strike: number,
     type: string,
-    callback: (deposit: DIPDeposit) => void
+    callback: (deposit: DIPDeposit) => void,
   ) {
     this.cluster = cluster;
     this.callback = callback;
@@ -37,17 +43,17 @@ export class Poller {
   }
 
   subscribe(address: string): void {
-    console.log("Listening at:", address);
+    console.log('Listening at:', address);
     // @ts-ignore
     const connection: Connection = new Connection(WEBSOCKET_URL);
     const callback: AccountChangeCallback = (
       accountInfo: solanaAccountInfo<Buffer>,
-      _context: Context
+      _context: Context,
     ) => {
       // @ts-ignore
       const new_amount = parseTokenAccount(accountInfo.data).amount.toNumber();
       let decimals = 6;
-      switch(this.splToken) {
+      switch (this.splToken) {
         // BTC
         case 'JDXktC6gbDXq4zuW3BT6ToSE7timShHQBL449ULDdoMv':
         case '9n4nbM75f5Ui33ZbPYXn59EwSgE8CGsHtAeTH5YFeJ9E':
@@ -72,15 +78,15 @@ export class Poller {
         expirationMs: this.expirationSec * 1_000,
         strike: this.strike,
         type: this.type,
-        qty: new_amount / Math.pow(10, decimals),
+        qty: new_amount / 10 ** decimals,
       };
       this.callback(dip_deposit);
     };
 
     // Watch the vault spl token account
-    try{
+    try {
       connection.onAccountChange(new PublicKey(address), callback);
-    } catch (err){
+    } catch (err) {
       console.log(err);
       console.log(err.stack);
     }

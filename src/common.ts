@@ -1,4 +1,4 @@
-import { Transaction } from "@solana/web3.js";
+import { Transaction } from '@solana/web3.js';
 
 export interface DIPDeposit {
   splToken: string;

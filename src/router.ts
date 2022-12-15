@@ -1,7 +1,9 @@
-import { Connection, PublicKey } from "@solana/web3.js";
+import { Connection, PublicKey } from '@solana/web3.js';
+import fetch from 'cross-fetch';
+import { blackScholes } from 'black-scholes';
 import {
   DIPDeposit,
-} from "./common";
+} from './common';
 import {
   API_URL,
   cluster,
@@ -12,8 +14,8 @@ import {
   OPTION_MINT_ADDRESS_SEED,
   PROTCOL_API_KEY,
   THEO_VOL_MAP,
-} from "./config";
-import { Poller } from "./poller";
+} from './config';
+import { Poller } from './poller';
 import {
   findProgramAddressWithMintAndStrikeAndExpiration,
   getAssociatedTokenAddress,
@@ -21,22 +23,24 @@ import {
   parseDipState,
   splMintToToken,
   tokenToSplMint,
-} from "./utils";
-import fetch from "cross-fetch";
-import * as apiSecret from "../apiSecret.json";
-const crypto = require("crypto");
-import { blackScholes } from 'black-scholes';
+} from './utils';
+import * as apiSecret from '../apiSecret.json';
+
+const crypto = require('crypto');
 
 export class Router {
   mm_callback: (d: DIPDeposit[]) => void;
+
   risk_manager_callback: (d: DIPDeposit[]) => void;
+
   dips: { [name: string]: DIPDeposit };
+
   token: string;
 
   constructor(
     mm_callback: (d: DIPDeposit[]) => void,
     risk_manager_callback: (d: DIPDeposit[]) => void,
-    token: string
+    token: string,
   ) {
     this.mm_callback = mm_callback;
     this.risk_manager_callback = risk_manager_callback;
@@ -54,29 +58,29 @@ export class Router {
     const symbol = `${dip_deposit.splToken},USDC,${date.getUTCFullYear()}-${
       date.getUTCMonth() + 1
     }-${date.getUTCDate()},${dip_deposit.strike * 1_000_000},UPSIDE,E,P`;
-    console.log("++++++++++++++++++++++++++++++++++++++++++++++++++++");
-    console.log("Routing for", symbol, "Deposit:", dip_deposit, new Date().toUTCString());
+    console.log('++++++++++++++++++++++++++++++++++++++++++++++++++++');
+    console.log('Routing for', symbol, 'Deposit:', dip_deposit, new Date().toUTCString());
 
     // This happens after sending tokens to a MM. Exit early.
     if (dip_deposit.qty == 0) {
       this.dips[
         this.dip_to_string(dip_deposit.expirationMs / 1_000, dip_deposit.strike)
       ] = dip_deposit;
-      console.log("DIP Deposit quantity zero");
+      console.log('DIP Deposit quantity zero');
       this.run_risk_manager();
       return;
     }
     this.fetchMMOrder(symbol).then(async (order) => {
       // Run the risk manager if there is no MM order
-      if (!order || Number(order["remainingQuantity"]) < dip_deposit.qty) {
+      if (!order || Number(order.remainingQuantity) < dip_deposit.qty) {
         this.dips[
           this.dip_to_string(
             dip_deposit.expirationMs / 1_000,
-            dip_deposit.strike
+            dip_deposit.strike,
           )
         ] = dip_deposit;
         this.run_risk_manager();
-        console.log("No remaining quantity", order);
+        console.log('No remaining quantity', order);
         return;
       }
 
@@ -85,54 +89,54 @@ export class Router {
       const vol = THEO_VOL_MAP[dip_deposit.splToken] * (1.15 + Math.random() / 10);
       const thresholdPrice = blackScholes(currentPrice, dip_deposit.strike / 1_000_000, fractionOfYear, vol, 0.01, 'call');
 
-      const price = order["price"];
+      const { price } = order;
       // TODO: Test this to make sure the decimals are correct on each.
-      console.log("MM price:", price, "BVE price:", thresholdPrice);
+      console.log('MM price:', price, 'BVE price:', thresholdPrice);
 
       if (thresholdPrice > price) {
         // If the price is worse than the BVE, then do not use the MM, treat it
         // like there is no MM bid.
-        console.log("Not routing to MM due to price:", thresholdPrice, price);
+        console.log('Not routing to MM due to price:', thresholdPrice, price);
         this.dips[
           this.dip_to_string(
             dip_deposit.expirationMs / 1_000,
-            dip_deposit.strike
+            dip_deposit.strike,
           )
         ] = dip_deposit;
         this.run_risk_manager();
         return;
       }
 
-      const client_order_id = "clientOrderId" + Date.now();
-      const side = "SELL";
+      const client_order_id = `clientOrderId${Date.now()}`;
+      const side = 'SELL';
       const quantity = dip_deposit.qty;
-      const secret = apiSecret['default'];
+      const secret = apiSecret.default;
 
       const request = `clientOrderId=${client_order_id}&symbol=${symbol}&price=${price}&quantity=${quantity}&side=${side}`;
       const calculated_hash = crypto
-        .createHmac("SHA256", secret)
+        .createHmac('SHA256', secret)
         .update(Buffer.from(request))
-        .digest("hex");
+        .digest('hex');
 
       const data = {
-        symbol: symbol,
-        price: price,
-        quantity: quantity,
-        side: side,
+        symbol,
+        price,
+        quantity,
+        side,
         clientOrderId: client_order_id,
         signature: calculated_hash,
       };
 
-      console.log("Creating api order for buy", data);
+      console.log('Creating api order for buy', data);
       const response = await fetch(`${DUAL_API}/orders/createorder`, {
-        method: "post",
+        method: 'post',
         headers: {
-          "Content-Type": "application/json",
-          "X-MBX-APIKEY": PROTCOL_API_KEY,
+          'Content-Type': 'application/json',
+          'X-MBX-APIKEY': PROTCOL_API_KEY,
         },
         body: JSON.stringify(data),
       });
-      console.log("API response", await response.json());
+      console.log('API response', await response.json());
     });
   }
 
@@ -146,8 +150,8 @@ export class Router {
       const order = (
         await (
           await fetch(`${DUAL_API}/symbols/getprice?symbol=${symbol}`, {
-            method: "get",
-            headers: { "Content-Type": "application/json" },
+            method: 'get',
+            headers: { 'Content-Type': 'application/json' },
           })
         ).json()
       )[0];
@@ -161,7 +165,7 @@ export class Router {
     expirationSec: number,
     strike: number,
     splMint: PublicKey,
-    connection: Connection
+    connection: Connection,
   ): Promise<void> {
     const [optionMint] = await findProgramAddressWithMintAndStrikeAndExpiration(
       OPTION_MINT_ADDRESS_SEED,
@@ -169,20 +173,20 @@ export class Router {
       expirationSec,
       splMint,
       usdcMintPk,
-      dualMarketProgramID
+      dualMarketProgramID,
     );
     const mmOptionAccount = await getAssociatedTokenAddress(
       optionMint,
-      optionVaultPk
+      optionVaultPk,
     );
     const balance = await connection.getTokenAccountBalance(mmOptionAccount);
 
     this.dips[this.dip_to_string(expirationSec, strike)] = {
       splToken: splMintToToken(splMint),
-      premiumAsset: "USDC",
+      premiumAsset: 'USDC',
       expirationMs: expirationSec * 1_000,
-      strike: strike,
-      type: "call",
+      strike,
+      type: 'call',
       qty: Number(balance.value.uiAmount),
     };
   }
@@ -192,10 +196,9 @@ export class Router {
   }
 
   async refresh_dips() {
-    console.log("Refreshing dips", API_URL);
+    console.log('Refreshing dips', API_URL);
     const connection: Connection = new Connection(API_URL);
-    const programAccountsPromise =
-      connection.getProgramAccounts(dualMarketProgramID);
+    const programAccountsPromise = connection.getProgramAccounts(dualMarketProgramID);
 
     await programAccountsPromise.then(async (data) => {
       for (const programAccount of data) {
@@ -215,8 +218,7 @@ export class Router {
         }
 
         if (splMintToToken(splMint) == this.token) {
-          const alreadyPolled: boolean =
-            this.dip_to_string(expirationSec, strike) in this.dips;
+          const alreadyPolled: boolean = this.dip_to_string(expirationSec, strike) in this.dips;
 
           // Always run add_dip since it refreshes the values if the subscribe
           // fails. Can fail in devnet because some incorrectly defined DIPs.
@@ -230,31 +232,30 @@ export class Router {
             continue;
           }
 
-          const [optionMint] =
-            await findProgramAddressWithMintAndStrikeAndExpiration(
-              OPTION_MINT_ADDRESS_SEED,
-              strike * 1_000_000,
-              expiration,
-              splMint,
-              usdcMintPk,
-              dualMarketProgramID
-            );
+          const [optionMint] = await findProgramAddressWithMintAndStrikeAndExpiration(
+            OPTION_MINT_ADDRESS_SEED,
+            strike * 1_000_000,
+            expiration,
+            splMint,
+            usdcMintPk,
+            dualMarketProgramID,
+          );
           const mmOptionAccount = await getAssociatedTokenAddress(
             optionMint,
-            optionVaultPk
+            optionVaultPk,
           );
 
           // Create a poller
           const poller: Poller = new Poller(
             cluster,
             this.token,
-            "USD",
+            'USD',
             expirationSec,
             strike,
-            "call",
+            'call',
             (deposit: DIPDeposit) => {
               this.route(deposit);
-            }
+            },
           );
 
           // Start polling for a specific DIP option token account

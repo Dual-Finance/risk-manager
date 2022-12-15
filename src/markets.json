@@ -1,15 +1,15 @@
 [
-    
-    {
-        "address": "8BnEgHoWFysVcuFFX7QztDmzuH8r5ZFvyP3sYwn1XTh6",
-        "deprecated": false,
-        "name": "SOL/USDC",
-        "programId": "srmqPvymJeFKQ4zGQed1GFppgkRHL9kaELCbyksJtPX"
-    },
-    {
-        "address": "E14BKBhDWD4EuTkWj1ooZezesGxMW8LPCps4W5PuzZJo",
-        "deprecated": false,
-        "name": "FIDA/USDC",
-        "programId": "9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin"
-    }
-]
+
+  {
+    "address": '8BnEgHoWFysVcuFFX7QztDmzuH8r5ZFvyP3sYwn1XTh6',
+    "deprecated": false,
+    "name": 'SOL/USDC',
+    "programId": 'srmqPvymJeFKQ4zGQed1GFppgkRHL9kaELCbyksJtPX'
+  },
+  {
+    "address": 'E14BKBhDWD4EuTkWj1ooZezesGxMW8LPCps4W5PuzZJo',
+    "deprecated": false,
+    "name": 'FIDA/USDC',
+    "programId": '9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin'
+  }
+];

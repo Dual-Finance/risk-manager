@@ -603,7 +603,7 @@ export class Scalper {
     const deltaThreshold = Math.max(dipTotalGamma * stdDevSpread * fairValue * gammaThreshold, this.minSpotSize);
     let hedgePrice = hedgeDeltaTotal < 0 ? fairValue * (1 + slippageTolerance) : fairValue * (1 - slippageTolerance);
     if (Math.abs(hedgeDeltaTotal * fairValue) < (deltaThreshold * fairValue)) {
-      console.log(this.symbol, "Delta Netural <", deltaThreshold);
+      console.log(this.symbol, "Delta Netural Within", deltaThreshold);
       return;
     } else {
       // Adjust delta for slippage allowed
@@ -611,8 +611,9 @@ export class Scalper {
       const dipDeltaDiff = slippageDIPDelta - dipTotalDelta;
       hedgeDeltaTotal += dipDeltaDiff;
       console.log(this.symbol, "Adjust Slippage Delta by", dipDeltaDiff, "to", -hedgeDeltaTotal);
-      if (Math.abs(hedgeDeltaTotal * fairValue) < (deltaThreshold * fairValue)) {
-        console.log(this.symbol, "Delta Netural: Slippage <", deltaThreshold);
+      if (((-hedgeDeltaTotal * fairValue) < (deltaThreshold * fairValue) && (hedgeSide =="buy")) ||
+       ((-hedgeDeltaTotal * fairValue) > (deltaThreshold * fairValue) && (hedgeSide =="sell"))) {
+        console.log(this.symbol, "Delta Netural: Slippage", deltaThreshold);
         return;
       }
       console.log(this.symbol, "Outside delta threshold:", Math.abs(hedgeDeltaTotal), "vs.", deltaThreshold);

@@ -141,3 +141,4 @@ export const fundingThreshold = 0.25; // % Funding to switch to openbook orders
 export const maxMktSpread = 0.01; // Max % allowable spread to use midvalue as accurate price
 export const gammaCompleteThreshold = 0.90; // Move on to new gamma cycle when 90% filled
 export const reductionSteps = 10; // Number of times to reduce the jupiter qty to check for routes
+export const minExecutionPremium = 0.001 // Min USDC amount to fill MM on

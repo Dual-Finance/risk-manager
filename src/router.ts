@@ -1,3 +1,4 @@
+/* eslint-disable */
 import { Connection, PublicKey } from '@solana/web3.js';
 import fetch from 'cross-fetch';
 import { blackScholes } from 'black-scholes';
@@ -14,6 +15,7 @@ import {
   OPTION_MINT_ADDRESS_SEED,
   PROTCOL_API_KEY,
   THEO_VOL_MAP,
+  minExecutionPremium,
 } from './config';
 import { Poller } from './poller';
 import {
@@ -72,6 +74,7 @@ export class Router {
     }
     this.fetchMMOrder(symbol).then(async (order) => {
       // Run the risk manager if there is no MM order
+      // @ts-ignore
       if (!order || Number(order.remainingQuantity) < dip_deposit.qty) {
         this.dips[
           this.dip_to_string(
@@ -88,10 +91,23 @@ export class Router {
       const fractionOfYear = (Date.now() - dip_deposit.expirationMs) / 365 * 24 * 60 * 60 * 1_000;
       const vol = THEO_VOL_MAP[dip_deposit.splToken] * (1.15 + Math.random() / 10);
       const thresholdPrice = blackScholes(currentPrice, dip_deposit.strike / 1_000_000, fractionOfYear, vol, 0.01, 'call');
-
+      // @ts-ignore
       const { price } = order;
-      // TODO: Test this to make sure the decimals are correct on each.
       console.log('MM price:', price, 'BVE price:', thresholdPrice);
+      const userPremium = price * dip_deposit.qty;
+      if (userPremium < minExecutionPremium) {
+        // If user premium is too small don't bother spamming MM
+        console.log('Not routing too small of a trade:', userPremium, minExecutionPremium);
+        this.dips[
+          this.dip_to_string(
+            dip_deposit.expirationMs / 1_000,
+            dip_deposit.strike,
+          )
+        ] = dip_deposit;
+        this.run_risk_manager();
+        return;
+      }
+      // TODO: Test this to make sure the decimals are correct on each.
 
       if (thresholdPrice > price) {
         // If the price is worse than the BVE, then do not use the MM, treat it
@@ -110,6 +126,7 @@ export class Router {
       const client_order_id = `clientOrderId${Date.now()}`;
       const side = 'SELL';
       const quantity = dip_deposit.qty;
+      // @ts-ignore
       const secret = apiSecret.default;
 
       const request = `clientOrderId=${client_order_id}&symbol=${symbol}&price=${price}&quantity=${quantity}&side=${side}`;

@@ -14,6 +14,7 @@ import {
   OPTION_MINT_ADDRESS_SEED,
   PROTCOL_API_KEY,
   THEO_VOL_MAP,
+  minExecutionPremium,
 } from './config';
 import { Poller } from './poller';
 import {
@@ -90,6 +91,19 @@ export class Router {
       const thresholdPrice = blackScholes(currentPrice, dip_deposit.strike / 1_000_000, fractionOfYear, vol, 0.01, 'call');
 
       const { price } = order;
+      const userPremium = price * dip_deposit.qty;
+      if (userPremium < minExecutionPremium) {
+        // If user premium is too small don't bother spamming MM
+        console.log('Not routing too small of a trade:', userPremium, minExecutionPremium);
+        this.dips[
+          this.dip_to_string(
+            dip_deposit.expirationMs / 1_000,
+            dip_deposit.strike,
+          )
+        ] = dip_deposit;
+        this.run_risk_manager();
+        return;
+      }
       // TODO: Test this to make sure the decimals are correct on each.
       console.log('MM price:', price, 'BVE price:', thresholdPrice);
 

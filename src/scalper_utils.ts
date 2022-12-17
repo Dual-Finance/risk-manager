@@ -378,7 +378,7 @@ export async function jupiterHedge(
     if (hedgeSide == "sell") {
       if (netPrice > hedgePrice){
         const swapQty = searchQty / (10 ** decimalsBaseSPL(splMintToToken(inputToken))) * -1;
-        const venue = bestRoute.marketInfos[0].amm.label;
+        const venue = bestRoute.marketInfos[numRoutes-1].amm.label;
         const { transactions } = await jupiter.exchange({
           routeInfo:routes.routesInfos[0],
         });
@@ -391,7 +391,7 @@ export async function jupiterHedge(
     } else {
       if (netPrice < hedgePrice){
         const swapQty = searchQty / (10 ** decimalsBaseSPL(splMintToToken(inputToken))) / hedgePrice;
-        const venue = bestRoute.marketInfos[0].amm.label;
+        const venue = bestRoute.marketInfos[numRoutes-1].amm.label;
         const { transactions } = await jupiter.exchange({
           routeInfo:routes.routesInfos[0],
         });

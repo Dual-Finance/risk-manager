@@ -143,3 +143,4 @@ export const gammaCompleteThreshold = 0.90; // Move on to new gamma cycle when 9
 export const searchSteps = 7; // Number of times to reduce the jupiter qty to check for routes
 export const minExecutionPremium = 0.001; // Min USDC amount to fill MM on
 export const JUPITER_LIQUIDITY = 100; // USDC amount to check jupiter mid point price
+export const jupiterSlippage = 50; // bps to allow calculating mid price to succeed

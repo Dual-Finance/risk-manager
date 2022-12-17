@@ -25,6 +25,7 @@ import {
   riskManagerPk,
   slippageMax,
   THEO_VOL_MAP,
+  jupiterSlippage,
 } from './config';
 import {
   decimalsBaseSPL, getAssociatedTokenAddress, getChainlinkPrice, getPythPrice, getSwitchboardPrice, splMintToToken, tokenToSplMint,
@@ -402,7 +403,6 @@ export async function jupiterHedge(
         }
       }
     }
-    console.log("Swap Path Factor", sortFactor, "Price", netPrice, "In", inQty, "Out", outQty)
   }
   return routeDetails;
 }
@@ -427,7 +427,7 @@ export async function getJupiterPrice(
     inputMint: inputBuyToken,
     outputMint: outputBuyToken,
     amount: JSBI.BigInt(buyQty),
-    slippageBps: 50,
+    slippageBps: jupiterSlippage,
     onlyDirectRoutes: false,
   });
   const buyPath = buyRoutes.routesInfos[0];
@@ -444,7 +444,7 @@ export async function getJupiterPrice(
     inputMint: inputSellToken,
     outputMint: outputSellToken,
     amount: JSBI.BigInt(sellQty),
-    slippageBps: 50,
+    slippageBps: jupiterSlippage,
     onlyDirectRoutes: false,
   });
   const sellPath = sellRoutes.routesInfos[0];

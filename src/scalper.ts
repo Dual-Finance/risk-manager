@@ -615,12 +615,12 @@ export class Scalper {
 
     // Find fair value.
     console.log(this.symbol, 'Loading Fair Value...');
-    let fairValue = await getFairValue(this.connection, spotMarket, this.symbol);
+    let fairValue = await getFairValue(this.connection, spotMarket, this.symbol, this.owner);
     for (let i = 0; i < maxHedges; i++) {
       if (fairValue == 0) {
         console.log(this.symbol, 'No Prices Refreshing Delta Hedge', i + 1, 'After', twapInterval, 'Seconds');
         await sleepExact(twapInterval);
-        fairValue = await getFairValue(this.connection, spotMarket, this.symbol);
+        fairValue = await getFairValue(this.connection, spotMarket, this.symbol, this.owner);
       }
     }
     if (fairValue == 0) {
@@ -680,16 +680,6 @@ export class Scalper {
       }
       console.log(this.symbol, 'Outside delta threshold:', Math.abs(hedgeDeltaTotal), 'vs.', deltaThreshold);
     }
-    // Adjust delta for slippage allowed
-    const slippageDIPDelta = getDIPDelta(dipProduct, hedgePrice, this.symbol);
-    const dipDeltaDiff = slippageDIPDelta - dipTotalDelta;
-    hedgeDeltaTotal += dipDeltaDiff;
-    console.log(this.symbol, 'Adjust Slippage Delta by', dipDeltaDiff, 'to', -hedgeDeltaTotal);
-    if (Math.abs(hedgeDeltaTotal * fairValue) < (deltaThreshold * fairValue)) {
-      console.log(this.symbol, 'Delta Netural: Slippage <', deltaThreshold);
-      return;
-    }
-    console.log(this.symbol, 'Outside delta threshold:', Math.abs(hedgeDeltaTotal), 'vs.', deltaThreshold);
 
     // Load order book data
     const bids = await spotMarket.loadBids(this.connection);
@@ -725,7 +715,7 @@ export class Scalper {
               hedgeDeltaTotal += spotDeltaUpdate;
               console.log(
                 this.symbol,
-                'Jupiter Hedge on',
+                'Jupiter Hedge via',
                 jupValues.venue,
                 'Price',
                 jupValues.price,
@@ -834,7 +824,7 @@ export class Scalper {
         } else {
           console.log(this.symbol, 'Gamma Scalp Fill From Taker?!', message.size, message.market, message.price, message.takerClientId, message.timestamp);
         }
-        if (gammaFillQty > netGamma * gammaCompleteThreshold) {
+        if (gammaFillQty > amountGamma * gammaCompleteThreshold) {
           gammaFillQty = 0;
           const fillPrice = Number(message.price);
           gammaScalpCount += 1;
@@ -844,7 +834,7 @@ export class Scalper {
             fillPrice,
           );
         } else {
-          console.log('Gamma Partially Filled', gammaFillQty, 'of', netGamma);
+          console.log('Gamma Partially Filled', gammaFillQty, 'of', amountGamma);
         }
       },
     );
@@ -878,13 +868,13 @@ export class Scalper {
       fairValue = priorFillPrice;
       console.log(this.symbol, 'Fair Value Set to Prior Fill', fairValue);
     } else {
-      fairValue = await getFairValue(this.connection, spotMarket, this.symbol);
+      fairValue = await getFairValue(this.connection, spotMarket, this.symbol, this.owner);
     }
     for (let i = 0; i < gammaCycles; i++) {
       if (fairValue == 0) {
         console.log(this.symbol, 'No Prices. Refreshing Gamma Scalp', i + 1, 'After', twapInterval, 'Seconds');
         await sleepExact(twapInterval);
-        fairValue = await getFairValue(this.connection, spotMarket, this.symbol);
+        fairValue = await getFairValue(this.connection, spotMarket, this.symbol, this.owner);
       }
     }
     if (fairValue == 0) {

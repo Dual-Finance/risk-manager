@@ -13,7 +13,7 @@ import {
   networkName, THEO_VOL_MAP, maxNotional, twapInterval, scalperWindow,
   zScore, MinContractSize, TickSize, FILLS_URL, IS_DEV, gammaThreshold,
   maxHedges, percentDrift, DELTA_OFFSET, MANGO_DOWNTIME_THRESHOLD, fundingThreshold, gammaCycles,
-  MinOpenBookSize, OPENBOOK_FORK_ID, OPENBOOK_MKT_MAP, OPENBOOK_ACCOUNT_MAP, treasuryPositions, slippageMax, gammaCompleteThreshold, cluster,
+  MinOpenBookSize, OPENBOOK_FORK_ID, OPENBOOK_MKT_MAP, OPENBOOK_ACCOUNT_MAP, treasuryPositions, slippageMax, gammaCompleteThreshold, cluster, dimQty, maxLevels, maxBackGammaMultiple,
 } from './config';
 import { DIPDeposit } from './common';
 import { readKeypair, sleepExact, sleepRandom } from './utils';
@@ -804,7 +804,9 @@ export class Scalper {
     const orderIDBase = new Date().getTime() * 2;
     const bidID = new BN(orderIDBase);
     const askID = new BN(orderIDBase + 1);
-    const gammaIds = [bidID.toString(), askID.toString()];
+    const backBidID = new BN(orderIDBase * 2);
+    const backAskID = new BN(orderIDBase * 2 + 1);
+    const gammaIds = [bidID.toString(), askID.toString(), backBidID.toString(), backAskID.toString()];
 
     if (this.serumVialClient.checkSerumVial() != WebSocket.OPEN) {
       this.serumVialClient.openSerumVial();
@@ -816,6 +818,13 @@ export class Scalper {
       [`${this.symbol}/USDC`],
       gammaIds,
       (message: SerumVialTradeMessage) => {
+        if (message.makerClientId == backBidID.toString()) {
+          console.log(this.symbol, 'Back Bid Fill!!!', message.size, message.market, message.price, message.makerClientId, message.timestamp);
+          return;
+        } else if (message.makerClientId == backAskID.toString()) {
+          console.log(this.symbol, 'Back Ask Fill!!!', message.size, message.market, message.price, message.makerClientId, message.timestamp);
+          return;
+        }
         gammaFillQty += Math.abs(message.size);
         if (message.makerClientId == bidID.toString()) {
           console.log(this.symbol, 'Gamma Bid Fill!', message.size, message.market, message.price, message.makerClientId, message.timestamp);
@@ -897,6 +906,31 @@ export class Scalper {
       return;
     }
 
+    // Find the prices at which whale qty is bid & offered
+    const bids = await spotMarket.loadBids(this.connection);
+    const numBids = bids.getL2(maxLevels).length;
+    let bidDepth = 0;
+    let whaleBidPrice : number;
+    for (let i = 0; i < numBids; i++){
+      bidDepth = bids.getL2(i+1)[i][1] + bidDepth;
+      if (bidDepth >= dimQty/fairValue){
+        whaleBidPrice = bids.getL2(i+1)[i][0];
+        break;
+      }
+    }
+    const asks = await spotMarket.loadAsks(this.connection);
+    const numAsks = asks.getL2(maxLevels).length;
+    let askDepth = 0;
+    let whaleAskPrice : number;
+    for (let i = 0; i < numAsks; i++){
+      askDepth = asks.getL2(i+1)[i][1] + askDepth;
+      if (askDepth >= dimQty/fairValue){
+        whaleAskPrice = asks.getL2(i+1)[i][0];
+        break;
+      }
+    }
+    console.log(this.symbol, "Whale Bid",  whaleBidPrice, "Ask", whaleAskPrice, "Spread %", (whaleAskPrice - whaleBidPrice) / fairValue * 100);
+
     const amountGamma = Math.round(Math.abs(netGamma) * (1 / this.minSpotSize)) / (1 / this.minSpotSize);
     const priceBid = Math.floor(Math.abs(gammaBid) * (1 / this.tickSize)) / (1 / this.tickSize);
     const priceAsk = Math.floor(Math.abs(gammaAsk) * (1 / this.tickSize)) / (1 / this.tickSize);
@@ -925,6 +959,49 @@ export class Scalper {
       selfTradeBehavior: 'abortTransaction',
     });
     gammaOrders.add(gammaAskTx.transaction);
+    
+    // Calculate effective gamma subject to max at price
+    const whaleBidDiff = fairValue - whaleBidPrice;
+    const whaleAskDiff = whaleAskPrice - fairValue;
+    const backBidPrice = whaleBidDiff > fairValue - gammaBid ? 
+      Math.floor((whaleBidPrice + this.tickSize) * (1 / this.tickSize)) / (1 / this.tickSize) : undefined;
+    const backAskPrice = whaleAskDiff > gammaAsk - fairValue ? 
+      Math.floor((whaleAskPrice - this.tickSize) * (1 / this.tickSize)) / (1 / this.tickSize) : undefined;
+    const whaleBidGammaQty = Math.min(netGamma * (maxBackGammaMultiple - 1), dipTotalGamma * whaleBidDiff - netGamma);
+    const whaleAskGammaQty = Math.min(netGamma * (maxBackGammaMultiple - 1), dipTotalGamma * whaleAskDiff - netGamma);
+    const backBidQty = Math.round(Math.abs(whaleBidGammaQty) * (1 / this.minSpotSize)) / (1 / this.minSpotSize);
+    const backAskQty = Math.round(Math.abs(whaleAskGammaQty) * (1 / this.minSpotSize)) / (1 / this.minSpotSize);
+
+    //Enter bid & offer if outside of range from gamma orders
+    if (backBidPrice != undefined) {
+      console.log(this.symbol, "Back", backBidQty, "Bid", backBidPrice, backBidID.toString())
+      const whaleBidTx = await spotMarket.makePlaceOrderTransaction(this.connection, {
+        owner: this.owner.publicKey,
+        payer: bidAccount,
+        side: 'buy',
+        price: backBidPrice,
+        size: backBidQty,
+        orderType: 'limit',
+        clientId: backBidID,
+        selfTradeBehavior: 'abortTransaction',
+      });
+      gammaOrders.add(whaleBidTx.transaction);
+    }
+    if (backAskPrice != undefined) {
+      console.log(this.symbol, "Back", backAskQty, "Ask", backAskPrice, backAskID.toString())
+      const whaleAskTx = await spotMarket.makePlaceOrderTransaction(this.connection, {
+        owner: this.owner.publicKey,
+        payer: askAccount,
+        side: 'sell',
+        price: backAskPrice,
+        size: backAskQty,
+        orderType: 'limit',
+        clientId: backAskID,
+        selfTradeBehavior: 'abortTransaction',
+      });
+      gammaOrders.add(whaleAskTx.transaction);
+    }
+
     try {
       await sendAndConfirmTransaction(this.connection, gammaOrders, [this.owner]);
       console.log(this.symbol, 'Gamma', amountGamma, 'Bid', priceBid, 'BidID', bidID.toString());
@@ -932,7 +1009,7 @@ export class Scalper {
     } catch (err) {
       console.log(this.symbol, 'Gamma Order', err, err.stack);
     }
-    console.log(this.symbol, 'Market Spread %', (priceAsk - priceBid) / fairValue * 100, 'Liquidity $', amountGamma * 2 * fairValue);
+    console.log(this.symbol, 'Gamma Spread %', (priceAsk - priceBid) / fairValue * 100, 'Liquidity $', (amountGamma * 2 + backBidQty + backAskQty) * fairValue);
     if (gammaScalpCount == 1) {
       await waitForGamma((_) => gammaScalpCount == gammaCycles);
       const scalpPnL = ((1 + 1 / (2 * gammaCycles)) * (gammaScalpCount - 1) * stdDevSpread * fairValue) * netGamma * gammaScalpCount

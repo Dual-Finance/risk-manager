@@ -209,6 +209,9 @@ export async function getPythPrice(splMint: PublicKey) {
   for (const symbol of data.symbols) {
     const price = data.productPrice.get(symbol)!;
     if (tokenToPythSymbol(splMintToToken(splMint)) == symbol) {
+      if (price == undefined){
+        return;
+      }
       return price.price;
     }
   }

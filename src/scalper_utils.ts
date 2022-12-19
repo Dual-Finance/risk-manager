@@ -286,7 +286,7 @@ export async function getFairValue(
   symbol: string,
   owner: Keypair
   ) {
-  let fairValue = 0;
+  let fairValue = 0; // Fail to return a zero price
   const chainlinkPrice = await getChainlinkPrice(new PublicKey(tokenToSplMint(symbol)));
   if (chainlinkPrice > 0) {
     fairValue = chainlinkPrice;

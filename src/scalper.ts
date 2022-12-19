@@ -960,7 +960,7 @@ export class Scalper {
     });
     gammaOrders.add(gammaAskTx.transaction);
     
-    // Calculate effective gamma subject to max at price
+    // Calculate effective gamma subject to max at price & round to nearest tick size for order entry
     const whaleBidDiff = fairValue - whaleBidPrice;
     const whaleAskDiff = whaleAskPrice - fairValue;
     const backBidPrice = whaleBidDiff > fairValue - gammaBid ? 

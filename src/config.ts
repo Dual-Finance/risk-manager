@@ -144,6 +144,5 @@ export const searchSteps = 5; // Number of times to reduce the jupiter qty to ch
 export const minExecutionPremium = 0.001; // Min USDC amount to fill MM on
 export const JUPITER_LIQUIDITY = 100; // USDC amount to check jupiter mid point price
 export const jupiterSlippage = 50; // bps to allow calculating mid price to succeed
-export const dimQty = 10000; // qty in USDC to find in the order book to dim
 export const maxLevels = 100; // max num of levels to search for order book depth
-export const maxBackGammaMultiple = 5; // max num of net gamma amounts to allow on the back bids
+export const maxBackGammaMultiple = 5; // qty to search order book & max multiple of gamma to allow on the back bids

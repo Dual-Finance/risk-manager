@@ -321,7 +321,7 @@ export async function getFairValue(
   const oracleSlippage = Math.abs(fairValue - jupPrice) / fairValue;
   if (oracleSlippage > slippageMax.get(symbol)) {
     fairValue = jupPrice;
-    console.log(symbol, 'Using Jupiter Mid Price', jupPrice, "Oracle Slippage", Math.round(oracleSlippage * 100 * 100));
+    console.log(symbol, 'Using Jupiter Mid Price', jupPrice, 'Oracle Slippage', Math.round(oracleSlippage * 100 * 100));
   }
   return fairValue;
 }
@@ -347,14 +347,14 @@ export async function jupiterHedge(
     outputToken = new PublicKey(tokenToSplMint(base));
     hedgeAmount = Math.abs(hedgeDelta) * hedgePrice;
   }
-  const inputMaxQty = Math.round(hedgeAmount * (10 ** decimalsBaseSPL(splMintToToken(inputToken))))
-  
+  const inputMaxQty = Math.round(hedgeAmount * (10 ** decimalsBaseSPL(splMintToToken(inputToken))));
+
   // Sort through paths of swap qty efficiently
   let routeDetails: RouteDetails;
   let sortFactor = 2;
   let lastSucess: Boolean;
-  for (let i=0; i < searchSteps; i++){
-    sortFactor = lastSucess ? sortFactor + 1/(2**i) : sortFactor - 1/(2**i);
+  for (let i = 0; i < searchSteps; i++) {
+    sortFactor = lastSucess ? sortFactor + 1 / (2 ** i) : sortFactor - 1 / (2 ** i);
     lastSucess = false;
     const searchQty = Math.round(inputMaxQty * sortFactor);
     const routes = await jupiter.computeRoutes({
@@ -367,33 +367,35 @@ export async function jupiterHedge(
     const bestRoute = routes.routesInfos[0];
     const numRoutes = bestRoute.marketInfos.length;
     const inQty = JSBI.toNumber(bestRoute.marketInfos[0].inAmount) / (10 ** decimalsBaseSPL(splMintToToken(inputToken)));
-    const outQty = JSBI.toNumber(bestRoute.marketInfos[numRoutes-1].outAmount) / (10 ** decimalsBaseSPL(splMintToToken(outputToken)));
-    const netPrice = hedgeSide == "sell" ? outQty / inQty : inQty / outQty;
-    if (hedgeSide == "sell") {
-      if (netPrice > hedgePrice){
+    const outQty = JSBI.toNumber(bestRoute.marketInfos[numRoutes - 1].outAmount) / (10 ** decimalsBaseSPL(splMintToToken(outputToken)));
+    const netPrice = hedgeSide == 'sell' ? outQty / inQty : inQty / outQty;
+    if (hedgeSide == 'sell') {
+      if (netPrice > hedgePrice) {
         const swapQty = searchQty / (10 ** decimalsBaseSPL(splMintToToken(inputToken))) * -1;
-        const venue = bestRoute.marketInfos[numRoutes-1].amm.label;
+        const venue = bestRoute.marketInfos[numRoutes - 1].amm.label;
         const { transactions } = await jupiter.exchange({
-          routeInfo:routes.routesInfos[0],
+          routeInfo: routes.routesInfos[0],
         });
-        routeDetails = {price: netPrice, qty: swapQty, venue: venue, txs: transactions};
+        routeDetails = {
+          price: netPrice, qty: swapQty, venue, txs: transactions,
+        };
         lastSucess = true;
-        if (i==0){
+        if (i == 0) {
           break;
         }
       }
-    } else {
-      if (netPrice < hedgePrice){
-        const swapQty = searchQty / (10 ** decimalsBaseSPL(splMintToToken(inputToken))) / hedgePrice;
-        const venue = bestRoute.marketInfos[numRoutes-1].amm.label;
-        const { transactions } = await jupiter.exchange({
-          routeInfo:routes.routesInfos[0],
-        });
-        routeDetails = {price: netPrice, qty: swapQty, venue: venue, txs: transactions};
-        lastSucess = true;
-        if (i==0){
-          break;
-        }
+    } else if (netPrice < hedgePrice) {
+      const swapQty = searchQty / (10 ** decimalsBaseSPL(splMintToToken(inputToken))) / hedgePrice;
+      const venue = bestRoute.marketInfos[numRoutes - 1].amm.label;
+      const { transactions } = await jupiter.exchange({
+        routeInfo: routes.routesInfos[0],
+      });
+      routeDetails = {
+        price: netPrice, qty: swapQty, venue, txs: transactions,
+      };
+      lastSucess = true;
+      if (i == 0) {
+        break;
       }
     }
   }
@@ -419,7 +421,7 @@ export async function getJupiterPrice(
   const buyPath = buyRoutes.routesInfos[0];
   const numBuyPath = buyPath.marketInfos.length;
   const inBuyQty = JSBI.toNumber(buyPath.marketInfos[0].inAmount) / (10 ** decimalsBaseSPL(splMintToToken(inputBuyToken)));
-  const outBuyQty = JSBI.toNumber(buyPath.marketInfos[numBuyPath-1].outAmount) / (10 ** decimalsBaseSPL(splMintToToken(outputBuyToken)));
+  const outBuyQty = JSBI.toNumber(buyPath.marketInfos[numBuyPath - 1].outAmount) / (10 ** decimalsBaseSPL(splMintToToken(outputBuyToken)));
   const buyPrice = inBuyQty / outBuyQty;
 
   // Check bids
@@ -436,7 +438,7 @@ export async function getJupiterPrice(
   const sellPath = sellRoutes.routesInfos[0];
   const numSellPath = sellPath.marketInfos.length;
   const inSellQty = JSBI.toNumber(sellPath.marketInfos[0].inAmount) / (10 ** decimalsBaseSPL(splMintToToken(inputSellToken)));
-  const outSellQty = JSBI.toNumber(sellPath.marketInfos[numSellPath-1].outAmount) / (10 ** decimalsBaseSPL(splMintToToken(outputSellToken)));
+  const outSellQty = JSBI.toNumber(sellPath.marketInfos[numSellPath - 1].outAmount) / (10 ** decimalsBaseSPL(splMintToToken(outputSellToken)));
   const sellPrice = outSellQty / inSellQty;
 
   // Calc midpoint price of aggregtor

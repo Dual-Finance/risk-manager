@@ -48,7 +48,8 @@ export function sleepExact(period: number) {
   });
 }
 
-export function readBigUInt64LE(buffer: Buffer, offset = 0) {
+export function readBigUInt64LE(buffer: Buffer, inputOffset = 0) {
+  let offset = inputOffset;
   const first = buffer[offset];
   const last = buffer[offset + 7];
   if (first === undefined || last === undefined) {
@@ -94,6 +95,15 @@ export function parseDipState(buf: Buffer) {
   };
 }
 
+export function toBytes(x: number): Uint8Array {
+  const y = Math.floor(x / 2 ** 32);
+  return Uint8Array.from(
+    [y, y << 8, y << 16, y << 24, x, x << 8, x << 16, x << 24].map(
+      (z) => z >>> 24,
+    ),
+  );
+}
+
 export async function findProgramAddressWithMintAndStrikeAndExpiration(
   seed: string,
   strikePrice: number,
@@ -111,15 +121,6 @@ export async function findProgramAddressWithMintAndStrikeAndExpiration(
       usdcMint.toBuffer(),
     ],
     programId,
-  );
-}
-
-export function toBytes(x: number): Uint8Array {
-  const y = Math.floor(x / 2 ** 32);
-  return Uint8Array.from(
-    [y, y << 8, y << 16, y << 24, x, x << 8, x << 16, x << 24].map(
-      (z) => z >>> 24,
-    ),
   );
 }
 
@@ -146,54 +147,54 @@ export function timeSinceMidDay() {
 }
 
 export function splMintToToken(splMint: PublicKey) {
-  if (splMint.toBase58() == wSOLPk.toBase58()) {
+  if (splMint.toBase58() === wSOLPk.toBase58()) {
     return 'SOL';
   }
-  if (splMint.toBase58() == soBTCPk.toBase58()) {
+  if (splMint.toBase58() === soBTCPk.toBase58()) {
     return 'BTC';
   }
-  if (splMint.toBase58() == soETHPk.toBase58()) {
+  if (splMint.toBase58() === soETHPk.toBase58()) {
     return 'ETH';
   }
-  if (splMint.toBase58() == mngoPK.toBase58()) {
+  if (splMint.toBase58() === mngoPK.toBase58()) {
     return 'MNGO';
   }
-  if (splMint.toBase58() == usdcMintPk.toBase58()) {
+  if (splMint.toBase58() === usdcMintPk.toBase58()) {
     return 'USDC';
   }
   return 'UNKNOWN_TOKEN';
 }
 
 export function tokenToSplMint(token: string) {
-  if (token == 'SOL') {
+  if (token === 'SOL') {
     return wSOLPk;
   }
-  if (token == 'BTC') {
+  if (token === 'BTC') {
     return soBTCPk;
   }
-  if (token == 'ETH') {
+  if (token === 'ETH') {
     return soETHPk;
   }
-  if (token == 'MNGO') {
+  if (token === 'MNGO') {
     return mngoPK;
   }
-  if (token == 'USDC') {
+  if (token === 'USDC') {
     return usdcMintPk;
   }
   return undefined;
 }
 
 export function tokenToPythSymbol(token: string) {
-  if (token == 'SOL') {
+  if (token === 'SOL') {
     return 'Crypto.SOL/USD';
   }
-  if (token == 'BTC') {
+  if (token === 'BTC') {
     return 'Crypto.BTC/USD';
   }
-  if (token == 'ETH') {
+  if (token === 'ETH') {
     return 'Crypto.ETH/USD';
   }
-  if (token == 'MNGO') {
+  if (token === 'MNGO') {
     return 'Crypto.MNGO/USD';
   }
   return undefined;
@@ -208,25 +209,27 @@ export async function getPythPrice(splMint: PublicKey) {
   const data = await pythClient.getData();
   for (const symbol of data.symbols) {
     const price = data.productPrice.get(symbol)!;
-    if (tokenToPythSymbol(splMintToToken(splMint)) == symbol) {
+    if (tokenToPythSymbol(splMintToToken(splMint)) === symbol) {
       if (price == undefined){
         return;
       }
       return price.price;
     }
   }
+  return 0;
 }
+
 export function tokenToSBSymbol(token: string) {
-  if (token == 'SOL') {
+  if (token === 'SOL') {
     return 'GvDMxPzN1sCj7L26YDK2HnMRXEQmQ2aemov8YBtPS7vR';
   }
-  if (token == 'BTC') {
+  if (token === 'BTC') {
     return '8SXvChNYFhRq4EZuZvnhjrB3jJRQCv4k3P4W6hesH3Ee';
   }
-  if (token == 'ETH') {
+  if (token === 'ETH') {
     return 'HNStfhaLnqwF2ZtJUizaA9uHDAVB976r2AgTUx9LrdEo';
   }
-  if (token == 'MNGO') {
+  if (token === 'MNGO') {
     return 'AmQunu75SLZjDQS9KkRNjAUWHp2ReSzfNiWVDURzeZTi';
   }
   return undefined;
@@ -272,35 +275,35 @@ function waitFor(conditionFunction) {
 }
 
 export function tokenToChainlinkSymbol(token: string) {
-  if (token == 'SOL') {
+  if (token === 'SOL') {
     return 'B4vR6BW4WpLh1mFs6LL6iqL4nydbmE5Uzaz2LLsoAXqk';
   }
-  if (token == 'BTC') {
+  if (token === 'BTC') {
     return '4NSNfkSgEdAtD8AKyyiu7QsavyR3GSXLXecwDEFbZCZ3';
   }
-  if (token == 'ETH') {
+  if (token === 'ETH') {
     return 'Aadkg8sVWV6BS5XNTt2mK6Q8FhYWECLdkDuqDHvdnoVT';
   }
-  if (token == 'MNGO') {
+  if (token === 'MNGO') {
     return '';
   }
   return undefined;
 }
 
 export function decimalsBaseSPL(token: string) {
-  if (token == 'SOL') {
+  if (token === 'SOL') {
     return 9;
   }
-  if (token == 'BTC') {
+  if (token === 'BTC') {
     return 8;
   }
-  if (token == 'ETH') {
+  if (token === 'ETH') {
     return 8;
   }
-  if (token == 'MNGO') {
+  if (token === 'MNGO') {
     return 6;
   }
-  if (token == 'USDC') {
+  if (token === 'USDC') {
     return 6;
   }
   return undefined;
@@ -311,7 +314,7 @@ export async function getChainlinkPrice(splMint: PublicKey) {
   process.env.ANCHOR_WALLET = `${os.homedir()}/mango-explorer/id.json`;
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
-  if (tokenToChainlinkSymbol(splMintToToken(splMint)) == '') {
+  if (tokenToChainlinkSymbol(splMintToToken(splMint)) === '') {
     return 0;
   }
   const feedAddress = new PublicKey(tokenToChainlinkSymbol(splMintToToken(splMint)));
@@ -324,10 +327,10 @@ export async function getChainlinkPrice(splMint: PublicKey) {
     dataFeed.removeListener(listener);
   });
 
-  await waitFor((_) => latestValue != 0);
+  await waitFor((_) => latestValue !== 0);
   const prettyLatestValue = latestValue / 10 ** decimalsBaseSPL(splMintToToken(splMint));
   // Chainlink SOL off by a factor of 10
-  if (splMintToToken(splMint) == 'SOL') {
+  if (splMintToToken(splMint) === 'SOL') {
     return prettyLatestValue * 10;
   }
   return prettyLatestValue;

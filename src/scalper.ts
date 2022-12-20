@@ -22,6 +22,7 @@ import {
   jupiterHedge, cancelTxOpenBookOrders, getDIPDelta, getDIPGamma, getDIPTheta, getFairValue, getPayerAccount, getSpotDelta, loadPrices,
   orderSpliceMango, liquidityCheckAndNumSplices, settleOpenBook,
 } from './scalper_utils';
+import { Jupiter } from '@jup-ag/core';
 
 export class Scalper {
   client: MangoClient;
@@ -521,10 +522,29 @@ export class Scalper {
 
     this.serumVialClient.removeAnyListeners();
 
+    const spotMarket = await Market.load(
+      this.connection,
+      new PublicKey(OPENBOOK_MKT_MAP.get(this.symbol)),
+      undefined,
+      OPENBOOK_FORK_ID,
+    );
+
+    console.log(this.symbol, 'Loading Jupiter');
+    const jupiter = await Jupiter.load({
+      connection: this.connection,
+      cluster: cluster,
+      user: this.owner,
+      wrapUnwrapSOL: false,
+      restrictIntermediateTokens: true,
+      shouldLoadSerumOpenOrders: false,
+    });
+
     try {
       await this.deltaHedgeOpenBook(
         dipProduct,
         1,
+        spotMarket,
+        jupiter,
       );
     } catch (err) {
       console.log(this.symbol, 'Main Delta Error', err.stack);
@@ -536,6 +556,8 @@ export class Scalper {
         dipProduct,
         1,
         0,
+        spotMarket,
+        jupiter,
       );
       // TODO: OpenBook settlement to move to mango if needed
     } catch (err) {
@@ -548,13 +570,9 @@ export class Scalper {
   async deltaHedgeOpenBook(
     dipProduct: DIPDeposit[],
     deltaHedgeCount: number,
+    spotMarket: Market,
+    jupiter: Jupiter,
   ): Promise<void> {
-    const spotMarket = await Market.load(
-      this.connection,
-      new PublicKey(OPENBOOK_MKT_MAP.get(this.symbol)),
-      undefined,
-      OPENBOOK_FORK_ID,
-    );
 
     // Clean the state by cancelling all existing open orders.
     const cancelDelta = await cancelTxOpenBookOrders(this.connection, this.owner, spotMarket, this.symbol);
@@ -615,12 +633,12 @@ export class Scalper {
 
     // Find fair value.
     console.log(this.symbol, 'Loading Fair Value...');
-    let fairValue = await getFairValue(this.connection, spotMarket, this.symbol, this.owner);
+    let fairValue = await getFairValue(this.connection, spotMarket, this.symbol, jupiter);
     for (let i = 0; i < maxHedges; i++) {
       if (fairValue == 0) {
         console.log(this.symbol, 'No Prices Refreshing Delta Hedge', i + 1, 'After', twapInterval, 'Seconds');
         await sleepExact(twapInterval);
-        fairValue = await getFairValue(this.connection, spotMarket, this.symbol, this.owner);
+        fairValue = await getFairValue(this.connection, spotMarket, this.symbol, jupiter);
       }
     }
     if (fairValue == 0) {
@@ -702,7 +720,7 @@ export class Scalper {
       if (spliceFactor > 0) {
         console.log(this.symbol, 'Not enough liquidity! Try Jupiter. Adjust Price', hedgePrice, 'Splice', spliceFactor);
         // Check on jupiter and sweep price
-        const jupValues = await jupiterHedge(this.connection, this.owner, hedgeSide, this.symbol, 'USDC', hedgeDeltaTotal, hedgePrice);
+        const jupValues = await jupiterHedge(hedgeSide, this.symbol, 'USDC', hedgeDeltaTotal, hedgePrice, jupiter);
         if (jupValues !== undefined) {
           const { setupTransaction, swapTransaction, cleanupTransaction } = jupValues.txs;
           for (const jupTx of [setupTransaction, swapTransaction, cleanupTransaction].filter(Boolean)) {
@@ -786,6 +804,8 @@ export class Scalper {
       await this.deltaHedgeOpenBook(
         dipProduct,
         deltaHedgeCount + 1,
+        spotMarket,
+        jupiter,
       );
     }
   }
@@ -794,13 +814,9 @@ export class Scalper {
     dipProduct: DIPDeposit[],
     gammaScalpCount: number,
     priorFillPrice: number,
+    spotMarket: Market,
+    jupiter: Jupiter,
   ): Promise<void> {
-    const spotMarket = await Market.load(
-      this.connection,
-      new PublicKey(OPENBOOK_MKT_MAP.get(this.symbol)),
-      undefined,
-      OPENBOOK_FORK_ID,
-    );
     const orderIDBase = new Date().getTime() * 2;
     const bidID = new BN(orderIDBase);
     const askID = new BN(orderIDBase + 1);
@@ -841,6 +857,8 @@ export class Scalper {
             dipProduct,
             gammaScalpCount,
             fillPrice,
+            spotMarket,
+            jupiter
           );
         } else {
           console.log('Gamma Partially Filled', gammaFillQty, 'of', amountGamma);
@@ -877,13 +895,13 @@ export class Scalper {
       fairValue = priorFillPrice;
       console.log(this.symbol, 'Fair Value Set to Prior Fill', fairValue);
     } else {
-      fairValue = await getFairValue(this.connection, spotMarket, this.symbol, this.owner);
+      fairValue = await getFairValue(this.connection, spotMarket, this.symbol, jupiter);
     }
     for (let i = 0; i < gammaCycles; i++) {
       if (fairValue == 0) {
         console.log(this.symbol, 'No Prices. Refreshing Gamma Scalp', i + 1, 'After', twapInterval, 'Seconds');
         await sleepExact(twapInterval);
-        fairValue = await getFairValue(this.connection, spotMarket, this.symbol, this.owner);
+        fairValue = await getFairValue(this.connection, spotMarket, this.symbol, jupiter);
       }
     }
     if (fairValue == 0) {

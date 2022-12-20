@@ -227,7 +227,7 @@ export function tokenToSBSymbol(token: string) {
     return 'HNStfhaLnqwF2ZtJUizaA9uHDAVB976r2AgTUx9LrdEo';
   }
   if (token == 'MNGO') {
-    return '82kWw8KKysTyZSXovgfPS7msfvnZZc4AAUsUNGp8Kcpy';
+    return 'AmQunu75SLZjDQS9KkRNjAUWHp2ReSzfNiWVDURzeZTi';
   }
   return undefined;
 }
@@ -247,8 +247,8 @@ export async function getSwitchboardPrice(splMint: PublicKey) {
       return 0;
     }
 
-    // Get latest value if its been updated in the last 60 seconds
-    const latestResult = sbv2.decodeLatestAggregatorValue(accountInfo, 60);
+    // Get latest value if its been updated in the last 100 seconds
+    const latestResult = sbv2.decodeLatestAggregatorValue(accountInfo, 100);
     if (latestResult === null) {
       console.log('Failed to fetch latest result for Switchboard aggregator');
       return 0;

@@ -13,7 +13,7 @@ import {
   networkName, THEO_VOL_MAP, maxNotional, twapInterval, scalperWindow,
   zScore, MinContractSize, TickSize, FILLS_URL, IS_DEV, gammaThreshold,
   maxHedges, percentDrift, DELTA_OFFSET, MANGO_DOWNTIME_THRESHOLD, fundingThreshold, gammaCycles,
-  MinOpenBookSize, OPENBOOK_FORK_ID, OPENBOOK_MKT_MAP, OPENBOOK_ACCOUNT_MAP, treasuryPositions, slippageMax, gammaCompleteThreshold, cluster, dimQty, maxLevels, maxBackGammaMultiple,
+  MinOpenBookSize, OPENBOOK_FORK_ID, OPENBOOK_MKT_MAP, OPENBOOK_ACCOUNT_MAP, treasuryPositions, slippageMax, gammaCompleteThreshold, cluster, maxLevels, maxBackGammaMultiple,
 } from './config';
 import { DIPDeposit } from './common';
 import { readKeypair, sleepExact, sleepRandom } from './utils';
@@ -937,11 +937,12 @@ export class Scalper {
     // Find the prices at which whale qty is bid & offered
     const bids = await spotMarket.loadBids(this.connection);
     const numBids = bids.getL2(maxLevels).length;
+    const dimQty = maxBackGammaMultiple * netGamma;
     let bidDepth = 0;
     let whaleBidPrice : number;
     for (let i = 0; i < numBids; i++){
       bidDepth = bids.getL2(i+1)[i][1] + bidDepth;
-      if (bidDepth >= dimQty/fairValue){
+      if (bidDepth >= dimQty){
         whaleBidPrice = bids.getL2(i+1)[i][0];
         break;
       }
@@ -952,7 +953,7 @@ export class Scalper {
     let whaleAskPrice : number;
     for (let i = 0; i < numAsks; i++){
       askDepth = asks.getL2(i+1)[i][1] + askDepth;
-      if (askDepth >= dimQty/fairValue){
+      if (askDepth >= dimQty){
         whaleAskPrice = asks.getL2(i+1)[i][0];
         break;
       }

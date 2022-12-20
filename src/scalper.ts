@@ -521,23 +521,34 @@ export class Scalper {
     console.log(this.symbol, 'Hedging on OpenBook');
 
     this.serumVialClient.removeAnyListeners();
+    let spotMarket: Market;
+    let jupiter: Jupiter;
+    try{
+      spotMarket = await Market.load(
+        this.connection,
+        new PublicKey(OPENBOOK_MKT_MAP.get(this.symbol)),
+        undefined,
+        OPENBOOK_FORK_ID,
+      );
+    } catch (err) {
+      console.log(this.symbol, "No OpenBook Market Found", err)
+      return;
+    }
 
-    const spotMarket = await Market.load(
-      this.connection,
-      new PublicKey(OPENBOOK_MKT_MAP.get(this.symbol)),
-      undefined,
-      OPENBOOK_FORK_ID,
-    );
-
-    console.log(this.symbol, 'Loading Jupiter');
-    const jupiter = await Jupiter.load({
-      connection: this.connection,
-      cluster: cluster,
-      user: this.owner,
-      wrapUnwrapSOL: false,
-      restrictIntermediateTokens: true,
-      shouldLoadSerumOpenOrders: false,
-    });
+    try {
+      console.log(this.symbol, 'Loading Jupiter');
+      jupiter = await Jupiter.load({
+        connection: this.connection,
+        cluster: cluster,
+        user: this.owner,
+        wrapUnwrapSOL: false,
+        restrictIntermediateTokens: true,
+        shouldLoadSerumOpenOrders: false,
+      });
+    } catch (err) {
+      console.log(this.symbol, "Jupiter Failed", err)
+      return;
+    }
 
     try {
       await this.deltaHedgeOpenBook(

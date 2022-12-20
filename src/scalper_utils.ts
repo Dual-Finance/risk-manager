@@ -284,9 +284,9 @@ export async function getFairValue(
   connection : Connection,
   spotMarket : Market,
   symbol: string,
-  owner: Keypair,
-) {
-  let fairValue: number;
+  jupiter: Jupiter,
+  ) {
+  let fairValue = 0; // Fail to return a zero price
   const chainlinkPrice = await getChainlinkPrice(new PublicKey(tokenToSplMint(symbol)));
   if (chainlinkPrice > 0) {
     fairValue = chainlinkPrice;
@@ -317,7 +317,7 @@ export async function getFairValue(
       }
     }
   }
-  const jupPrice = await getJupiterPrice(connection, owner, symbol, 'USDC');
+  const jupPrice = await getJupiterPrice(symbol, "USDC", jupiter);
   const oracleSlippage = Math.abs(fairValue - jupPrice) / fairValue;
   if (oracleSlippage > slippageMax.get(symbol)) {
     fairValue = jupPrice;
@@ -327,20 +327,13 @@ export async function getFairValue(
 }
 
 export async function jupiterHedge(
-  connection: Connection,
-  owner: Keypair,
   hedgeSide: string,
   base: string,
   quote: string,
   hedgeDelta: number,
   hedgePrice: number,
+  jupiter: Jupiter,
 ) {
-  const jupiter = await Jupiter.load({
-    connection,
-    cluster,
-    user: owner,
-    wrapUnwrapSOL: false,
-  });
   let inputToken: PublicKey;
   let outputToken: PublicKey;
   let hedgeAmount: number;
@@ -410,18 +403,11 @@ export async function jupiterHedge(
 }
 
 export async function getJupiterPrice(
-  connection: Connection,
-  owner: Keypair,
   base: string,
   quote: string,
+  jupiter: Jupiter,
 ) {
-  const jupiter = await Jupiter.load({
-    connection,
-    cluster,
-    user: owner,
-  });
-
-  // Check asks
+  //Check asks
   const inputBuyToken = new PublicKey(tokenToSplMint(quote));
   const outputBuyToken = new PublicKey(tokenToSplMint(base));
   const buyQty = Math.round(JUPITER_LIQUIDITY * (10 ** decimalsBaseSPL(splMintToToken(inputBuyToken))));

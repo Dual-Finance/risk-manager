@@ -114,7 +114,7 @@ export const treasuryPositions: DIPDeposit[] = [({
   expirationMs: 1672747200000,
   strike: 0.016,
   type: 'put',
-  qty: 7812500,
+  qty: 781250.0,
 }),
 ({
   splToken: 'MNGO',
@@ -122,7 +122,7 @@ export const treasuryPositions: DIPDeposit[] = [({
   expirationMs: 1672747200000,
   strike: 0.019,
   type: 'put',
-  qty: 6578947,
+  qty: 657894.7,
 }),
 ];
 
@@ -140,7 +140,10 @@ export const MANGO_DOWNTIME_THRESHOLD = 15; // Time in Minutes to stop routing t
 export const fundingThreshold = 0.25; // % Funding to switch to openbook orders
 export const maxMktSpread = 0.01; // Max % allowable spread to use midvalue as accurate price
 export const gammaCompleteThreshold = 0.90; // Move on to new gamma cycle when 90% filled
-export const searchSteps = 7; // Number of times to reduce the jupiter qty to check for routes
+export const searchSteps = 5; // Number of times to reduce the jupiter qty to check for routes
 export const minExecutionPremium = 0.001; // Min USDC amount to fill MM on
 export const JUPITER_LIQUIDITY = 100; // USDC amount to check jupiter mid point price
 export const jupiterSlippage = 50; // bps to allow calculating mid price to succeed
+export const dimQty = 10000; // qty in USDC to find in the order book to dim
+export const maxLevels = 100; // max num of levels to search for order book depth
+export const maxBackGammaMultiple = 5; // max num of net gamma amounts to allow on the back bids

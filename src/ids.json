@@ -2,7 +2,7 @@
   "cluster_urls": {
     "devnet": "https://mango.devnet.rpcpool.com",
     "localnet": "http://127.0.0.1:8899",
-    "mainnet": "https://mango.rpcpool.com/6f7b66c979597f87cca334b8228b",
+    "mainnet": "https://mango.rpcpool.com/",
     "testnet": "http://api.testnet.rpcpool.com"
   },
   "groups": [

@@ -1,5 +1,5 @@
 /* eslint-disable */
-import { Connection, PublicKey } from '@solana/web3.js';
+import { Commitment, Connection, PublicKey } from '@solana/web3.js';
 import fetch from 'cross-fetch';
 import { blackScholes } from 'black-scholes';
 import {
@@ -214,7 +214,7 @@ export class Router {
 
   async refresh_dips() {
     console.log('Refreshing dips', API_URL);
-    const connection: Connection = new Connection(API_URL);
+    const connection = new Connection(API_URL, 'processed' as Commitment);
     const programAccountsPromise = connection.getProgramAccounts(dualMarketProgramID);
 
     await programAccountsPromise.then(async (data) => {

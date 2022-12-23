@@ -4,10 +4,11 @@ import {
   PublicKey,
   AccountInfo as solanaAccountInfo,
   Context,
+  Commitment,
 } from '@solana/web3.js';
 import { AccountInfo, AccountLayout, u64 } from '@solana/spl-token';
 import { DIPDeposit } from './common';
-import { WEBSOCKET_URL } from './config';
+import { API_URL } from './config';
 
 export class Poller {
   cluster: string;
@@ -45,7 +46,7 @@ export class Poller {
   subscribe(address: string): void {
     console.log('Listening at:', address);
     // @ts-ignore
-    const connection: Connection = new Connection(WEBSOCKET_URL);
+    const connection = new Connection(API_URL, 'processed' as Commitment);
     const callback: AccountChangeCallback = (
       accountInfo: solanaAccountInfo<Buffer>,
       _context: Context,

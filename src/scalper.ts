@@ -13,7 +13,7 @@ import {
   networkName, THEO_VOL_MAP, maxNotional, twapInterval, scalperWindow,
   zScore, MinContractSize, TickSize, FILLS_URL, IS_DEV, gammaThreshold,
   maxHedges, percentDrift, DELTA_OFFSET, MANGO_DOWNTIME_THRESHOLD, fundingThreshold, gammaCycles,
-  MinOpenBookSize, OPENBOOK_FORK_ID, OPENBOOK_MKT_MAP, OPENBOOK_ACCOUNT_MAP, treasuryPositions, slippageMax, gammaCompleteThreshold, cluster, maxLevels, maxBackGammaMultiple,
+  MinOpenBookSize, OPENBOOK_FORK_ID, OPENBOOK_MKT_MAP, OPENBOOK_ACCOUNT_MAP, treasuryPositions, slippageMax, gammaCompleteThreshold, cluster, maxLevels, maxBackGammaMultiple, API_URL,
 } from './config';
 import { DIPDeposit } from './common';
 import { readKeypair, sleepExact, sleepRandom } from './utils';
@@ -60,7 +60,7 @@ export class Scalper {
     this.config = new Config(configFile);
     this.groupConfig = this.config.getGroupWithName(networkName) as GroupConfig;
     this.connection = new Connection(
-      this.config.cluster_urls[this.groupConfig.cluster],
+      API_URL,
       'processed' as Commitment,
     );
     this.client = new MangoClient(

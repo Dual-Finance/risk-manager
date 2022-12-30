@@ -30,6 +30,13 @@ export const THEO_VOL_MAP = new Map<string, number>([
   ['MNGO', parseFloat(mngo_vars[2]) > 0 ? parseFloat(mngo_vars[2]) : 1.6],
 ]);
 
+export const ZSCORE = new Map<string, number>([
+  ['BTC', parseFloat(btc_vars[3]) > 0 ? parseFloat(btc_vars[3]) : 1.282],
+  ['ETH', parseFloat(eth_vars[3]) > 0 ? parseFloat(eth_vars[3]) : 1.282],
+  ['SOL', parseFloat(sol_vars[3]) > 0 ? parseFloat(sol_vars[3]) : 1.282],
+  ['MNGO', parseFloat(mngo_vars[3]) > 0 ? parseFloat(mngo_vars[3]) : 1.282],
+]); // Corresponds to 80% CI by default
+
 export const ENVIRONMENT: string = IS_DEV ? 'DEVNET' : 'MAINNET';
 
 export const networkName = IS_DEV ? 'devnet.2' : 'mainnet.1';
@@ -113,7 +120,7 @@ export const treasuryPositions: DIPDeposit[] = [({
   expirationMs: 1672747200000,
   strike: 0.016,
   type: 'put',
-  qty: 781250.0,
+  qty: 7812500,
 }),
 ({
   splToken: 'MNGO',
@@ -121,7 +128,7 @@ export const treasuryPositions: DIPDeposit[] = [({
   expirationMs: 1672747200000,
   strike: 0.019,
   type: 'put',
-  qty: 657894.7,
+  qty: 6578947,
 }),
 ];
 
@@ -129,7 +136,6 @@ export const rfRate = 0.03; // Risk Free Rate of Return ~ T-Bill Rate
 export const twapInterval = 15; // Number of seconds to space spliced delta orders across
 export const scalperWindow = 600; // Number of seconds for each gamma scalping window
 export const monthAdj = 1; // Adjustment since Date.UTC is zero based
-export const zScore = 1.282; // Corresponds to 80% CI
 export const percentDrift = 0.05; // Percentage of time to allow drift of the timed actions
 export const gammaThreshold = 0.05; // Percentage of gamma to calc delta hedge threshold
 export const maxHedges = 4; // Maximum amount of orders to delta hedge across

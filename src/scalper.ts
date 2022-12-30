@@ -11,7 +11,7 @@ import { BN } from '@project-serum/anchor';
 import configFile from './ids.json';
 import {
   networkName, THEO_VOL_MAP, maxNotional, twapInterval, scalperWindow,
-  zScore, MinContractSize, TickSize, FILLS_URL, IS_DEV, gammaThreshold,
+  ZSCORE, MinContractSize, TickSize, FILLS_URL, IS_DEV, gammaThreshold,
   maxHedges, percentDrift, DELTA_OFFSET, MANGO_DOWNTIME_THRESHOLD, fundingThreshold, gammaCycles,
   MinOpenBookSize, OPENBOOK_FORK_ID, OPENBOOK_MKT_MAP, OPENBOOK_ACCOUNT_MAP, treasuryPositions, slippageMax, gammaCompleteThreshold, cluster, maxLevels, maxBackGammaMultiple, API_URL,
 } from './config';
@@ -51,6 +51,8 @@ export class Scalper {
 
   deltaOffset: number;
 
+  zScore: number;
+
   openBookAccount: string;
 
   serumVialClient: SerumVialClient;
@@ -78,6 +80,7 @@ export class Scalper {
     this.tickSize = TickSize.get(symbol);
     this.deltaOffset = DELTA_OFFSET.get(symbol);
     this.openBookAccount = OPENBOOK_ACCOUNT_MAP.get(symbol);
+    this.zScore = ZSCORE.get(symbol);
 
     this.serumVialClient = new SerumVialClient();
     this.serumVialClient.openSerumVial();
@@ -220,7 +223,7 @@ export class Scalper {
 
     // Check whether we need to hedge.
     const dipTotalGamma = getDIPGamma(dipProduct, fairValue, this.symbol);
-    const stdDevSpread = this.impliedVol / Math.sqrt((365 * 24 * 60 * 60) / scalperWindow) * zScore;
+    const stdDevSpread = this.impliedVol / Math.sqrt((365 * 24 * 60 * 60) / scalperWindow) * this.zScore;
     const slippageTolerance = Math.min(stdDevSpread / 2, slippageMax.get(this.symbol));
     const deltaThreshold = Math.max(dipTotalGamma * stdDevSpread * fairValue * gammaThreshold, this.minSize);
     if (Math.abs(hedgeDeltaTotal * fairValue) < (deltaThreshold * fairValue)) {
@@ -407,7 +410,7 @@ export class Scalper {
     const dipTotalGamma = getDIPGamma(dipProduct, fairValue, this.symbol);
 
     // Calc scalperWindow std deviation spread from zScore & IV for gamma levels
-    const stdDevSpread = this.impliedVol / Math.sqrt((365 * 24 * 60 * 60) / scalperWindow) * zScore;
+    const stdDevSpread = this.impliedVol / Math.sqrt((365 * 24 * 60 * 60) / scalperWindow) * this.zScore;
     const netGamma = IS_DEV ? Math.max(0.01, dipTotalGamma * stdDevSpread * fairValue) : dipTotalGamma * stdDevSpread * fairValue;
 
     console.log(this.symbol, 'Position Gamma Γ:', netGamma, 'Fair Value', fairValue);
@@ -689,7 +692,7 @@ export class Scalper {
 
     // Check whether we need to hedge.
     const dipTotalGamma = getDIPGamma(dipProduct, fairValue, this.symbol);
-    const stdDevSpread = this.impliedVol / Math.sqrt((365 * 24 * 60 * 60) / scalperWindow) * zScore;
+    const stdDevSpread = this.impliedVol / Math.sqrt((365 * 24 * 60 * 60) / scalperWindow) * this.zScore;
     const slippageTolerance = Math.min(stdDevSpread / 2, slippageMax.get(this.symbol));
     const deltaThreshold = Math.max(dipTotalGamma * stdDevSpread * fairValue * gammaThreshold, this.minSpotSize);
     let hedgePrice = hedgeDeltaTotal < 0 ? fairValue * (1 + slippageTolerance) : fairValue * (1 - slippageTolerance);
@@ -921,7 +924,7 @@ export class Scalper {
     const dipTotalGamma = getDIPGamma(dipProduct, fairValue, this.symbol);
 
     // Calc scalperWindow std deviation spread from zScore & IV for gamma levels
-    const stdDevSpread = this.impliedVol / Math.sqrt((365 * 24 * 60 * 60) / scalperWindow) * zScore;
+    const stdDevSpread = this.impliedVol / Math.sqrt((365 * 24 * 60 * 60) / scalperWindow) * this.zScore;
     const netGamma = IS_DEV ? Math.max(0.01, dipTotalGamma * stdDevSpread * fairValue) : dipTotalGamma * stdDevSpread * fairValue;
 
     const widenSpread = (gammaScalpCount - 1) / gammaCycles;

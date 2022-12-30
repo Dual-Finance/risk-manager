@@ -68,8 +68,7 @@ export class Router {
       this.dips[
         this.dip_to_string(dip_deposit.expirationMs / 1_000, dip_deposit.strike)
       ] = dip_deposit;
-      console.log('DIP Deposit quantity zero');
-      this.run_risk_manager();
+      console.log('DIP Deposit quantity zero. No Rerun');
       return;
     }
     this.fetchMMOrder(symbol).then(async (order) => {
@@ -83,7 +82,7 @@ export class Router {
           )
         ] = dip_deposit;
         this.run_risk_manager();
-        console.log('No remaining quantity', order);
+        console.log('No available MM bid', order);
         return;
       }
 
@@ -155,6 +154,101 @@ export class Router {
       });
       console.log('API response', await response.json());
     });
+  }
+
+  // Reads all DIP Deposits and decides whether to send it to the mm_callback
+  async checkMMPrices(): Promise<void> {
+    for (const dip_deposit of Object.values(this.dips)) {
+      if (dip_deposit.qty > 0) {
+        const date = new Date(dip_deposit.expirationMs);
+        // TODO: Update this for other types of assets
+        const symbol = `${dip_deposit.splToken},USDC,${date.getUTCFullYear()}-${
+          date.getUTCMonth() + 1
+        }-${date.getUTCDate()},${dip_deposit.strike * 1_000_000},UPSIDE,E,P`;
+        console.log('######################################################################');
+        console.log('Checking MM Quotes vs ', symbol, 'Deposit:', dip_deposit, new Date().toUTCString());
+
+        this.fetchMMOrder(symbol).then(async (order) => {
+          // @ts-ignore
+          if (!order || Number(order.remainingQuantity) < dip_deposit.qty) {
+            this.dips[
+              this.dip_to_string(
+                dip_deposit.expirationMs / 1_000,
+                dip_deposit.strike,
+              )
+            ] = dip_deposit;
+            console.log('No available MM bid', order);
+            return;
+          }
+
+          const currentPrice = getPythPrice(new PublicKey(tokenToSplMint(dip_deposit.splToken)));
+          const fractionOfYear = (Date.now() - dip_deposit.expirationMs) / 365 * 24 * 60 * 60 * 1_000;
+          const vol = THEO_VOL_MAP[dip_deposit.splToken] * (1.15 + Math.random() / 10);
+          const thresholdPrice = blackScholes(currentPrice, dip_deposit.strike / 1_000_000, fractionOfYear, vol, 0.01, 'call');
+          // @ts-ignore
+          const { price } = order;
+          console.log('MM price:', price, 'BVE price:', thresholdPrice);
+          const userPremium = price * dip_deposit.qty;
+          if (userPremium < minExecutionPremium) {
+            // If user premium is too small don't bother spamming MM
+            console.log('Not routing too small of a trade:', userPremium, minExecutionPremium);
+            this.dips[
+              this.dip_to_string(
+                dip_deposit.expirationMs / 1_000,
+                dip_deposit.strike,
+              )
+            ] = dip_deposit;
+            return;
+          }
+          // TODO: Test this to make sure the decimals are correct on each.
+
+          if (thresholdPrice > price) {
+            // If the price is worse than the BVE, then do not use the MM, treat it
+            // like there is no MM bid.
+            console.log('Not routing to MM due to price:', thresholdPrice, price);
+            this.dips[
+              this.dip_to_string(
+                dip_deposit.expirationMs / 1_000,
+                dip_deposit.strike,
+              )
+            ] = dip_deposit;
+            return;
+          }
+
+          const client_order_id = `clientOrderId${Date.now()}`;
+          const side = 'SELL';
+          const quantity = dip_deposit.qty;
+          // @ts-ignore
+          const secret = apiSecret.default;
+
+          const request = `clientOrderId=${client_order_id}&symbol=${symbol}&price=${price}&quantity=${quantity}&side=${side}`;
+          const calculated_hash = crypto
+            .createHmac('SHA256', secret)
+            .update(Buffer.from(request))
+            .digest('hex');
+
+          const data = {
+            symbol,
+            price,
+            quantity,
+            side,
+            clientOrderId: client_order_id,
+            signature: calculated_hash,
+          };
+
+          console.log('Creating api order for buy', data);
+          const response = await fetch(`${DUAL_API}/orders/createorder`, {
+            method: 'post',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-MBX-APIKEY': PROTCOL_API_KEY,
+            },
+            body: JSON.stringify(data),
+          });
+          console.log('API response', await response.json());
+        });
+      }
+    }
   }
 
   run_risk_manager(): void {

@@ -54,26 +54,34 @@ async function main() {
   );
 
   if (productStatus.get('SOL')) {
-    console.log('Run SOL Risk Manager', new Date().toUTCString());
     await solRouter.refresh_dips();
+    console.log('Check SOL Position vs MM Quotes', new Date().toUTCString());
+    solRouter.checkMMPrices();
+    console.log('Run SOL Risk Manager', new Date().toUTCString());
     solRouter.run_risk_manager();
     await sleepExact(staggerTime);
   }
   if (productStatus.get('BTC')) {
-    console.log('Run BTC Risk Manager', new Date().toUTCString());
     await btcRouter.refresh_dips();
+    console.log('Check BTC Position vs MM Quotes', new Date().toUTCString());
+    btcRouter.checkMMPrices();
+    console.log('Run BTC Risk Manager', new Date().toUTCString());
     btcRouter.run_risk_manager();
     await sleepExact(staggerTime);
   }
   if (productStatus.get('ETH')) {
-    console.log('Run ETH Risk Manager', new Date().toUTCString());
     await ethRouter.refresh_dips();
+    console.log('Check ETH Position vs MM Quotes', new Date().toUTCString());
+    ethRouter.checkMMPrices();
+    console.log('Run ETH Risk Manager', new Date().toUTCString());
     ethRouter.run_risk_manager();
     await sleepExact(staggerTime);
   }
   if (productStatus.get('MNGO')) {
-    console.log('Run MNGO Risk Manager', new Date().toUTCString());
     await mngoRouter.refresh_dips();
+    console.log('Check MNGO Position vs MM Quotes', new Date().toUTCString());
+    mngoRouter.checkMMPrices();
+    console.log('Run MNGO Risk Manager', new Date().toUTCString());
     mngoRouter.run_risk_manager();
   }
 
@@ -81,6 +89,8 @@ async function main() {
     try {
       if (productStatus.get('SOL')) {
         console.log('------------------------------------------------');
+        console.log('Re-Check SOL Position vs MM Quotes', new Date().toUTCString());
+        solRouter.checkMMPrices();
         console.log('RERUN SOL Risk Manager', new Date().toUTCString());
         await solRouter.refresh_dips();
         solRouter.run_risk_manager();
@@ -88,6 +98,8 @@ async function main() {
       }
       if (productStatus.get('BTC')) {
         console.log('------------------------------------------------');
+        console.log('Re-Check BTC Position vs MM Quotes', new Date().toUTCString());
+        btcRouter.checkMMPrices();
         console.log('RERUN BTC Risk Manager', new Date().toUTCString());
         await btcRouter.refresh_dips();
         btcRouter.run_risk_manager();
@@ -95,6 +107,8 @@ async function main() {
       }
       if (productStatus.get('ETH')) {
         console.log('------------------------------------------------');
+        console.log('Re-Check ETH Position vs MM Quotes', new Date().toUTCString());
+        ethRouter.checkMMPrices();
         console.log('RERUN ETH Risk Manager', new Date().toUTCString());
         await ethRouter.refresh_dips();
         ethRouter.run_risk_manager();
@@ -102,6 +116,8 @@ async function main() {
       }
       if (productStatus.get('MNGO')) {
         console.log('------------------------------------------------');
+        console.log('Re-Check MNGO Position vs MM Quotes', new Date().toUTCString());
+        mngoRouter.checkMMPrices();
         console.log('RERUN MNGO Risk Manager', new Date().toUTCString());
         await mngoRouter.refresh_dips();
         mngoRouter.run_risk_manager();

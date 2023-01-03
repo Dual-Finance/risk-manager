@@ -117,18 +117,18 @@ export const slippageMax = new Map<string, number>([
 export const treasuryPositions: DIPDeposit[] = [({
   splToken: 'MNGO',
   premiumAsset: 'USDC',
-  expirationMs: 1672747200000,
-  strike: 0.016,
+  expirationMs: 1677672000000,
+  strike: 0.018,
   type: 'put',
-  qty: 7812500,
+  qty: 6944444,
 }),
 ({
   splToken: 'MNGO',
   premiumAsset: 'USDC',
-  expirationMs: 1672747200000,
-  strike: 0.019,
+  expirationMs: 1675252800000,
+  strike: 0.020,
   type: 'put',
-  qty: 6578947,
+  qty: 6250000,
 }),
 ];
 

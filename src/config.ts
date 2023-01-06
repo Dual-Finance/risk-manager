@@ -1,3 +1,4 @@
+/* eslint-disable */
 import { PublicKey } from '@solana/web3.js';
 import { DIPDeposit } from './common';
 
@@ -7,12 +8,14 @@ export const sol_vars = process.env.SOL.split(',');
 export const btc_vars = process.env.BTC.split(',');
 export const eth_vars = process.env.ETH.split(',');
 export const mngo_vars = process.env.MNGO.split(',');
+export const bonk_vars = process.env.BONK.split(',');
 
 export const productStatus = new Map<string, boolean>([
   ['BTC', btc_vars[0] == 'ON'],
   ['ETH', eth_vars[0] == 'ON'],
   ['SOL', sol_vars[0] == 'ON'],
   ['MNGO', mngo_vars[0] == 'ON'],
+  ['BONK', bonk_vars[0] == 'ON'],
 ]);
 // Adjust delta hedges for loans, negative values allow positive spot balances in mango
 // CAUTION! Turn off scalper, send funds to mango & update value before running!
@@ -21,6 +24,7 @@ export const DELTA_OFFSET = new Map<string, number>([
   ['ETH', eth_vars[1] == null ? 0 : parseFloat(eth_vars[1])],
   ['SOL', sol_vars[1] == null ? 0 : parseFloat(sol_vars[1])],
   ['MNGO', mngo_vars[1] == null ? 0 : parseFloat(mngo_vars[1])],
+  ['BONK', bonk_vars[1] == null ? 0 : parseFloat(bonk_vars[1])],
 ]);
 
 export const THEO_VOL_MAP = new Map<string, number>([
@@ -28,6 +32,7 @@ export const THEO_VOL_MAP = new Map<string, number>([
   ['ETH', parseFloat(eth_vars[2]) > 0 ? parseFloat(eth_vars[2]) : 0.72],
   ['SOL', parseFloat(sol_vars[2]) > 0 ? parseFloat(sol_vars[2]) : 0.84],
   ['MNGO', parseFloat(mngo_vars[2]) > 0 ? parseFloat(mngo_vars[2]) : 1.6],
+  ['BONK', parseFloat(bonk_vars[2]) > 0 ? parseFloat(bonk_vars[2]) : 3],
 ]);
 
 export const ZSCORE = new Map<string, number>([
@@ -35,7 +40,16 @@ export const ZSCORE = new Map<string, number>([
   ['ETH', parseFloat(eth_vars[3]) > 0 ? parseFloat(eth_vars[3]) : 1.282],
   ['SOL', parseFloat(sol_vars[3]) > 0 ? parseFloat(sol_vars[3]) : 1.282],
   ['MNGO', parseFloat(mngo_vars[3]) > 0 ? parseFloat(mngo_vars[3]) : 1.282],
+  ['BONK', parseFloat(bonk_vars[3]) > 0 ? parseFloat(bonk_vars[3]) : 2.58],
 ]); // Corresponds to 80% CI by default
+
+export const MODE = new Map<string, number>([
+  ['BTC', parseFloat(btc_vars[4]) > 0 ? parseFloat(btc_vars[4]) : 0],
+  ['ETH', parseFloat(eth_vars[4]) > 0 ? parseFloat(eth_vars[4]) : 0],
+  ['SOL', parseFloat(sol_vars[4]) > 0 ? parseFloat(sol_vars[4]) : 0],
+  ['MNGO', parseFloat(mngo_vars[4]) > 0 ? parseFloat(mngo_vars[4]) : 0],
+  ['BONK', parseFloat(bonk_vars[4]) > 0 ? parseFloat(bonk_vars[4]) : 0],
+]); // 0 - Normal 1 - Gamma+Back 2- Back Only
 
 export const ENVIRONMENT: string = IS_DEV ? 'DEVNET' : 'MAINNET';
 
@@ -62,6 +76,10 @@ export const mngoPK = new PublicKey(
   'MangoCzJ36AjZyKwVj3VnYU4GTonjfVEnJmvvWaxLac',
 );
 
+export const bonkPK = new PublicKey(
+  'DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263',
+);
+
 export const dualMarketProgramID = new PublicKey(
   'DiPbvUUJkDhV9jFtQsDFnMEMRJyjW5iS6NMwoySiW8ki',
 );
@@ -81,36 +99,34 @@ export const OPENBOOK_FORK_ID = IS_DEV ? new PublicKey('EoTcMgcDRTJVZDMZWBoU6rhY
   : new PublicKey('srmqPvymJeFKQ4zGQed1GFppgkRHL9kaELCbyksJtPX');
 export const OPENBOOK_MKT_MAP = new Map<string, string>([
   ['SOL', '8BnEgHoWFysVcuFFX7QztDmzuH8r5ZFvyP3sYwn1XTh6'], ['MNGO', '3NnxQvDcZXputNMxaxsGvqiKpqgPfSYXpNigZNFcknmD'],
+  ['BONK', '8PhnCfgqpgFM7ZJvttGdBVMXHuU4Q23ACxCvWkbs1M71'],
 ]);
 export const ACCOUNT_MAP = new Map<string, string>([
   ['BTC', '79ee6JPqTPUDzX4FeAWSntFatmpb5BY5LQrXzMX3aAE6'], ['ETH', 'F7qSsLofbpZBfZ11wkajX9JPshSEeyGpaFvDeuur2mNW'],
   ['SOL', '9EaYbxzU1YJwJojKsKp3U38PBy5aqcN2KS9Xc8hAxZB7'], ['USDC', '2gyJ4SZyQtUEXCLRa459nbWaFzuN8uvyoUsVb7xmpkh1'],
-  ['MNGO', '4zzgXnhfwdtASw9JugEyrPSKzvaN8i2WSDm1bnGiHFcK'],
-]);
-export const OPENBOOK_ACCOUNT_MAP = new Map<string, string>([
-  ['SOL', '6A4xj97ah6QJmMyJb5jTKSNXVsdc2sJSak3wneSMJrPX'], ['MNGO', '2KVSgMn5soLxF4E42NUrJWrckx5TZbTwZCUMPcsQLzp2'],
+  ['MNGO', '4zzgXnhfwdtASw9JugEyrPSKzvaN8i2WSDm1bnGiHFcK'], ['BONK', 'D8yD6us5X7YNeweppFdBR4idGsyPooetuW2fA6Suabqg'],
 ]);
 
 export const OPTION_MINT_ADDRESS_SEED = 'option-mint';
 
 export const MinContractSize = new Map<string, number>([
-  ['BTC', 0.0001], ['ETH', 0.001], ['SOL', 0.01], ['MNGO', 0.01],
+  ['BTC', 0.0001], ['ETH', 0.001], ['SOL', 0.01], ['MNGO', 0.01], ['BONK', 1000],
 ]);
 
 export const MinOpenBookSize = new Map<string, number>([
-  ['BTC', 0.0001], ['ETH', 0.001], ['SOL', 0.001], ['MNGO', 10],
+  ['BTC', 0.0001], ['ETH', 0.001], ['SOL', 0.001], ['MNGO', 10], ['BONK', 1000],
 ]);
 
 export const TickSize = new Map<string, number>([
-  ['BTC', 0.1], ['ETH', 0.1], ['SOL', 0.001], ['MNGO', 0.000001],
+  ['BTC', 0.1], ['ETH', 0.1], ['SOL', 0.001], ['MNGO', 0.000001], ['BONK', 0.000000001],
 ]);
 
 export const maxNotional = new Map<string, number>([
-  ['BTC', 20000], ['ETH', 10000], ['SOL', 10000], ['MNGO', 2500],
+  ['BTC', 20000], ['ETH', 10000], ['SOL', 10000], ['MNGO', 2500], ['BONK', 100],
 ]); // Max hedging $ notional sizes
 
 export const slippageMax = new Map<string, number>([
-  ['BTC', 0.0005], ['ETH', 0.0005], ['SOL', 0.0010], ['MNGO', 0.0015],
+  ['BTC', 0.0005], ['ETH', 0.0005], ['SOL', 0.0010], ['MNGO', 0.0015], ['BONK', 0.0005],
 ]); // // Max Allowed xbps above/below FMV on limit orders
 
 // Enter any Staking Options Owned and to be hedged from the treasury
@@ -130,6 +146,22 @@ export const treasuryPositions: DIPDeposit[] = [({
   type: 'put',
   qty: 6250000,
 }),
+({
+  splToken: 'BONK',
+  premiumAsset: 'USDC',
+  expirationMs: 1675166400000,
+  strike: 0.0000005,
+  type: 'call',
+  qty: 10000150,
+}), // Actually GSO Position
+({
+  splToken: 'BONK',
+  premiumAsset: 'USDC',
+  expirationMs: 1676462400000,
+  strike: 0.000003,
+  type: 'call',
+  qty: 10000000,
+}), // Running this until EOM
 ];
 
 export const rfRate = 0.03; // Risk Free Rate of Return ~ T-Bill Rate
@@ -151,3 +183,4 @@ export const JUPITER_LIQUIDITY = 100; // USDC amount to check jupiter mid point 
 export const jupiterSlippage = 50; // bps to allow calculating mid price to succeed
 export const maxLevels = 100; // max num of levels to search for order book depth
 export const maxBackGammaMultiple = 5; // qty to search order book & max multiple of gamma to allow on the back bids
+export const PRIORITY_FEE = 1000; // Priority Fee to use for all txs in micro lamports

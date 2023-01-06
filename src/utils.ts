@@ -1,3 +1,4 @@
+/* eslint-disable */
 import * as os from 'os';
 import * as fs from 'fs';
 import { Connection, PublicKey } from '@solana/web3.js';
@@ -22,6 +23,7 @@ import {
   API_URL,
   IS_DEV,
   mngoPK,
+  bonkPK,
   CHAINLINK_PROGRAM_ID,
   usdcMintPk,
 } from './config';
@@ -159,6 +161,9 @@ export function splMintToToken(splMint: PublicKey) {
   if (splMint.toBase58() === mngoPK.toBase58()) {
     return 'MNGO';
   }
+  if (splMint.toBase58() === bonkPK.toBase58()) {
+    return 'BONK';
+  }
   if (splMint.toBase58() === usdcMintPk.toBase58()) {
     return 'USDC';
   }
@@ -178,6 +183,9 @@ export function tokenToSplMint(token: string) {
   if (token === 'MNGO') {
     return mngoPK;
   }
+  if (token === 'BONK') {
+    return bonkPK;
+  }
   if (token === 'USDC') {
     return usdcMintPk;
   }
@@ -196,6 +204,9 @@ export function tokenToPythSymbol(token: string) {
   }
   if (token === 'MNGO') {
     return 'Crypto.MNGO/USD';
+  }
+  if (token === 'BONK') {
+    return 'Crypto.BONK/USD';
   }
   return undefined;
 }
@@ -231,6 +242,9 @@ export function tokenToSBSymbol(token: string) {
   }
   if (token === 'MNGO') {
     return 'AmQunu75SLZjDQS9KkRNjAUWHp2ReSzfNiWVDURzeZTi';
+  }
+  if (token === 'BONK') {
+    return '6qBqGAYmoZw2r4fda7671NSUbcDWE4XicJdJoWqK8aTe';
   }
   return undefined;
 }
@@ -287,6 +301,9 @@ export function tokenToChainlinkSymbol(token: string) {
   if (token === 'MNGO') {
     return '';
   }
+  if (token === 'BONK') {
+    return '';
+  }
   return undefined;
 }
 
@@ -302,6 +319,9 @@ export function decimalsBaseSPL(token: string) {
   }
   if (token === 'MNGO') {
     return 6;
+  }
+  if (token === 'BONK') {
+    return 5;
   }
   if (token === 'USDC') {
     return 6;

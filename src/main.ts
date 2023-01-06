@@ -13,6 +13,7 @@ async function main() {
   const btcScalper: Scalper = new Scalper('BTC');
   const ethScalper: Scalper = new Scalper('ETH');
   const mngoScalper: Scalper = new Scalper('MNGO');
+  const bonkScalper: Scalper = new Scalper('BONK');
 
   const solRouter: Router = new Router(
     (deposit: DIPDeposit[]) => {
@@ -33,7 +34,6 @@ async function main() {
     },
     'BTC',
   );
-
   const ethRouter: Router = new Router(
     (deposit: DIPDeposit[]) => {
       console.log('Route to MM', deposit);
@@ -42,6 +42,15 @@ async function main() {
       ethScalper.pickAndRunScalper(deposits);
     },
     'ETH',
+  );
+  const bonkRouter: Router = new Router(
+    (deposit: DIPDeposit[]) => {
+      console.log('Route to MM', deposit);
+    },
+    (deposits: DIPDeposit[]) => {
+      bonkScalper.pickAndRunScalper(deposits);
+    },
+    'BONK',
   );
   const mngoRouter: Router = new Router(
     (deposit: DIPDeposit[]) => {
@@ -75,6 +84,14 @@ async function main() {
     ethRouter.checkMMPrices();
     console.log('Run ETH Risk Manager', new Date().toUTCString());
     ethRouter.run_risk_manager();
+    await sleepExact(staggerTime);
+  }
+  if (productStatus.get('BONK')) {
+    await bonkRouter.refresh_dips();
+    console.log('Check BONK Position vs MM Quotes', new Date().toUTCString());
+    bonkRouter.checkMMPrices();
+    console.log('Run BONK Risk Manager', new Date().toUTCString());
+    bonkRouter.run_risk_manager();
     await sleepExact(staggerTime);
   }
   if (productStatus.get('MNGO')) {
@@ -114,6 +131,15 @@ async function main() {
         ethRouter.run_risk_manager();
         await sleepExact(staggerTime);
       }
+      if (productStatus.get('BONK')) {
+        console.log('------------------------------------------------');
+        console.log('Re-Check BONK Position vs MM Quotes', new Date().toUTCString());
+        bonkRouter.checkMMPrices();
+        console.log('RERUN BONK Risk Manager', new Date().toUTCString());
+        await bonkRouter.refresh_dips();
+        bonkRouter.run_risk_manager();
+        await sleepExact(staggerTime);
+      }
       if (productStatus.get('MNGO')) {
         console.log('------------------------------------------------');
         console.log('Re-Check MNGO Position vs MM Quotes', new Date().toUTCString());
@@ -126,7 +152,8 @@ async function main() {
       console.log(err);
       console.log(err.stack);
     }
-  }, 1_000 * (scalperWindow + (((Math.random() * 2) - 1) * scalperWindow * percentDrift) - (2 * staggerTime)));
+  }, 1_000 * (scalperWindow + (((Math.random() * 2) - 1)
+    * scalperWindow * percentDrift) - (2 * staggerTime)));
 }
 
 main();

@@ -1,3 +1,4 @@
+/* eslint-disable */
 // @ts-ignore
 import * as greeks from 'greeks';
 import {
@@ -7,7 +8,7 @@ import {
   PerpMarket,
 } from '@blockworks-foundation/mango-client';
 import {
-  Account, Connection, Keypair, LAMPORTS_PER_SOL, PublicKey, Transaction,
+   ComputeBudgetProgram, Connection, Keypair, LAMPORTS_PER_SOL, PublicKey, Transaction,
 } from '@solana/web3.js';
 import { Market } from '@project-serum/serum';
 import { Jupiter } from '@jup-ag/core';
@@ -15,7 +16,6 @@ import JSBI from 'jsbi';
 import { DIPDeposit, RouteDetails } from './common';
 import {
   ACCOUNT_MAP,
-  cluster,
   JUPITER_LIQUIDITY,
   mangoTesterPk,
   maxMktSpread,
@@ -26,6 +26,7 @@ import {
   slippageMax,
   THEO_VOL_MAP,
   jupiterSlippage,
+  PRIORITY_FEE,
 } from './config';
 import {
   decimalsBaseSPL, getAssociatedTokenAddress, getChainlinkPrice, getPythPrice, getSwitchboardPrice, splMintToToken, tokenToSplMint,
@@ -275,7 +276,7 @@ export async function cancelTxOpenBookOrders(
   const cancelTx = new Transaction();
   for (const order of myOrders) {
     console.log(symbol, 'Cancelling OpenBook Orders', order.size, symbol, '@', order.price, order.clientId.toString());
-    cancelTx.add(await spotMarket.makeCancelOrderTransaction(connection, owner.publicKey, order));
+    cancelTx.add(spotMarket.makeCancelOrderInstruction(connection, owner.publicKey, order));
   }
   return cancelTx;
 }
@@ -444,4 +445,18 @@ export async function getJupiterPrice(
   // Calc midpoint price of aggregtor
   const midPrice = (buyPrice + sellPrice) / 2;
   return midPrice;
+}
+
+export function setPriorityFee(
+  tx: Transaction
+) {
+  const modifyComputeUnits = ComputeBudgetProgram.setComputeUnitLimit({ 
+    units: 1000000 
+  });
+  const addPriorityFee = ComputeBudgetProgram.setComputeUnitPrice({ 
+    microLamports: PRIORITY_FEE
+  });
+  tx.add(modifyComputeUnits);
+  tx.add(addPriorityFee);
+  return tx;
 }

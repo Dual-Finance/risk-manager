@@ -1,3 +1,4 @@
+/* eslint-disable */
 import WebSocket from 'ws';
 import {
   Config, getMarketByBaseSymbolAndKind, GroupConfig, MangoAccount, MangoClient, MangoCache,
@@ -13,14 +14,14 @@ import {
   networkName, THEO_VOL_MAP, maxNotional, twapInterval, scalperWindow,
   ZSCORE, MinContractSize, TickSize, FILLS_URL, IS_DEV, gammaThreshold,
   maxHedges, percentDrift, DELTA_OFFSET, MANGO_DOWNTIME_THRESHOLD, fundingThreshold, gammaCycles,
-  MinOpenBookSize, OPENBOOK_FORK_ID, OPENBOOK_MKT_MAP, OPENBOOK_ACCOUNT_MAP, treasuryPositions, slippageMax, gammaCompleteThreshold, cluster, maxLevels, maxBackGammaMultiple, API_URL,
+  MinOpenBookSize, OPENBOOK_FORK_ID, OPENBOOK_MKT_MAP, treasuryPositions, slippageMax, gammaCompleteThreshold, cluster, maxLevels, maxBackGammaMultiple, API_URL, MODE,
 } from './config';
 import { DIPDeposit } from './common';
 import { readKeypair, sleepExact, sleepRandom } from './utils';
 import { SerumVialClient, SerumVialTradeMessage } from './serumVial';
 import {
   jupiterHedge, cancelTxOpenBookOrders, getDIPDelta, getDIPGamma, getDIPTheta, getFairValue, getPayerAccount, getSpotDelta, loadPrices,
-  orderSpliceMango, liquidityCheckAndNumSplices, settleOpenBook,
+  orderSpliceMango, liquidityCheckAndNumSplices, settleOpenBook, setPriorityFee,
 } from './scalper_utils';
 import { Jupiter } from '@jup-ag/core';
 
@@ -53,6 +54,8 @@ export class Scalper {
 
   zScore: number;
 
+  mode: number;
+
   openBookAccount: string;
 
   serumVialClient: SerumVialClient;
@@ -79,8 +82,8 @@ export class Scalper {
     this.minSpotSize = MinOpenBookSize.get(symbol);
     this.tickSize = TickSize.get(symbol);
     this.deltaOffset = DELTA_OFFSET.get(symbol);
-    this.openBookAccount = OPENBOOK_ACCOUNT_MAP.get(symbol);
     this.zScore = ZSCORE.get(symbol);
+    this.mode = MODE.get(symbol);
 
     this.serumVialClient = new SerumVialClient();
     this.serumVialClient.openSerumVial();
@@ -93,7 +96,21 @@ export class Scalper {
       this.symbol,
       'perp',
     );
+    
+    // Add Any Treasury Positions from Staking Options
+    for (const positions of treasuryPositions) {
+      if (this.symbol == positions.splToken) {
+        dipProduct.push(positions);
+      }
+    }
+    console.log(this.symbol, 'Active Positions', dipProduct);
+
     this.marketIndex = this.perpMarketConfig.marketIndex;
+    if (this.marketIndex == undefined){
+      console.log('No Mango Market Exists. Run OpenBook');
+      await this.scalperOpenBook(dipProduct);
+      return;
+    }
 
     // Setup for scalping
     const mangoGroup: MangoGroup = await this.client.getMangoGroup(
@@ -105,14 +122,6 @@ export class Scalper {
       this.perpMarketConfig.baseDecimals,
       this.perpMarketConfig.quoteDecimals,
     );
-
-    // Add Any Treasury Positions from Staking Options
-    for (const positions of treasuryPositions) {
-      if (this.symbol == positions.splToken) {
-        dipProduct.push(positions);
-      }
-    }
-    console.log(this.symbol, 'Active Positions', dipProduct);
 
     // Check if Mango is live
     if ((Date.now() - perpMarket.lastUpdated.toNumber() * 1_000) / (1_000 * 60) > MANGO_DOWNTIME_THRESHOLD) {
@@ -552,18 +561,19 @@ export class Scalper {
       console.log(this.symbol, "Jupiter Failed", err)
       return;
     }
-
-    try {
-      await this.deltaHedgeOpenBook(
-        dipProduct,
-        1,
-        spotMarket,
-        jupiter,
-      );
-    } catch (err) {
-      console.log(this.symbol, 'Main Delta Error', err.stack);
+    if (this.mode == 0) {
+      try {
+        await this.deltaHedgeOpenBook(
+          dipProduct,
+          1,
+          spotMarket,
+          jupiter,
+        );
+      } catch (err) {
+        console.log(this.symbol, 'Main Delta Error', err.stack);
+      }
+      this.serumVialClient.removeAnyListeners();
     }
-    this.serumVialClient.removeAnyListeners();
 
     try {
       await this.gammaScalpOpenBook(
@@ -592,7 +602,7 @@ export class Scalper {
     const cancelDelta = await cancelTxOpenBookOrders(this.connection, this.owner, spotMarket, this.symbol);
     if (cancelDelta != undefined) {
       try {
-        await sendAndConfirmTransaction(this.connection, cancelDelta, [this.owner]);
+        await sendAndConfirmTransaction(this.connection, setPriorityFee(cancelDelta), [this.owner]);
       } catch (err) {
         console.log(this.symbol, 'Cancel OpenBook Orders', err, err.stack);
       }
@@ -740,7 +750,7 @@ export class Scalper {
             if (!jupTx) {
               continue;
             }
-            const txid = await sendAndConfirmTransaction(this.connection, jupTx, [this.owner]);
+            const txid = await sendAndConfirmTransaction(this.connection, setPriorityFee(jupTx), [this.owner]);
             if (swapTransaction) {
               const spotDeltaUpdate = jupValues.qty;
               hedgeDeltaTotal += spotDeltaUpdate;
@@ -778,7 +788,8 @@ export class Scalper {
       const priceDelta = Math.floor(Math.abs(hedgePrice) * (1 / this.tickSize)) / (1 / this.tickSize);
       const payerAccount = getPayerAccount(hedgeSide, this.symbol, 'USDC');
       console.log(this.symbol, hedgeSide, 'OpenBook-SPOT', amountDelta, 'Limit:', priceDelta, '#', deltaHedgeCount, 'ID', deltaID.toString());
-      await spotMarket.placeOrder(this.connection, {
+      const deltaOrderTx = new Transaction();
+      const deltaTx = await spotMarket.makePlaceOrderTransaction(this.connection, {
         owner: new Account(this.owner.secretKey),
         payer: payerAccount,
         side: hedgeSide,
@@ -788,6 +799,8 @@ export class Scalper {
         clientId: deltaID,
         selfTradeBehavior: 'abortTransaction',
       });
+      deltaOrderTx.add(deltaTx.transaction)
+      await sendAndConfirmTransaction(this.connection, setPriorityFee(deltaOrderTx), [this.owner]);
     } catch (err) {
       console.log(this.symbol, 'Delta Hedge', err, err.stack);
     }
@@ -882,7 +895,7 @@ export class Scalper {
     const cancelGammaStart = await cancelTxOpenBookOrders(this.connection, this.owner, spotMarket, this.symbol);
     if (cancelGammaStart != undefined) {
       try {
-        await sendAndConfirmTransaction(this.connection, cancelGammaStart, [this.owner]);
+        await sendAndConfirmTransaction(this.connection, setPriorityFee(cancelGammaStart), [this.owner]);
       } catch (err) {
         console.log(this.symbol, 'Cancel OpenBook Orders', err, err.stack);
       }
@@ -969,29 +982,32 @@ export class Scalper {
     const bidAccount = getPayerAccount('buy', this.symbol, 'USDC');
     const askAccount = getPayerAccount('sell', this.symbol, 'USDC');
     const gammaOrders = new Transaction();
-    const gammaBidTx = await spotMarket.makePlaceOrderTransaction(this.connection, {
-      owner: this.owner.publicKey,
-      payer: bidAccount,
-      side: 'buy',
-      price: priceBid,
-      size: amountGamma,
-      orderType: 'limit',
-      clientId: bidID,
-      selfTradeBehavior: 'abortTransaction',
-    });
-    gammaOrders.add(gammaBidTx.transaction);
-    const gammaAskTx = await spotMarket.makePlaceOrderTransaction(this.connection, {
-      owner: this.owner.publicKey,
-      payer: askAccount,
-      side: 'sell',
-      price: priceAsk,
-      size: amountGamma,
-      orderType: 'limit',
-      clientId: askID,
-      selfTradeBehavior: 'abortTransaction',
-    });
-    gammaOrders.add(gammaAskTx.transaction);
-    
+    if (this.mode < 2) {
+      const gammaBidTx = await spotMarket.makePlaceOrderTransaction(this.connection, {
+        owner: this.owner.publicKey,
+        payer: bidAccount,
+        side: 'buy',
+        price: priceBid,
+        size: amountGamma,
+        orderType: 'limit',
+        clientId: bidID,
+        selfTradeBehavior: 'abortTransaction',
+      });
+      const gammaAskTx = await spotMarket.makePlaceOrderTransaction(this.connection, {
+        owner: this.owner.publicKey,
+        payer: askAccount,
+        side: 'sell',
+        price: priceAsk,
+        size: amountGamma,
+        orderType: 'limit',
+        clientId: askID,
+        selfTradeBehavior: 'abortTransaction',
+      });
+      gammaOrders.add(gammaBidTx.transaction);
+      gammaOrders.add(gammaAskTx.transaction);
+      console.log(this.symbol, 'Gamma', amountGamma, 'Bid', priceBid, 'BidID', bidID.toString());
+      console.log(this.symbol, 'Gamma', amountGamma, 'Ask', priceAsk, 'AskID', askID.toString());
+    }
     // Calculate effective gamma subject to max at price & round to nearest tick size for order entry
     const whaleBidDiff = fairValue - whaleBidPrice;
     const whaleAskDiff = whaleAskPrice - fairValue;
@@ -1035,9 +1051,7 @@ export class Scalper {
     }
 
     try {
-      await sendAndConfirmTransaction(this.connection, gammaOrders, [this.owner]);
-      console.log(this.symbol, 'Gamma', amountGamma, 'Bid', priceBid, 'BidID', bidID.toString());
-      console.log(this.symbol, 'Gamma', amountGamma, 'Ask', priceAsk, 'AskID', askID.toString());
+      await sendAndConfirmTransaction(this.connection, setPriorityFee(gammaOrders), [this.owner]);
     } catch (err) {
       console.log(this.symbol, 'Gamma Order', err, err.stack);
     }

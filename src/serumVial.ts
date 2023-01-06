@@ -1,3 +1,4 @@
+/* eslint-disable */
 import WebSocket from 'ws';
 
 const WS_URL = 'wss://vial.mngo.cloud/v1/ws';

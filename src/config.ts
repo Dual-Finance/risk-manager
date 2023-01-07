@@ -43,6 +43,7 @@ export const ZSCORE = new Map<string, number>([
   ['BONK', parseFloat(bonk_vars[3]) > 0 ? parseFloat(bonk_vars[3]) : 2.58],
 ]); // Corresponds to 80% CI by default
 
+// TODO make enum
 export const MODE = new Map<string, number>([
   ['BTC', parseFloat(btc_vars[4]) > 0 ? parseFloat(btc_vars[4]) : 0],
   ['ETH', parseFloat(eth_vars[4]) > 0 ? parseFloat(eth_vars[4]) : 0],

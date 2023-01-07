@@ -447,6 +447,7 @@ export async function getJupiterPrice(
   return midPrice;
 }
 
+// TODO refine logic & make dynamic
 export function setPriorityFee(
   tx: Transaction
 ) {

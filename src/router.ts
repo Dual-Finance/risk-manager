@@ -16,6 +16,7 @@ import {
   PROTCOL_API_KEY,
   THEO_VOL_MAP,
   minExecutionPremium,
+  volSpread,
 } from './config';
 import { Poller } from './poller';
 import {
@@ -86,13 +87,13 @@ export class Router {
         return;
       }
 
-      const currentPrice = getPythPrice(new PublicKey(tokenToSplMint(dip_deposit.splToken)));
-      const fractionOfYear = (Date.now() - dip_deposit.expirationMs) / 365 * 24 * 60 * 60 * 1_000;
-      const vol = THEO_VOL_MAP[dip_deposit.splToken] * (1.15 + Math.random() / 10);
-      const thresholdPrice = blackScholes(currentPrice, dip_deposit.strike / 1_000_000, fractionOfYear, vol, 0.01, 'call');
+      const currentPrice = await getPythPrice(new PublicKey(tokenToSplMint(dip_deposit.splToken)));
+      const fractionOfYear = (dip_deposit.expirationMs - Date.now() ) / (365 * 24 * 60 * 60 * 1_000);
+      const vol = THEO_VOL_MAP.get(dip_deposit.splToken) * (1 + volSpread + Math.random() * volSpread);
+      const thresholdPrice = blackScholes(currentPrice, dip_deposit.strike, fractionOfYear, vol, 0.01, 'call');
       // @ts-ignore
       const { price } = order;
-      console.log('MM price:', price, 'BVE price:', thresholdPrice);
+      console.log('MM price:', price, 'BVE Re-Route price:', thresholdPrice);
       const userPremium = price * dip_deposit.qty;
       if (userPremium < minExecutionPremium) {
         // If user premium is too small don't bother spamming MM
@@ -106,7 +107,6 @@ export class Router {
         this.run_risk_manager();
         return;
       }
-      // TODO: Test this to make sure the decimals are correct on each.
 
       if (thresholdPrice > price) {
         // If the price is worse than the BVE, then do not use the MM, treat it
@@ -181,10 +181,10 @@ export class Router {
             return;
           }
 
-          const currentPrice = getPythPrice(new PublicKey(tokenToSplMint(dip_deposit.splToken)));
-          const fractionOfYear = (Date.now() - dip_deposit.expirationMs) / 365 * 24 * 60 * 60 * 1_000;
-          const vol = THEO_VOL_MAP[dip_deposit.splToken] * (1.15 + Math.random() / 10);
-          const thresholdPrice = blackScholes(currentPrice, dip_deposit.strike / 1_000_000, fractionOfYear, vol, 0.01, 'call');
+          const currentPrice = await getPythPrice(new PublicKey(tokenToSplMint(dip_deposit.splToken)));
+          const fractionOfYear = (dip_deposit.expirationMs - Date.now() ) / (365 * 24 * 60 * 60 * 1_000);
+          const vol = THEO_VOL_MAP.get(dip_deposit.splToken) * (1 + volSpread + Math.random() * volSpread);
+          const thresholdPrice = blackScholes(currentPrice, dip_deposit.strike, fractionOfYear, vol, 0.01, 'call');
           // @ts-ignore
           const { price } = order;
           console.log('MM price:', price, 'BVE price:', thresholdPrice);
@@ -200,7 +200,6 @@ export class Router {
             ] = dip_deposit;
             return;
           }
-          // TODO: Test this to make sure the decimals are correct on each.
 
           if (thresholdPrice > price) {
             // If the price is worse than the BVE, then do not use the MM, treat it

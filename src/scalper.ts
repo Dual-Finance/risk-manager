@@ -750,7 +750,7 @@ export class Scalper {
             if (!jupTx) {
               continue;
             }
-            const txid = await sendAndConfirmTransaction(this.connection, setPriorityFee(jupTx), [this.owner]);
+            const txid = await sendAndConfirmTransaction(this.connection, jupTx, [this.owner]);
             if (swapTransaction) {
               const spotDeltaUpdate = jupValues.qty;
               hedgeDeltaTotal += spotDeltaUpdate;

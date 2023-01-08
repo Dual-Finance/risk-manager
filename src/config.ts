@@ -28,12 +28,12 @@ export const DELTA_OFFSET = new Map<string, number>([
 ]);
 
 export const THEO_VOL_MAP = new Map<string, number>([
-  ['BTC', parseFloat(btc_vars[2]) > 0 ? parseFloat(btc_vars[2]) : 0.60],
-  ['ETH', parseFloat(eth_vars[2]) > 0 ? parseFloat(eth_vars[2]) : 0.72],
-  ['SOL', parseFloat(sol_vars[2]) > 0 ? parseFloat(sol_vars[2]) : 0.84],
-  ['MNGO', parseFloat(mngo_vars[2]) > 0 ? parseFloat(mngo_vars[2]) : 1.6],
-  ['BONK', parseFloat(bonk_vars[2]) > 0 ? parseFloat(bonk_vars[2]) : 3],
-]);
+  ['BTC', parseFloat(btc_vars[2]) > 0 ? parseFloat(btc_vars[2]) : 0.3],
+  ['ETH', parseFloat(eth_vars[2]) > 0 ? parseFloat(eth_vars[2]) : 0.4],
+  ['SOL', parseFloat(sol_vars[2]) > 0 ? parseFloat(sol_vars[2]) : 0.5],
+  ['MNGO', parseFloat(mngo_vars[2]) > 0 ? parseFloat(mngo_vars[2]) : 0.6],
+  ['BONK', parseFloat(bonk_vars[2]) > 0 ? parseFloat(bonk_vars[2]) : 1],
+]); // Defaults to system wide BVE, should be run at realistic IV estimate for best hedging
 
 export const ZSCORE = new Map<string, number>([
   ['BTC', parseFloat(btc_vars[3]) > 0 ? parseFloat(btc_vars[3]) : 1.282],

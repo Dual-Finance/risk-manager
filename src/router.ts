@@ -91,6 +91,10 @@ export class Router {
       const fractionOfYear = (dip_deposit.expirationMs - Date.now() ) / (365 * 24 * 60 * 60 * 1_000);
       const vol = THEO_VOL_MAP.get(dip_deposit.splToken) * (1 + volSpread + Math.random() * volSpread);
       const thresholdPrice = blackScholes(currentPrice, dip_deposit.strike, fractionOfYear, vol, 0.01, 'call');
+      if (!(thresholdPrice > 0)) {
+        console.log('No Routing Spot Price', thresholdPrice);
+        return;
+      }
       // @ts-ignore
       const { price } = order;
       console.log('MM price:', price, 'BVE Re-Route price:', thresholdPrice);
@@ -185,6 +189,10 @@ export class Router {
           const fractionOfYear = (dip_deposit.expirationMs - Date.now() ) / (365 * 24 * 60 * 60 * 1_000);
           const vol = THEO_VOL_MAP.get(dip_deposit.splToken) * (1 + volSpread + Math.random() * volSpread);
           const thresholdPrice = blackScholes(currentPrice, dip_deposit.strike, fractionOfYear, vol, 0.01, 'call');
+          if (!(thresholdPrice > 0)) {
+            console.log('No Routing Spot Price', thresholdPrice);
+            return;
+          }
           // @ts-ignore
           const { price } = order;
           console.log('MM price:', price, 'BVE price:', thresholdPrice);

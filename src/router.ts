@@ -156,6 +156,7 @@ export class Router {
     });
   }
 
+  // Todo use this routing logic only once for reruns and new trades
   // Reads all DIP Deposits and decides whether to send it to the mm_callback
   async checkMMPrices(): Promise<void> {
     for (const dip_deposit of Object.values(this.dips)) {

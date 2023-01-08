@@ -130,6 +130,10 @@ export const slippageMax = new Map<string, number>([
   ['BTC', 0.0005], ['ETH', 0.0005], ['SOL', 0.0010], ['MNGO', 0.0015], ['BONK', 0.0005],
 ]); // // Max Allowed xbps above/below FMV on limit orders
 
+export const BVE_VOL_MAP = new Map<string, number>([
+  ['BTC', 0.3], ['ETH', 0.4], ['SOL', 0.5], ['MNGO', 0.6], ['BONK', 1.0],
+]); // BVE vol keep alligned with app & contract vol
+
 // Enter any Staking Options Owned and to be hedged from the treasury
 export const treasuryPositions: DIPDeposit[] = [({
   splToken: 'MNGO',

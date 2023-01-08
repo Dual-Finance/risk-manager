@@ -14,7 +14,7 @@ import {
   optionVaultPk,
   OPTION_MINT_ADDRESS_SEED,
   PROTCOL_API_KEY,
-  THEO_VOL_MAP,
+  BVE_VOL_MAP,
   minExecutionPremium,
   volSpread,
 } from './config';
@@ -89,7 +89,7 @@ export class Router {
 
       const currentPrice = await getPythPrice(new PublicKey(tokenToSplMint(dip_deposit.splToken)));
       const fractionOfYear = (dip_deposit.expirationMs - Date.now() ) / (365 * 24 * 60 * 60 * 1_000);
-      const vol = THEO_VOL_MAP.get(dip_deposit.splToken) * (1 + volSpread + Math.random() * volSpread);
+      const vol = BVE_VOL_MAP.get(dip_deposit.splToken) * (1 + volSpread + Math.random() * volSpread);
       const thresholdPrice = blackScholes(currentPrice, dip_deposit.strike, fractionOfYear, vol, 0.01, 'call');
       // @ts-ignore
       const { price } = order;
@@ -184,7 +184,7 @@ export class Router {
 
           const currentPrice = await getPythPrice(new PublicKey(tokenToSplMint(dip_deposit.splToken)));
           const fractionOfYear = (dip_deposit.expirationMs - Date.now() ) / (365 * 24 * 60 * 60 * 1_000);
-          const vol = THEO_VOL_MAP.get(dip_deposit.splToken) * (1 + volSpread + Math.random() * volSpread);
+          const vol = BVE_VOL_MAP.get(dip_deposit.splToken) * (1 + volSpread + Math.random() * volSpread);
           const thresholdPrice = blackScholes(currentPrice, dip_deposit.strike, fractionOfYear, vol, 0.01, 'call');
           // @ts-ignore
           const { price } = order;

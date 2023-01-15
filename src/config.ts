@@ -4,6 +4,7 @@ import { DIPDeposit } from './common';
 
 export const IS_DEV = process.env.DEV != 'false';
 export const API_URL = process.env.RPC;
+export const PRIORITY_FEE = parseInt(process.env.FEE);
 export const sol_vars = process.env.SOL.split(',');
 export const btc_vars = process.env.BTC.split(',');
 export const eth_vars = process.env.ETH.split(',');
@@ -188,5 +189,4 @@ export const JUPITER_LIQUIDITY = 100; // USDC amount to check jupiter mid point 
 export const jupiterSlippage = 50; // bps to allow calculating mid price to succeed
 export const maxLevels = 100; // max num of levels to search for order book depth
 export const maxBackGammaMultiple = 5; // qty to search order book & max multiple of gamma to allow on the back bids
-export const PRIORITY_FEE = 1000; // Priority Fee to use for all txs in micro lamports
 export const volSpread = 0.05; // IV spread market maker at minimum must beat backstop to take fills

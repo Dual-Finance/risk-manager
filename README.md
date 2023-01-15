@@ -19,6 +19,7 @@ Trading events per event:
 Environment Variables
 DEV=true || DEV=false (Defaults to true)
 RPC=[Enter RPC url]
+FEE=Priority Fee to use for all txs in micro lamports
 SOL, BTC, ETH, MNGO = [OFF || ON, DELTA_OFFSET, THEO_VOL, ZCORE, MODE]
 Defaults to OFF,0,120%*BVE,1.258,0
-Example: DEV=false RPC=https://api.mainnet-beta.solana.com SOL=OFF,-117.6,0.84 BTC=OFF ETH=OFF MNGO=OFF,0,1.2 BONK=ON,0,2,1.95,1 yarn run main
+Example: DEV=false RPC=https://api.mainnet-beta.solana.com FEE=1000 SOL=OFF,-117.6,0.84 BTC=OFF ETH=OFF MNGO=OFF,0,1.2 BONK=ON,0,2,1.95,1 yarn run main

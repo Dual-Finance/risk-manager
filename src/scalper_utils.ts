@@ -8,9 +8,10 @@ import {
   PerpMarket,
 } from '@blockworks-foundation/mango-client';
 import {
-   ComputeBudgetProgram, Connection, Keypair, LAMPORTS_PER_SOL, PublicKey, Transaction,
+   ComputeBudgetProgram, Connection, Keypair, LAMPORTS_PER_SOL, PublicKey, Transaction, TransactionInstruction,
 } from '@solana/web3.js';
 import { Market } from '@project-serum/serum';
+import fetch from "node-fetch"
 import { Jupiter } from '@jup-ag/core';
 import JSBI from 'jsbi';
 import { DIPDeposit, RouteDetails } from './common';
@@ -232,25 +233,21 @@ export async function getSpotDelta(connection: Connection, symbol: string) {
   return spotDelta;
 }
 
-export async function settleOpenBook(connection, owner, market, base, quote) {
+export async function settleOpenBook(connection : Connection, owner: Keypair, market : Market, base: string, quote: string) {
+  let settleTx = new Transaction();
   for (const openOrders of await market.findOpenOrdersAccountsForOwner(
     connection,
     owner.publicKey,
   )) {
-    if (openOrders.baseTokenFree > 0 || openOrders.quoteTokenFree > 0) {
+    if (openOrders.baseTokenFree.toNumber() > 0 || openOrders.quoteTokenFree.toNumber() > 0) {
       // spl-token accounts to which to send the proceeds from trades
       const baseTokenAccount = new PublicKey(ACCOUNT_MAP.get(base));
       const quoteTokenAccount = new PublicKey(ACCOUNT_MAP.get(quote));
-
-      await market.settleFunds(
-        connection,
-        owner,
-        openOrders,
-        baseTokenAccount,
-        quoteTokenAccount,
-      );
+      const { transaction } = await market.makeSettleFundsTransaction(connection, openOrders, baseTokenAccount, quoteTokenAccount)
+      settleTx.add(transaction);
     }
   }
+  return settleTx;
 }
 
 export function getPayerAccount(hedgeSide, base, quote) {
@@ -401,6 +398,12 @@ export async function jupiterHedge(
     }
   }
   return routeDetails;
+}
+export async function getJupPriceAPI(baseMint: PublicKey) :Promise<number> {
+  const url = `https://quote-api.jup.ag/v3/price?ids=${baseMint}`;
+  const { data }  = await (await fetch(url)).json();
+  const { price } = data[baseMint.toBase58()];
+  return price;
 }
 
 export async function getJupiterPrice(

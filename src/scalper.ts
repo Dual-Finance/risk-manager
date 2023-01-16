@@ -611,6 +611,7 @@ export class Scalper {
     // Settle Funds
     try {
       const settleTransaction = await settleOpenBook(this.connection, this.owner, spotMarket, this.symbol, 'USDC');
+      // If there are funds ready to be settled, settle them
       if (settleTransaction != undefined) {
         await sendAndConfirmTransaction(this.connection, setPriorityFee(settleTransaction), [this.owner]);
       }

@@ -1,55 +1,54 @@
-/* eslint-disable */
 import { PublicKey } from '@solana/web3.js';
 import { DIPDeposit } from './common';
 
-export const IS_DEV = process.env.DEV != 'false';
+export const IS_DEV = process.env.DEV !== 'false';
 export const API_URL = process.env.RPC;
-export const sol_vars = process.env.SOL.split(',');
-export const btc_vars = process.env.BTC.split(',');
-export const eth_vars = process.env.ETH.split(',');
-export const mngo_vars = process.env.MNGO.split(',');
-export const bonk_vars = process.env.BONK.split(',');
+const solVars = process.env.SOL.split(',');
+const btcVars = process.env.BTC.split(',');
+const ethVars = process.env.ETH.split(',');
+const mngoVars = process.env.MNGO.split(',');
+const bonkVars = process.env.BONK.split(',');
 
 export const productStatus = new Map<string, boolean>([
-  ['BTC', btc_vars[0] == 'ON'],
-  ['ETH', eth_vars[0] == 'ON'],
-  ['SOL', sol_vars[0] == 'ON'],
-  ['MNGO', mngo_vars[0] == 'ON'],
-  ['BONK', bonk_vars[0] == 'ON'],
+  ['BTC', btcVars[0] === 'ON'],
+  ['ETH', ethVars[0] === 'ON'],
+  ['SOL', solVars[0] === 'ON'],
+  ['MNGO', mngoVars[0] === 'ON'],
+  ['BONK', bonkVars[0] === 'ON'],
 ]);
 // Adjust delta hedges for loans, negative values allow positive spot balances in mango
 // CAUTION! Turn off scalper, send funds to mango & update value before running!
 export const DELTA_OFFSET = new Map<string, number>([
-  ['BTC', btc_vars[1] == null ? 0 : parseFloat(btc_vars[1])],
-  ['ETH', eth_vars[1] == null ? 0 : parseFloat(eth_vars[1])],
-  ['SOL', sol_vars[1] == null ? 0 : parseFloat(sol_vars[1])],
-  ['MNGO', mngo_vars[1] == null ? 0 : parseFloat(mngo_vars[1])],
-  ['BONK', bonk_vars[1] == null ? 0 : parseFloat(bonk_vars[1])],
+  ['BTC', btcVars[1] == null ? 0 : parseFloat(btcVars[1])],
+  ['ETH', ethVars[1] == null ? 0 : parseFloat(ethVars[1])],
+  ['SOL', solVars[1] == null ? 0 : parseFloat(solVars[1])],
+  ['MNGO', mngoVars[1] == null ? 0 : parseFloat(mngoVars[1])],
+  ['BONK', bonkVars[1] == null ? 0 : parseFloat(bonkVars[1])],
 ]);
 
 export const THEO_VOL_MAP = new Map<string, number>([
-  ['BTC', parseFloat(btc_vars[2]) > 0 ? parseFloat(btc_vars[2]) : 0.3],
-  ['ETH', parseFloat(eth_vars[2]) > 0 ? parseFloat(eth_vars[2]) : 0.4],
-  ['SOL', parseFloat(sol_vars[2]) > 0 ? parseFloat(sol_vars[2]) : 0.5],
-  ['MNGO', parseFloat(mngo_vars[2]) > 0 ? parseFloat(mngo_vars[2]) : 0.6],
-  ['BONK', parseFloat(bonk_vars[2]) > 0 ? parseFloat(bonk_vars[2]) : 1],
+  ['BTC', parseFloat(btcVars[2]) > 0 ? parseFloat(btcVars[2]) : 0.3],
+  ['ETH', parseFloat(ethVars[2]) > 0 ? parseFloat(ethVars[2]) : 0.4],
+  ['SOL', parseFloat(solVars[2]) > 0 ? parseFloat(solVars[2]) : 0.5],
+  ['MNGO', parseFloat(mngoVars[2]) > 0 ? parseFloat(mngoVars[2]) : 0.6],
+  ['BONK', parseFloat(bonkVars[2]) > 0 ? parseFloat(bonkVars[2]) : 1],
 ]); // Defaults to system wide BVE, should be run at realistic IV estimate for best hedging
 
 export const ZSCORE = new Map<string, number>([
-  ['BTC', parseFloat(btc_vars[3]) > 0 ? parseFloat(btc_vars[3]) : 1.282],
-  ['ETH', parseFloat(eth_vars[3]) > 0 ? parseFloat(eth_vars[3]) : 1.282],
-  ['SOL', parseFloat(sol_vars[3]) > 0 ? parseFloat(sol_vars[3]) : 1.282],
-  ['MNGO', parseFloat(mngo_vars[3]) > 0 ? parseFloat(mngo_vars[3]) : 1.282],
-  ['BONK', parseFloat(bonk_vars[3]) > 0 ? parseFloat(bonk_vars[3]) : 2.58],
+  ['BTC', parseFloat(btcVars[3]) > 0 ? parseFloat(btcVars[3]) : 1.282],
+  ['ETH', parseFloat(ethVars[3]) > 0 ? parseFloat(ethVars[3]) : 1.282],
+  ['SOL', parseFloat(solVars[3]) > 0 ? parseFloat(solVars[3]) : 1.282],
+  ['MNGO', parseFloat(mngoVars[3]) > 0 ? parseFloat(mngoVars[3]) : 1.282],
+  ['BONK', parseFloat(bonkVars[3]) > 0 ? parseFloat(bonkVars[3]) : 2.58],
 ]); // Corresponds to 80% CI by default
 
 // TODO make enum
 export const MODE = new Map<string, number>([
-  ['BTC', parseFloat(btc_vars[4]) > 0 ? parseFloat(btc_vars[4]) : 0],
-  ['ETH', parseFloat(eth_vars[4]) > 0 ? parseFloat(eth_vars[4]) : 0],
-  ['SOL', parseFloat(sol_vars[4]) > 0 ? parseFloat(sol_vars[4]) : 0],
-  ['MNGO', parseFloat(mngo_vars[4]) > 0 ? parseFloat(mngo_vars[4]) : 0],
-  ['BONK', parseFloat(bonk_vars[4]) > 0 ? parseFloat(bonk_vars[4]) : 0],
+  ['BTC', parseFloat(btcVars[4]) > 0 ? parseFloat(btcVars[4]) : 0],
+  ['ETH', parseFloat(ethVars[4]) > 0 ? parseFloat(ethVars[4]) : 0],
+  ['SOL', parseFloat(solVars[4]) > 0 ? parseFloat(solVars[4]) : 0],
+  ['MNGO', parseFloat(mngoVars[4]) > 0 ? parseFloat(mngoVars[4]) : 0],
+  ['BONK', parseFloat(bonkVars[4]) > 0 ? parseFloat(bonkVars[4]) : 0],
 ]); // 0 - Normal 1 - Gamma+Back 2- Back Only
 
 export const ENVIRONMENT: string = IS_DEV ? 'DEVNET' : 'MAINNET';
@@ -128,7 +127,7 @@ export const maxNotional = new Map<string, number>([
 
 export const slippageMax = new Map<string, number>([
   ['BTC', 0.0005], ['ETH', 0.0005], ['SOL', 0.0010], ['MNGO', 0.0015], ['BONK', 0.0005],
-]); // // Max Allowed xbps above/below FMV on limit orders
+]); // Max Allowed xbps above/below FMV on limit orders
 
 export const BVE_VOL_MAP = new Map<string, number>([
   ['BTC', 0.3], ['ETH', 0.4], ['SOL', 0.5], ['MNGO', 0.6], ['BONK', 1.0],
@@ -169,24 +168,43 @@ export const treasuryPositions: DIPDeposit[] = [({
 }), // Running this until EOM
 ];
 
-export const rfRate = 0.03; // Risk Free Rate of Return ~ T-Bill Rate
-export const twapInterval = 15; // Number of seconds to space spliced delta orders across
-export const scalperWindow = 600; // Number of seconds for each gamma scalping window
-export const monthAdj = 1; // Adjustment since Date.UTC is zero based
-export const percentDrift = 0.05; // Percentage of time to allow drift of the timed actions
-export const gammaThreshold = 0.05; // Percentage of gamma to calc delta hedge threshold
-export const maxHedges = 4; // Maximum amount of orders to delta hedge across
-export const gammaCycles = 10; // Maximum amount of cycles to allow scalps
-export const staggerTime = 30; // Seconds to wait between reruns of each product
-export const MANGO_DOWNTIME_THRESHOLD = 15; // Time in Minutes to stop routing transactions to Mango
-export const fundingThreshold = 0.25; // % Funding to switch to openbook orders
-export const maxMktSpread = 0.01; // Max % allowable spread to use midvalue as accurate price
-export const gammaCompleteThreshold = 0.90; // Move on to new gamma cycle when 90% filled
-export const searchSteps = 5; // Number of times to reduce the jupiter qty to check for routes
-export const minExecutionPremium = 0.001; // Min USDC amount to fill MM on
-export const JUPITER_LIQUIDITY = 100; // USDC amount to check jupiter mid point price
-export const jupiterSlippage = 50; // bps to allow calculating mid price to succeed
-export const maxLevels = 100; // max num of levels to search for order book depth
-export const maxBackGammaMultiple = 5; // qty to search order book & max multiple of gamma to allow on the back bids
-export const PRIORITY_FEE = 1000; // Priority Fee to use for all txs in micro lamports
-export const volSpread = 0.05; // IV spread market maker at minimum must beat backstop to take fills
+// Risk Free Rate of Return ~ T-Bill Rate
+export const rfRate = 0.03;
+// Number of seconds to space spliced delta orders across
+export const twapIntervalSec = 15;
+// Number of seconds for each gamma scalping window
+export const scalperWindowSec = 600;
+// Percentage of time to allow drift of the timed actions
+export const percentDrift = 0.05;
+// Percentage of gamma to calc delta hedge threshold
+export const gammaThreshold = 0.05;
+// Maximum amount of orders to delta hedge across
+export const maxDeltaHedges = 4;
+// Number cycles to scalp gamma
+export const gammaCycles = 10;
+// Seconds to wait between reruns of each product
+export const productStaggerSec = 30;
+// Time in minutes of downtime to stop routing transactions to mango
+export const MANGO_DOWNTIME_THRESHOLD_MIN = 15;
+// % Funding to switch to openbook orders instead of mango
+export const perpFundingRateThreshold = 0.25;
+// Max % allowable spread to use midvalue as accurate price
+export const maxMktSpreadPctForPricing = 0.01;
+// Move on to new gamma cycle when 90% filled
+export const gammaCompleteThresholdPct = 0.90;
+// Number of times to reduce the jupiter qty to check for routes
+export const jupiterSearchSteps = 5;
+// Min USDC amount to fill MM on
+export const minExecutionPremium = 0.001;
+// USDC amount to check jupiter mid point price
+export const JUPITER_LIQUIDITY = 100;
+// Bps to allow calculating mid price to succeed
+export const jupiterSlippageBps = 50;
+// Max num of levels to search for order book depth
+export const maxOrderBookSearchDepth = 100;
+// Max multiple of gamma to allow on the back bids
+export const maxBackGammaMultiple = 5;
+// Priority Fee to use for all txs in micro lamports
+export const PRIORITY_FEE = 1000;
+// IV spread market maker at minimum must beat backstop to take fills
+export const volSpread = 0.05;

@@ -2,7 +2,7 @@ import { DIPDeposit } from './common';
 import { Router } from './router';
 import { Scalper } from './scalper';
 import {
-  percentDrift, scalperWindow, cluster, staggerTime, productStatus,
+  percentDrift, scalperWindowSec, cluster, productStaggerSec, productStatus,
 } from './config';
 import { sleepExact } from './utils';
 
@@ -68,7 +68,7 @@ async function main() {
     solRouter.checkMMPrices();
     console.log('Run SOL Risk Manager', new Date().toUTCString());
     solRouter.run_risk_manager();
-    await sleepExact(staggerTime);
+    await sleepExact(productStaggerSec);
   }
   if (productStatus.get('BTC')) {
     await btcRouter.refresh_dips();
@@ -76,7 +76,7 @@ async function main() {
     btcRouter.checkMMPrices();
     console.log('Run BTC Risk Manager', new Date().toUTCString());
     btcRouter.run_risk_manager();
-    await sleepExact(staggerTime);
+    await sleepExact(productStaggerSec);
   }
   if (productStatus.get('ETH')) {
     await ethRouter.refresh_dips();
@@ -84,7 +84,7 @@ async function main() {
     ethRouter.checkMMPrices();
     console.log('Run ETH Risk Manager', new Date().toUTCString());
     ethRouter.run_risk_manager();
-    await sleepExact(staggerTime);
+    await sleepExact(productStaggerSec);
   }
   if (productStatus.get('BONK')) {
     await bonkRouter.refresh_dips();
@@ -92,7 +92,7 @@ async function main() {
     bonkRouter.checkMMPrices();
     console.log('Run BONK Risk Manager', new Date().toUTCString());
     bonkRouter.run_risk_manager();
-    await sleepExact(staggerTime);
+    await sleepExact(productStaggerSec);
   }
   if (productStatus.get('MNGO')) {
     await mngoRouter.refresh_dips();
@@ -111,7 +111,7 @@ async function main() {
         console.log('RERUN SOL Risk Manager', new Date().toUTCString());
         await solRouter.refresh_dips();
         solRouter.run_risk_manager();
-        await sleepExact(staggerTime);
+        await sleepExact(productStaggerSec);
       }
       if (productStatus.get('BTC')) {
         console.log('------------------------------------------------');
@@ -120,7 +120,7 @@ async function main() {
         console.log('RERUN BTC Risk Manager', new Date().toUTCString());
         await btcRouter.refresh_dips();
         btcRouter.run_risk_manager();
-        await sleepExact(staggerTime);
+        await sleepExact(productStaggerSec);
       }
       if (productStatus.get('ETH')) {
         console.log('------------------------------------------------');
@@ -129,7 +129,7 @@ async function main() {
         console.log('RERUN ETH Risk Manager', new Date().toUTCString());
         await ethRouter.refresh_dips();
         ethRouter.run_risk_manager();
-        await sleepExact(staggerTime);
+        await sleepExact(productStaggerSec);
       }
       if (productStatus.get('BONK')) {
         console.log('------------------------------------------------');
@@ -138,7 +138,7 @@ async function main() {
         console.log('RERUN BONK Risk Manager', new Date().toUTCString());
         await bonkRouter.refresh_dips();
         bonkRouter.run_risk_manager();
-        await sleepExact(staggerTime);
+        await sleepExact(productStaggerSec);
       }
       if (productStatus.get('MNGO')) {
         console.log('------------------------------------------------');
@@ -152,8 +152,8 @@ async function main() {
       console.log(err);
       console.log(err.stack);
     }
-  }, 1_000 * (scalperWindow + (((Math.random() * 2) - 1)
-    * scalperWindow * percentDrift) - (2 * staggerTime)));
+  }, 1_000 * (scalperWindowSec + (((Math.random() * 2) - 1)
+    * scalperWindowSec * percentDrift) - (2 * productStaggerSec)));
 }
 
 main();

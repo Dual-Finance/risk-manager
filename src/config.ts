@@ -3,6 +3,7 @@ import { DIPDeposit } from './common';
 
 export const IS_DEV = process.env.DEV !== 'false';
 export const API_URL = process.env.RPC;
+export const PRIORITY_FEE = parseInt(process.env.FEE);
 const solVars = process.env.SOL.split(',');
 const btcVars = process.env.BTC.split(',');
 const ethVars = process.env.ETH.split(',');

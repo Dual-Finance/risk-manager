@@ -13,6 +13,7 @@
     "eslint": "^7.32.0 || ^8.2.0",
     "greeks": "^1.0.0",
     "jsbi": "^4.3.0",
+    "node-fetch": "^2.6.6",
     "websocket-ts": "^1.1.1"
   },
   "devDependencies": {

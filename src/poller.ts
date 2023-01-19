@@ -17,7 +17,7 @@ class Poller {
 
   splTokenName: string;
 
-  premiumAsset: string;
+  premiumAssetName: string;
 
   expirationSec: number;
 
@@ -28,7 +28,7 @@ class Poller {
   constructor(
     cluster: string,
     splTokenName: string,
-    premiumAsset: string,
+    premiumAssetName: string,
     expirationSec: number,
     strikeTokens: number,
     callOrPut: string,
@@ -37,7 +37,7 @@ class Poller {
     this.cluster = cluster;
     this.callback = callback;
     this.splTokenName = splTokenName;
-    this.premiumAsset = premiumAsset;
+    this.premiumAssetName = premiumAssetName;
     this.expirationSec = expirationSec;
     this.strikeTokens = strikeTokens;
     this.callOrPut = callOrPut;
@@ -45,7 +45,6 @@ class Poller {
 
   subscribe(address: string): void {
     console.log('Listening at:', address);
-    console.log(this.splTokenName);
     const connection = new Connection(API_URL, 'processed' as Commitment);
 
     const callback: AccountChangeCallback = (
@@ -58,7 +57,7 @@ class Poller {
 
       const dipDeposit: DIPDeposit = {
         splTokenName: this.splTokenName,
-        premiumAssetName: this.premiumAsset,
+        premiumAssetName: this.premiumAssetName,
         expirationMs: this.expirationSec * 1_000,
         strikeUsdcPerToken: this.strikeTokens,
         callOrPut: this.callOrPut,

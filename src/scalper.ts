@@ -90,7 +90,6 @@ export class Scalper {
   }
 
   async pickAndRunScalper(dipProduct: DIPDeposit[]): Promise<void> {
-    return;
     console.log(this.symbol, 'Choosing Market to Hedge');
     this.perpMarketConfig = getMarketByBaseSymbolAndKind(
       this.groupConfig,

@@ -336,6 +336,8 @@ export class Router {
           try {
             await this.add_dip(expirationSec, strike, splMint, connection);
           } catch (err) {
+            console.log('Failed to add dip');
+            console.log(err);
             continue;
           }
 

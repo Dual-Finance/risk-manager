@@ -1,12 +1,12 @@
 import { Transaction } from '@solana/web3.js';
 
 export interface DIPDeposit {
-  splToken: string;
-  premiumAsset: string;
+  splTokenMint: string;
+  premiumAssetName: string;
   expirationMs: number;
-  strike: number;
-  type: string;
-  qty: number;
+  strikeUsdcPerToken: number;
+  callOrPut: string;
+  qtyTokens: number;
 }
 
 export interface RouteDetails {

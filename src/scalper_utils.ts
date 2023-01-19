@@ -55,13 +55,13 @@ export function getDIPDelta(
     yearsUntilMaturity = (dip.expirationMs - Date.now()) / (365 * 60 * 60 * 24 * 1_000);
     deltaSum = greeks.getDelta(
       fairValue,
-      dip.strike,
+      dip.strikeUsdcPerToken,
       yearsUntilMaturity,
       impliedVol,
       rfRate,
-      dip.type,
+      dip.callOrPut,
     )
-        * dip.qty
+        * dip.qtyTokens
       + deltaSum;
   }
   return deltaSum;
@@ -145,13 +145,13 @@ export function getDIPGamma(
     yearsUntilMaturity = (dip.expirationMs - Date.now()) / (365 * 60 * 60 * 24 * 1_000);
     gammaSum = greeks.getGamma(
       fairValue,
-      dip.strike,
+      dip.strikeUsdcPerToken,
       yearsUntilMaturity,
       impliedVol,
       rfRate,
-      dip.type,
+      dip.callOrPut,
     )
-        * dip.qty
+        * dip.qtyTokens
       + gammaSum;
   }
   return gammaSum;
@@ -169,13 +169,13 @@ export function getDIPTheta(
     yearsUntilMaturity = (dip.expirationMs - Date.now()) / (365 * 60 * 60 * 24 * 1_000);
     thetaSum = greeks.getTheta(
       fairValue,
-      dip.strike,
+      dip.strikeUsdcPerToken,
       yearsUntilMaturity,
       impliedVol,
       rfRate,
-      dip.type,
+      dip.callOrPut,
     )
-        * dip.qty
+        * dip.qtyTokens
         + thetaSum;
   }
   return thetaSum;

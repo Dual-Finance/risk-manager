@@ -137,36 +137,36 @@ export const BVE_VOL_MAP = new Map<string, number>([
 
 // Enter any Staking Options Owned and to be hedged from the treasury
 export const treasuryPositions: DIPDeposit[] = [({
-  splToken: 'MNGO',
-  premiumAsset: 'USDC',
+  splTokenMint: 'MNGO',
+  premiumAssetName: 'USDC',
   expirationMs: 1677672000000,
-  strike: 0.018,
-  type: 'put',
-  qty: 6944444,
+  strikeUsdcPerToken: 0.018,
+  callOrPut: 'put',
+  qtyTokens: 6944444,
 }),
 ({
-  splToken: 'MNGO',
-  premiumAsset: 'USDC',
+  splTokenMint: 'MNGO',
+  premiumAssetName: 'USDC',
   expirationMs: 1675252800000,
-  strike: 0.020,
-  type: 'put',
-  qty: 6250000,
+  strikeUsdcPerToken: 0.020,
+  callOrPut: 'put',
+  qtyTokens: 6250000,
 }),
 ({
-  splToken: 'BONK',
-  premiumAsset: 'USDC',
+  splTokenMint: 'BONK',
+  premiumAssetName: 'USDC',
   expirationMs: 1675166400000,
-  strike: 0.0000005,
-  type: 'call',
-  qty: 10000150,
+  strikeUsdcPerToken: 0.0000005,
+  callOrPut: 'call',
+  qtyTokens: 10000150,
 }), // Actually GSO Position
 ({
-  splToken: 'BONK',
-  premiumAsset: 'USDC',
+  splTokenMint: 'BONK',
+  premiumAssetName: 'USDC',
   expirationMs: 1676462400000,
-  strike: 0.000003,
-  type: 'call',
-  qty: 10000000,
+  strikeUsdcPerToken: 0.000003,
+  callOrPut: 'call',
+  qtyTokens: 10000000,
 }), // Running this until EOM
 ];
 

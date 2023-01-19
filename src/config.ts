@@ -109,6 +109,8 @@ export const ACCOUNT_MAP = new Map<string, string>([
   ['MNGO', '4zzgXnhfwdtASw9JugEyrPSKzvaN8i2WSDm1bnGiHFcK'], ['BONK', 'D8yD6us5X7YNeweppFdBR4idGsyPooetuW2fA6Suabqg'],
 ]);
 
+export const NUM_DIP_ATOMS_PER_TOKEN = 10 ** 6;
+
 export const OPTION_MINT_ADDRESS_SEED = 'option-mint';
 
 export const MinContractSize = new Map<string, number>([
@@ -137,7 +139,7 @@ export const BVE_VOL_MAP = new Map<string, number>([
 
 // Enter any Staking Options Owned and to be hedged from the treasury
 export const treasuryPositions: DIPDeposit[] = [({
-  splTokenMint: 'MNGO',
+  splTokenName: 'MNGO',
   premiumAssetName: 'USDC',
   expirationMs: 1677672000000,
   strikeUsdcPerToken: 0.018,
@@ -145,7 +147,7 @@ export const treasuryPositions: DIPDeposit[] = [({
   qtyTokens: 6944444,
 }),
 ({
-  splTokenMint: 'MNGO',
+  splTokenName: 'MNGO',
   premiumAssetName: 'USDC',
   expirationMs: 1675252800000,
   strikeUsdcPerToken: 0.020,
@@ -153,7 +155,7 @@ export const treasuryPositions: DIPDeposit[] = [({
   qtyTokens: 6250000,
 }),
 ({
-  splTokenMint: 'BONK',
+  splTokenName: 'BONK',
   premiumAssetName: 'USDC',
   expirationMs: 1675166400000,
   strikeUsdcPerToken: 0.0000005,
@@ -161,7 +163,7 @@ export const treasuryPositions: DIPDeposit[] = [({
   qtyTokens: 10000150,
 }), // Actually GSO Position
 ({
-  splTokenMint: 'BONK',
+  splTokenName: 'BONK',
   premiumAssetName: 'USDC',
   expirationMs: 1676462400000,
   strikeUsdcPerToken: 0.000003,

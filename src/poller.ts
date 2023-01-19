@@ -8,15 +8,14 @@ import {
 } from '@solana/web3.js';
 import { AccountLayout, u64 } from '@solana/spl-token';
 import { DIPDeposit } from './common';
-import { API_URL } from './config';
-const token = require('@solana/spl-token');
+import { API_URL, NUM_DIP_ATOMS_PER_TOKEN } from './config';
 
 class Poller {
   cluster: string;
 
   callback: (deposit: DIPDeposit) => void;
 
-  splToken: string;
+  splTokenName: string;
 
   premiumAsset: string;
 
@@ -28,7 +27,7 @@ class Poller {
 
   constructor(
     cluster: string,
-    splToken: string,
+    splTokenName: string,
     premiumAsset: string,
     expirationSec: number,
     strikeTokens: number,
@@ -37,20 +36,17 @@ class Poller {
   ) {
     this.cluster = cluster;
     this.callback = callback;
-    this.splToken = splToken;
+    this.splTokenName = splTokenName;
     this.premiumAsset = premiumAsset;
     this.expirationSec = expirationSec;
     this.strikeTokens = strikeTokens;
     this.callOrPut = callOrPut;
   }
 
-  async subscribe(address: string): Promise<void> {
+  subscribe(address: string): void {
     console.log('Listening at:', address);
+    console.log(this.splTokenName);
     const connection = new Connection(API_URL, 'processed' as Commitment);
-
-    const tokenAccount = await token.getAccount(connection, new PublicKey(address));
-    const mint = await token.getMint(connection, tokenAccount.mint);
-    const decimals = mint.decimals;
 
     const callback: AccountChangeCallback = (
       accountInfo: solanaAccountInfo<Buffer>,
@@ -61,12 +57,12 @@ class Poller {
       ).toNumber();
 
       const dipDeposit: DIPDeposit = {
-        splTokenMint: this.splToken,
+        splTokenName: this.splTokenName,
         premiumAssetName: this.premiumAsset,
         expirationMs: this.expirationSec * 1_000,
         strikeUsdcPerToken: this.strikeTokens,
         callOrPut: this.callOrPut,
-        qtyTokens: newAmount / 10 ** decimals,
+        qtyTokens: newAmount / 10 ** NUM_DIP_ATOMS_PER_TOKEN,
       };
       this.callback(dipDeposit);
     };

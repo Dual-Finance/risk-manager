@@ -99,7 +99,7 @@ export class Scalper {
     
     // Add Any Treasury Positions from Staking Options
     for (const positions of treasuryPositions) {
-      if (this.symbol == positions.splTokenMint) {
+      if (this.symbol == positions.splTokenName) {
         dipProduct.push(positions);
       }
     }

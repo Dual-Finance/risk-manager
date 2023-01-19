@@ -1,13 +1,7 @@
-/* eslint-disable */
 import * as os from 'os';
 import * as fs from 'fs';
 import { Connection, PublicKey } from '@solana/web3.js';
 import { utils } from '@project-serum/anchor';
-import {
-  ASSOCIATED_TOKEN_PROGRAM_ID,
-  Token,
-  TOKEN_PROGRAM_ID,
-} from '@solana/spl-token';
 import {
   PythHttpClient,
   getPythProgramKeyForCluster,
@@ -123,18 +117,6 @@ export async function findProgramAddressWithMintAndStrikeAndExpiration(
       usdcMint.toBuffer(),
     ],
     programId,
-  );
-}
-
-export async function getAssociatedTokenAddress(
-  mintPk: PublicKey,
-  owner: PublicKey,
-) {
-  return Token.getAssociatedTokenAddress(
-    ASSOCIATED_TOKEN_PROGRAM_ID,
-    TOKEN_PROGRAM_ID,
-    mintPk,
-    owner,
   );
 }
 

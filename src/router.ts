@@ -17,16 +17,17 @@ import {
   BVE_VOL_MAP,
   minExecutionPremium,
   volSpread,
+  NUM_DIP_ATOMS_PER_TOKEN,
 } from './config';
-import { Poller } from './poller';
+import Poller from './poller';
 import {
   findProgramAddressWithMintAndStrikeAndExpiration,
-  getAssociatedTokenAddress,
   getPythPrice,
   parseDipState,
   splMintToToken,
   tokenToSplMint,
 } from './utils';
+import { getAssociatedTokenAddress } from '@project-serum/associated-token';
 import * as apiSecret from '../apiSecret.json';
 
 const crypto = require('crypto');
@@ -58,7 +59,7 @@ export class Router {
 
     // TODO: Update this for other types of assets
 
-    const symbol = `${dip_deposit.splTokenMint},USDC,${date.getUTCFullYear()}-${
+    const symbol = `${dip_deposit.splTokenName},USDC,${date.getUTCFullYear()}-${
       date.getUTCMonth() + 1
     }-${date.getUTCDate()},${dip_deposit.strikeUsdcPerToken * 1_000_000},UPSIDE,E,P`;
     console.log('++++++++++++++++++++++++++++++++++++++++++++++++++++');
@@ -87,9 +88,9 @@ export class Router {
         return;
       }
 
-      const currentPrice = await getPythPrice(new PublicKey(tokenToSplMint(dip_deposit.splTokenMint)));
+      const currentPrice = await getPythPrice(new PublicKey(tokenToSplMint(dip_deposit.splTokenName)));
       const fractionOfYear = (dip_deposit.expirationMs - Date.now() ) / (365 * 24 * 60 * 60 * 1_000);
-      const vol = BVE_VOL_MAP.get(dip_deposit.splTokenMint) * (1 + volSpread + Math.random() * volSpread);
+      const vol = BVE_VOL_MAP.get(dip_deposit.splTokenName) * (1 + volSpread + Math.random() * volSpread);
       const thresholdPrice = blackScholes(currentPrice, dip_deposit.strikeUsdcPerToken, fractionOfYear, vol, 0.01, 'call');
       // @ts-ignore
       const { price } = order;
@@ -163,7 +164,7 @@ export class Router {
       if (dip_deposit.qtyTokens > 0) {
         const date = new Date(dip_deposit.expirationMs);
         // TODO: Update this for other types of assets
-        const symbol = `${dip_deposit.splTokenMint},USDC,${date.getUTCFullYear()}-${
+        const symbol = `${dip_deposit.splTokenName},USDC,${date.getUTCFullYear()}-${
           date.getUTCMonth() + 1
         }-${date.getUTCDate()},${dip_deposit.strikeUsdcPerToken * 1_000_000},UPSIDE,E,P`;
         console.log('######################################################################');
@@ -182,9 +183,9 @@ export class Router {
             return;
           }
 
-          const currentPrice = await getPythPrice(new PublicKey(tokenToSplMint(dip_deposit.splTokenMint)));
+          const currentPrice = await getPythPrice(new PublicKey(tokenToSplMint(dip_deposit.splTokenName)));
           const fractionOfYear = (dip_deposit.expirationMs - Date.now() ) / (365 * 24 * 60 * 60 * 1_000);
-          const vol = BVE_VOL_MAP.get(dip_deposit.splTokenMint) * (1 + volSpread + Math.random() * volSpread);
+          const vol = BVE_VOL_MAP.get(dip_deposit.splTokenName) * (1 + volSpread + Math.random() * volSpread);
           const thresholdPrice = blackScholes(currentPrice, dip_deposit.strikeUsdcPerToken, fractionOfYear, vol, 0.01, 'call');
           // @ts-ignore
           const { price } = order;
@@ -280,20 +281,20 @@ export class Router {
   ): Promise<void> {
     const [optionMint] = await findProgramAddressWithMintAndStrikeAndExpiration(
       OPTION_MINT_ADDRESS_SEED,
-      strike * 1_000_000,
+      strike * NUM_DIP_ATOMS_PER_TOKEN,
       expirationSec,
       splMint,
       usdcMintPk,
       dualMarketProgramID,
     );
     const mmOptionAccount = await getAssociatedTokenAddress(
-      optionMint,
       optionVaultPk,
+      optionMint,
     );
     const balance = await connection.getTokenAccountBalance(mmOptionAccount);
 
     this.dips[this.dip_to_string(expirationSec, strike)] = {
-      splTokenMint: splMintToToken(splMint),
+      splTokenName: splMintToToken(splMint),
       premiumAssetName: 'USDC',
       expirationMs: expirationSec * 1_000,
       strikeUsdcPerToken: strike,
@@ -337,7 +338,6 @@ export class Router {
             await this.add_dip(expirationSec, strike, splMint, connection);
           } catch (err) {
             console.log('Failed to add dip');
-            console.log(err);
             continue;
           }
 
@@ -354,15 +354,15 @@ export class Router {
             dualMarketProgramID,
           );
           const mmOptionAccount = await getAssociatedTokenAddress(
-            optionMint,
             optionVaultPk,
+            optionMint,
           );
 
           // Create a poller
           const poller: Poller = new Poller(
             cluster,
             this.token,
-            'USD',
+            'USDC',
             expirationSec,
             strike,
             'call',

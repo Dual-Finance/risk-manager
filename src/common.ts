@@ -5,7 +5,6 @@ export interface DIPDeposit {
   premiumAssetName: string;
   expirationMs: number;
   strikeUsdcPerToken: number;
-  // TODO: Remove this since all options are calls, just different tokens involved.
   callOrPut: string;
   qtyTokens: number;
 }

@@ -18,15 +18,15 @@ import {
   minExecutionPremium,
   volSpread,
 } from './config';
-import { Poller } from './poller';
+import Poller from './poller';
 import {
   findProgramAddressWithMintAndStrikeAndExpiration,
-  getAssociatedTokenAddress,
   getPythPrice,
   parseDipState,
   splMintToToken,
   tokenToSplMint,
 } from './utils';
+import { getAssociatedTokenAddress } from '@project-serum/associated-token';
 import * as apiSecret from '../apiSecret.json';
 
 const crypto = require('crypto');
@@ -287,8 +287,8 @@ export class Router {
       dualMarketProgramID,
     );
     const mmOptionAccount = await getAssociatedTokenAddress(
-      optionMint,
       optionVaultPk,
+      optionMint,
     );
     const balance = await connection.getTokenAccountBalance(mmOptionAccount);
 
@@ -337,7 +337,6 @@ export class Router {
             await this.add_dip(expirationSec, strike, splMint, connection);
           } catch (err) {
             console.log('Failed to add dip');
-            console.log(err);
             continue;
           }
 
@@ -354,8 +353,8 @@ export class Router {
             dualMarketProgramID,
           );
           const mmOptionAccount = await getAssociatedTokenAddress(
-            optionMint,
             optionVaultPk,
+            optionMint,
           );
 
           // Create a poller
@@ -372,7 +371,7 @@ export class Router {
           );
 
           // Start polling for a specific DIP option token account
-          poller.subscribe(mmOptionAccount.toBase58());
+          await poller.subscribe(mmOptionAccount.toBase58());
         }
       }
     });

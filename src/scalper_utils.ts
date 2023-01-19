@@ -11,6 +11,7 @@ import {
    ComputeBudgetProgram, Connection, Keypair, LAMPORTS_PER_SOL, PublicKey, Transaction, TransactionInstruction,
 } from '@solana/web3.js';
 import { Market } from '@project-serum/serum';
+import { getAssociatedTokenAddress } from '@project-serum/associated-token';
 import fetch from "node-fetch"
 import { Jupiter } from '@jup-ag/core';
 import JSBI from 'jsbi';
@@ -30,7 +31,7 @@ import {
   PRIORITY_FEE,
 } from './config';
 import {
-  decimalsBaseSPL, getAssociatedTokenAddress, getChainlinkPrice, getPythPrice, getSwitchboardPrice, splMintToToken, tokenToSplMint,
+  decimalsBaseSPL, getChainlinkPrice, getPythPrice, getSwitchboardPrice, splMintToToken, tokenToSplMint,
 } from './utils';
 
 export async function loadPrices(
@@ -218,8 +219,8 @@ export async function getSpotDelta(connection: Connection, symbol: string) {
     }
     try {
       const tokenAccount = await getAssociatedTokenAddress(
-        tokenToSplMint(symbol),
         account,
+        tokenToSplMint(symbol),
       );
       const balance = await connection.getTokenAccountBalance(tokenAccount);
       const tokenBalance = Number(balance.value.amount);

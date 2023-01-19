@@ -1,4 +1,3 @@
-/* eslint-disable */
 import {
   Connection,
   AccountChangeCallback,
@@ -7,7 +6,7 @@ import {
   Context,
   Commitment,
 } from '@solana/web3.js';
-import { AccountInfo, AccountLayout, u64 } from '@solana/spl-token';
+import { AccountLayout, u64 } from '@solana/spl-token';
 import { DIPDeposit } from './common';
 import { API_URL } from './config';
 
@@ -46,14 +45,16 @@ export class Poller {
 
   subscribe(address: string): void {
     console.log('Listening at:', address);
-    // @ts-ignore
+    // TODO: Use a serum API to get the decimals once at the start, but also
+    // debug why SOL has 8 decimals instead of expected 9.
+    
     const connection = new Connection(API_URL, 'processed' as Commitment);
+
     const callback: AccountChangeCallback = (
       accountInfo: solanaAccountInfo<Buffer>,
       _context: Context,
     ) => {
-      // @ts-ignore
-      const new_amount = parseTokenAccount(accountInfo.data).amount.toNumber();
+      const new_amount: number = u64.fromBuffer(AccountLayout.decode(accountInfo.data).amount).toNumber();
       let decimals = 6;
       switch (this.splToken) {
         // BTC
@@ -74,13 +75,13 @@ export class Poller {
           break;
       }
 
-      const dip_deposit = {
-        splToken: this.splToken,
-        premiumAsset: this.premiumAsset,
+      const dip_deposit: DIPDeposit = {
+        splTokenMint: this.splToken,
+        premiumAssetName: this.premiumAsset,
         expirationMs: this.expirationSec * 1_000,
-        strike: this.strike,
-        type: this.type,
-        qty: new_amount / 10 ** decimals,
+        strikeUsdcPerToken: this.strike,
+        callOrPut: this.type,
+        qtyTokens: new_amount / 10 ** decimals,
       };
       this.callback(dip_deposit);
     };
@@ -93,38 +94,4 @@ export class Poller {
       console.log(err.stack);
     }
   }
-}
-
-function parseTokenAccount(data: Buffer): AccountInfo {
-  const accountInfo: any = AccountLayout.decode(data);
-  accountInfo.mint = new PublicKey(accountInfo.mint);
-  accountInfo.owner = new PublicKey(accountInfo.owner);
-  accountInfo.amount = u64.fromBuffer(accountInfo.amount);
-
-  if (accountInfo.delegateOption === 0) {
-    accountInfo.delegate = null;
-    accountInfo.delegatedAmount = new u64(0);
-  } else {
-    accountInfo.delegate = new PublicKey(accountInfo.delegate);
-    accountInfo.delegatedAmount = u64.fromBuffer(accountInfo.delegatedAmount);
-  }
-
-  accountInfo.isInitialized = accountInfo.state !== 0;
-  accountInfo.isFrozen = accountInfo.state === 2;
-
-  if (accountInfo.isNativeOption === 1) {
-    accountInfo.rentExemptReserve = u64.fromBuffer(accountInfo.isNative);
-    accountInfo.isNative = true;
-  } else {
-    accountInfo.rentExemptReserve = null;
-    accountInfo.isNative = false;
-  }
-
-  if (accountInfo.closeAuthorityOption === 0) {
-    accountInfo.closeAuthority = null;
-  } else {
-    accountInfo.closeAuthority = new PublicKey(accountInfo.closeAuthority);
-  }
-
-  return accountInfo;
 }

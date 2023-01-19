@@ -66,7 +66,7 @@ class Poller {
       this.callback(dipDeposit);
     };
 
-    // Watch the vault spl token account
+    // Watch the option token account
     try {
       connection.onAccountChange(new PublicKey(address), callback);
     } catch (err) {

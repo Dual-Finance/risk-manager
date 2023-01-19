@@ -3,7 +3,8 @@ import { DIPDeposit } from './common';
 
 export const IS_DEV = process.env.DEV !== 'false';
 export const API_URL = process.env.RPC;
-export const PRIORITY_FEE = parseInt(process.env.FEE);
+// Priority Fee to use for all txs in micro lamports
+export const PRIORITY_FEE = parseInt(process.env.FEE, 10);
 const solVars = process.env.SOL.split(',');
 const btcVars = process.env.BTC.split(',');
 const ethVars = process.env.ETH.split(',');
@@ -205,7 +206,5 @@ export const jupiterSlippageBps = 50;
 export const maxOrderBookSearchDepth = 100;
 // Max multiple of gamma to allow on the back bids
 export const maxBackGammaMultiple = 5;
-// Priority Fee to use for all txs in micro lamports
-export const PRIORITY_FEE = 1000;
 // IV spread market maker at minimum must beat backstop to take fills
 export const volSpread = 0.05;

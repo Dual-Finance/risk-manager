@@ -25,7 +25,8 @@
   },
   "scripts": {
     "scalper": "npx ts-node src/scalper.ts",
-    "main": "npx ts-node src/main.ts"
+    "main": "npx ts-node src/main.ts",
+    "lint": "eslint --ext .js,jsx,ts,tsx,md src"
   },
   "compilerOptions": {
     "lib": [

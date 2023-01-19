@@ -11,10 +11,10 @@ import { Market } from '@project-serum/serum';
 import { BN } from '@project-serum/anchor';
 import configFile from './ids.json';
 import {
-  networkName, THEO_VOL_MAP, maxNotional, twapInterval, scalperWindow,
+  networkName, THEO_VOL_MAP, maxNotional, twapIntervalSec, scalperWindowSec,
   ZSCORE, MinContractSize, TickSize, FILLS_URL, IS_DEV, gammaThreshold,
-  maxHedges, percentDrift, DELTA_OFFSET, MANGO_DOWNTIME_THRESHOLD, fundingThreshold, gammaCycles,
-  MinOpenBookSize, OPENBOOK_FORK_ID, OPENBOOK_MKT_MAP, treasuryPositions, slippageMax, gammaCompleteThreshold, cluster, maxLevels, maxBackGammaMultiple, API_URL, MODE,
+  maxDeltaHedges, percentDrift, DELTA_OFFSET, MANGO_DOWNTIME_THRESHOLD_MIN, perpFundingRateThreshold, gammaCycles,
+  MinOpenBookSize, OPENBOOK_FORK_ID, OPENBOOK_MKT_MAP, treasuryPositions, slippageMax, gammaCompleteThresholdPct, cluster, maxOrderBookSearchDepth, maxBackGammaMultiple, API_URL, MODE,
 } from './config';
 import { DIPDeposit } from './common';
 import { readKeypair, sleepExact, sleepRandom } from './utils';
@@ -124,7 +124,7 @@ export class Scalper {
     );
 
     // Check if Mango is live
-    if ((Date.now() - perpMarket.lastUpdated.toNumber() * 1_000) / (1_000 * 60) > MANGO_DOWNTIME_THRESHOLD) {
+    if ((Date.now() - perpMarket.lastUpdated.toNumber() * 1_000) / (1_000 * 60) > MANGO_DOWNTIME_THRESHOLD_MIN) {
       console.log(this.symbol, 'Mango Down! Last Updated:', new Date(perpMarket.lastUpdated.toNumber() * 1_000));
       await this.scalperOpenBook(dipProduct);
     } else {
@@ -209,7 +209,7 @@ export class Scalper {
     await this.cancelStaleOrders(mangoAccount, mangoGroup, perpMarket);
 
     // Avoid unsafe recursion.
-    if (deltaHedgeCount > maxHedges) {
+    if (deltaHedgeCount > maxDeltaHedges) {
       console.log(this.symbol, 'Max Hedges exceeded without getting to neutral');
       return;
     }
@@ -232,7 +232,7 @@ export class Scalper {
 
     // Check whether we need to hedge.
     const dipTotalGamma = getDIPGamma(dipProduct, fairValue, this.symbol);
-    const stdDevSpread = this.impliedVol / Math.sqrt((365 * 24 * 60 * 60) / scalperWindow) * this.zScore;
+    const stdDevSpread = this.impliedVol / Math.sqrt((365 * 24 * 60 * 60) / scalperWindowSec) * this.zScore;
     const slippageTolerance = Math.min(stdDevSpread / 2, slippageMax.get(this.symbol));
     const deltaThreshold = Math.max(dipTotalGamma * stdDevSpread * fairValue * gammaThreshold, this.minSize);
     if (Math.abs(hedgeDeltaTotal * fairValue) < (deltaThreshold * fairValue)) {
@@ -245,8 +245,8 @@ export class Scalper {
     const bidSide = await perpMarket.loadBids(this.connection);
     const askSide = await perpMarket.loadAsks(this.connection);
     const fundingRate = 24 * 365 * perpMarket.getCurrentFundingRate(mangoGroup, mangoCache, this.marketIndex, bidSide, askSide);
-    const buySpot = fundingRate > fundingThreshold;
-    const sellSpot = -fundingRate < fundingThreshold;
+    const buySpot = fundingRate > perpFundingRateThreshold;
+    const sellSpot = -fundingRate < perpFundingRateThreshold;
     const hedgeSide = hedgeDeltaTotal < 0 ? 'buy' : 'sell'; // TODO Make Enum everywhere
     let hedgeProduct: string;
     if (hedgeSide == 'buy' && buySpot) {
@@ -376,8 +376,8 @@ export class Scalper {
     }
 
     // Wait the twapInterval of time to see if the position gets to neutral.
-    console.log(this.symbol, 'Scan Delta Fills for ~', twapInterval, 'seconds');
-    await sleepRandom(twapInterval);
+    console.log(this.symbol, 'Scan Delta Fills for ~', twapIntervalSec, 'seconds');
+    await sleepRandom(twapIntervalSec);
 
     // Cleanup listener.
     fillFeed.removeEventListener('message', deltaFillListener);
@@ -419,7 +419,7 @@ export class Scalper {
     const dipTotalGamma = getDIPGamma(dipProduct, fairValue, this.symbol);
 
     // Calc scalperWindow std deviation spread from zScore & IV for gamma levels
-    const stdDevSpread = this.impliedVol / Math.sqrt((365 * 24 * 60 * 60) / scalperWindow) * this.zScore;
+    const stdDevSpread = this.impliedVol / Math.sqrt((365 * 24 * 60 * 60) / scalperWindowSec) * this.zScore;
     const netGamma = IS_DEV ? Math.max(0.01, dipTotalGamma * stdDevSpread * fairValue) : dipTotalGamma * stdDevSpread * fairValue;
 
     console.log(this.symbol, 'Position Gamma Γ:', netGamma, 'Fair Value', fairValue);
@@ -498,7 +498,7 @@ export class Scalper {
     console.log(this.symbol, 'Market Spread %', (gammaAsk - gammaBid) / fairValue * 100, 'Liquidity $', netGamma * 2 * fairValue);
 
     // Sleep for the max time of the reruns then kill thread
-    await sleepExact((1 + percentDrift) * scalperWindow);
+    await sleepExact((1 + percentDrift) * scalperWindowSec);
     console.log(this.symbol, 'Remove stale gamma fill listener', gammaBidID, gammaAskID);
     fillFeed.removeEventListener('message', gammaFillListener);
   }
@@ -620,7 +620,7 @@ export class Scalper {
     }
 
     // Prevent too much recursion.
-    if (deltaHedgeCount > maxHedges) {
+    if (deltaHedgeCount > maxDeltaHedges) {
       console.log(this.symbol, 'Max OpenBook Hedges exceeded!');
       return;
     }
@@ -662,10 +662,10 @@ export class Scalper {
     // Find fair value.
     console.log(this.symbol, 'Loading Fair Value...');
     let fairValue = await getFairValue(this.connection, spotMarket, this.symbol, jupiter);
-    for (let i = 0; i < maxHedges; i++) {
+    for (let i = 0; i < maxDeltaHedges; i++) {
       if (fairValue == 0) {
-        console.log(this.symbol, 'No Prices Refreshing Delta Hedge', i + 1, 'After', twapInterval, 'Seconds');
-        await sleepExact(twapInterval);
+        console.log(this.symbol, 'No Prices Refreshing Delta Hedge', i + 1, 'After', twapIntervalSec, 'Seconds');
+        await sleepExact(twapIntervalSec);
         fairValue = await getFairValue(this.connection, spotMarket, this.symbol, jupiter);
       }
     }
@@ -706,7 +706,7 @@ export class Scalper {
 
     // Check whether we need to hedge.
     const dipTotalGamma = getDIPGamma(dipProduct, fairValue, this.symbol);
-    const stdDevSpread = this.impliedVol / Math.sqrt((365 * 24 * 60 * 60) / scalperWindow) * this.zScore;
+    const stdDevSpread = this.impliedVol / Math.sqrt((365 * 24 * 60 * 60) / scalperWindowSec) * this.zScore;
     const slippageTolerance = Math.min(stdDevSpread / 2, slippageMax.get(this.symbol));
     const deltaThreshold = Math.max(dipTotalGamma * stdDevSpread * fairValue * gammaThreshold, this.minSpotSize);
     let hedgePrice = hedgeDeltaTotal < 0 ? fairValue * (1 + slippageTolerance) : fairValue * (1 - slippageTolerance);
@@ -811,9 +811,9 @@ export class Scalper {
 
     // Rest single order & do not refresh if the hedge should be completed in a single clip
     if (spliceFactor == 1) {
-      const netHedgePeriod = twapInterval * maxHedges;
+      const netHedgePeriod = twapIntervalSec * maxDeltaHedges;
       console.log(this.symbol, 'Scan Delta Fills for ~', netHedgePeriod, 'seconds');
-      for (let i = 0; i < maxHedges; i++) {
+      for (let i = 0; i < maxDeltaHedges; i++) {
         await waitForFill(() => Math.abs(hedgeDeltaTotal * fairValue) < (this.minSpotSize * fairValue));
         if (Math.abs(hedgeDeltaTotal * fairValue) < (this.minSpotSize * fairValue)) {
           console.log(this.symbol, 'Delta Hedge Complete: SerumVial');
@@ -823,7 +823,7 @@ export class Scalper {
       console.log(this.symbol, 'OpenBook Delta Hedge Timeout. Spread %', spreadDelta, '> Slippage %', slippageTolerance * 100);
     } else {
       // Wait the twapInterval of time to see if the position gets to neutral.
-      console.log(this.symbol, 'Scan Delta Fills for ~', twapInterval, 'seconds');
+      console.log(this.symbol, 'Scan Delta Fills for ~', twapIntervalSec, 'seconds');
       await waitForFill((_) => Math.abs(hedgeDeltaTotal * fairValue) < (this.minSpotSize * fairValue));
       if (Math.abs(hedgeDeltaTotal * fairValue) < (this.minSpotSize * fairValue)) {
         console.log(this.symbol, 'Delta Hedge Complete: SerumVial');
@@ -879,7 +879,7 @@ export class Scalper {
         } else {
           console.log(this.symbol, 'Gamma Scalp Fill From Taker?!', message.size, message.market, message.price, message.takerClientId, message.timestamp);
         }
-        if (gammaFillQty > amountGamma * gammaCompleteThreshold) {
+        if (gammaFillQty > amountGamma * gammaCompleteThresholdPct) {
           gammaFillQty = 0;
           const fillPrice = Number(message.price);
           gammaScalpCount += 1;
@@ -929,8 +929,8 @@ export class Scalper {
     }
     for (let i = 0; i < gammaCycles; i++) {
       if (fairValue == 0) {
-        console.log(this.symbol, 'No Prices. Refreshing Gamma Scalp', i + 1, 'After', twapInterval, 'Seconds');
-        await sleepExact(twapInterval);
+        console.log(this.symbol, 'No Prices. Refreshing Gamma Scalp', i + 1, 'After', twapIntervalSec, 'Seconds');
+        await sleepExact(twapIntervalSec);
         fairValue = await getFairValue(this.connection, spotMarket, this.symbol, jupiter);
       }
     }
@@ -941,7 +941,7 @@ export class Scalper {
     const dipTotalGamma = getDIPGamma(dipProduct, fairValue, this.symbol);
 
     // Calc scalperWindow std deviation spread from zScore & IV for gamma levels
-    const stdDevSpread = this.impliedVol / Math.sqrt((365 * 24 * 60 * 60) / scalperWindow) * this.zScore;
+    const stdDevSpread = this.impliedVol / Math.sqrt((365 * 24 * 60 * 60) / scalperWindowSec) * this.zScore;
     const netGamma = IS_DEV ? Math.max(0.01, dipTotalGamma * stdDevSpread * fairValue) : dipTotalGamma * stdDevSpread * fairValue;
 
     const widenSpread = (gammaScalpCount - 1) / gammaCycles;
@@ -956,7 +956,7 @@ export class Scalper {
 
     // Find the prices at which whale qty is bid & offered
     const bids = await spotMarket.loadBids(this.connection);
-    const numBids = bids.getL2(maxLevels).length;
+    const numBids = bids.getL2(maxOrderBookSearchDepth).length;
     const dimQty = maxBackGammaMultiple * netGamma;
     let bidDepth = 0;
     let whaleBidPrice : number;
@@ -968,7 +968,7 @@ export class Scalper {
       }
     }
     const asks = await spotMarket.loadAsks(this.connection);
-    const numAsks = asks.getL2(maxLevels).length;
+    const numAsks = asks.getL2(maxOrderBookSearchDepth).length;
     let askDepth = 0;
     let whaleAskPrice : number;
     for (let i = 0; i < numAsks; i++){
@@ -1064,7 +1064,7 @@ export class Scalper {
       await waitForGamma((_) => gammaScalpCount == gammaCycles);
       const scalpPnL = ((1 + 1 / (2 * gammaCycles)) * (gammaScalpCount - 1) * stdDevSpread * fairValue) * netGamma * gammaScalpCount
         + ((1 + 1 / (2 * gammaCycles)) * (gammaScalpCount - 1) * stdDevSpread * fairValue) * gammaFillQty;
-      const thetaPnL = getDIPTheta(dipProduct, fairValue, this.symbol) / (24 * 60 * 60 / scalperWindow);
+      const thetaPnL = getDIPTheta(dipProduct, fairValue, this.symbol) / (24 * 60 * 60 / scalperWindowSec);
       const estTotalPnL = scalpPnL + thetaPnL;
       console.log(this.symbol, 'Estimated Total PnL', estTotalPnL, 'Scalp PnL', scalpPnL, 'Theta PnL', thetaPnL, 'Total Scalps', gammaScalpCount - 1);
     }
@@ -1076,7 +1076,7 @@ function waitForFill(conditionFunction) {
   const resolvePeriodMs = 100;
   const poll = (resolve) => {
     pollCount += 1;
-    if (pollCount > twapInterval * resolvePeriodMs / 10) resolve();
+    if (pollCount > twapIntervalSec * resolvePeriodMs / 10) resolve();
     else if (conditionFunction()) resolve();
     else setTimeout((_) => poll(resolve), resolvePeriodMs);
   };
@@ -1087,7 +1087,7 @@ function waitForFill(conditionFunction) {
 function waitForGamma(conditionFunction) {
   let pollCount = 0;
   const resolvePeriodMs = 100;
-  const maxScalpWindow = (1 + percentDrift) * scalperWindow;
+  const maxScalpWindow = (1 + percentDrift) * scalperWindowSec;
   const poll = (resolve) => {
     pollCount += 1;
     if (pollCount > maxScalpWindow * resolvePeriodMs / 10) resolve();

@@ -13,5 +13,9 @@ export interface RouteDetails {
   price: number;
   qty: number;
   venue: string;
-  txs: {setupTransaction?: Transaction, swapTransaction: Transaction, cleanupTransaction?: Transaction};
+  txs: {
+    setupTransaction?: Transaction,
+    swapTransaction: Transaction,
+    cleanupTransaction?: Transaction
+  };
 }

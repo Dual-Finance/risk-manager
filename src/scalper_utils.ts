@@ -19,14 +19,14 @@ import {
   ACCOUNT_MAP,
   JUPITER_LIQUIDITY,
   mangoTesterPk,
-  maxMktSpread,
+  maxMktSpreadPctForPricing,
   optionVaultPk,
-  searchSteps,
+  jupiterSearchSteps,
   rfRate,
   riskManagerPk,
   slippageMax,
   THEO_VOL_MAP,
-  jupiterSlippage,
+  jupiterSlippageBps,
   PRIORITY_FEE,
 } from './config';
 import {
@@ -306,7 +306,7 @@ export async function getFairValue(
         const [askPrice, _askSize] = asks.getL2(1)[0];
         const midValue = (bidPrice + askPrice) / 2.0;
         const mktSpread = (askPrice - bidPrice) / midValue;
-        if (mktSpread < maxMktSpread) {
+        if (mktSpread < maxMktSpreadPctForPricing) {
           fairValue = midValue;
           console.log(symbol, 'OpenBook Mid Price', midValue);
         } else {
@@ -351,7 +351,7 @@ export async function jupiterHedge(
   let routeDetails: RouteDetails;
   let sortFactor = 2;
   let lastSucess: Boolean;
-  for (let i = 0; i < searchSteps; i++) {
+  for (let i = 0; i < jupiterSearchSteps; i++) {
     sortFactor = lastSucess ? sortFactor + 1 / (2 ** i) : sortFactor - 1 / (2 ** i);
     lastSucess = false;
     const searchQty = Math.round(inputMaxQty * sortFactor);
@@ -419,7 +419,7 @@ export async function getJupiterPrice(
     inputMint: inputBuyToken,
     outputMint: outputBuyToken,
     amount: JSBI.BigInt(buyQty),
-    slippageBps: jupiterSlippage,
+    slippageBps: jupiterSlippageBps,
     onlyDirectRoutes: false,
   });
   const buyPath = buyRoutes.routesInfos[0];
@@ -436,7 +436,7 @@ export async function getJupiterPrice(
     inputMint: inputSellToken,
     outputMint: outputSellToken,
     amount: JSBI.BigInt(sellQty),
-    slippageBps: jupiterSlippage,
+    slippageBps: jupiterSlippageBps,
     onlyDirectRoutes: false,
   });
   const sellPath = sellRoutes.routesInfos[0];

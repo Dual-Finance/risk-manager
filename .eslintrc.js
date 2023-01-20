@@ -20,6 +20,7 @@ module.exports = {
     'import/extensions': 0,
     'import/no-extraneous-dependencies': 0,
     'import/no-unresolved': 0,
+    'no-restricted-syntax': 0,
     'no-console': 0,
     'no-bitwise': 0,
     'no-plusplus': 0,

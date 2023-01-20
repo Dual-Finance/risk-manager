@@ -9,21 +9,24 @@ import {
 } from '@solana/web3.js';
 import { Market } from '@project-serum/serum';
 import { BN } from '@project-serum/anchor';
+import { Jupiter } from '@jup-ag/core';
 import configFile from './ids.json';
 import {
   networkName, THEO_VOL_MAP, maxNotional, twapIntervalSec, scalperWindowSec,
   ZSCORE, MinContractSize, TickSize, FILLS_URL, IS_DEV, gammaThreshold,
-  maxDeltaHedges, percentDrift, DELTA_OFFSET, MANGO_DOWNTIME_THRESHOLD_MIN, perpFundingRateThreshold, gammaCycles,
-  MinOpenBookSize, OPENBOOK_FORK_ID, OPENBOOK_MKT_MAP, treasuryPositions, slippageMax, gammaCompleteThresholdPct, cluster, maxOrderBookSearchDepth, maxBackGammaMultiple, API_URL, MODE,
+  maxDeltaHedges, percentDrift, DELTA_OFFSET, MANGO_DOWNTIME_THRESHOLD_MIN,
+  perpFundingRateThreshold, gammaCycles, MinOpenBookSize, OPENBOOK_FORK_ID,
+  OPENBOOK_MKT_MAP, treasuryPositions, slippageMax, gammaCompleteThresholdPct,
+  cluster, maxOrderBookSearchDepth, maxBackGammaMultiple, API_URL, MODE,
 } from './config';
 import { DIPDeposit } from './common';
 import { readKeypair, sleepExact, sleepRandom } from './utils';
 import { SerumVialClient, SerumVialTradeMessage } from './serumVial';
 import {
-  jupiterHedge, cancelTxOpenBookOrders, getDIPDelta, getDIPGamma, getDIPTheta, getFairValue, getPayerAccount, getSpotDelta, loadPrices,
-  orderSpliceMango, liquidityCheckAndNumSplices, settleOpenBook, setPriorityFee,
+  jupiterHedge, cancelTxOpenBookOrders, getDIPDelta, getDIPGamma, getDIPTheta,
+  getFairValue, getPayerAccount, getSpotDelta, loadPrices, orderSpliceMango,
+  liquidityCheckAndNumSplices, settleOpenBook, setPriorityFee, waitForGamma, waitForFill,
 } from './scalper_utils';
-import { Jupiter } from '@jup-ag/core';
 
 export class Scalper {
   client: MangoClient;
@@ -96,17 +99,17 @@ export class Scalper {
       this.symbol,
       'perp',
     );
-    
+
     // Add Any Treasury Positions from Staking Options
     for (const positions of treasuryPositions) {
-      if (this.symbol == positions.splTokenName) {
+      if (this.symbol === positions.splTokenName) {
         dipProduct.push(positions);
       }
     }
     console.log(this.symbol, 'Active Positions', dipProduct);
 
     this.marketIndex = this.perpMarketConfig.marketIndex;
-    if (this.marketIndex == undefined){
+    if (this.marketIndex === undefined) {
       console.log('No Mango Market Exists. Run OpenBook');
       await this.scalperOpenBook(dipProduct);
       return;
@@ -150,11 +153,6 @@ export class Scalper {
       this.perpMarketConfig.quoteDecimals,
     );
 
-    const spotMarketConfig = getMarketByBaseSymbolAndKind(
-      this.groupConfig,
-      this.symbol,
-      'spot',
-    );
     const spotMarket = await Market.load(
       this.connection,
       new PublicKey(OPENBOOK_MKT_MAP.get(this.symbol)),
@@ -249,9 +247,9 @@ export class Scalper {
     const sellSpot = -fundingRate < perpFundingRateThreshold;
     const hedgeSide = hedgeDeltaTotal < 0 ? 'buy' : 'sell'; // TODO Make Enum everywhere
     let hedgeProduct: string;
-    if (hedgeSide == 'buy' && buySpot) {
+    if (hedgeSide === 'buy' && buySpot) {
       hedgeProduct = '-SPOT';
-    } else if (hedgeSide == 'sell' && sellSpot) {
+    } else if (hedgeSide === 'sell' && sellSpot) {
       hedgeProduct = '-SPOT';
     } else {
       hedgeProduct = '-PERP';
@@ -307,7 +305,7 @@ export class Scalper {
           (fillEvent.makerClientOrderId.toString() == deltaOrderId.toString())
           || (fillEvent.takerClientOrderId.toString() == deltaOrderId.toString())
         ) {
-          const fillQty = (hedgeSide == 'buy' ? 1 : -1) * fillEvent.quantity.toNumber() * this.minSize;
+          const fillQty = (hedgeSide === 'buy' ? 1 : -1) * fillEvent.quantity.toNumber() * this.minSize;
           const fillPrice = fillEvent.price.toNumber() * this.tickSize;
           hedgeDeltaTotal += fillQty;
           console.log(
@@ -443,10 +441,10 @@ export class Scalper {
       ) {
         const fillBytes = Buffer.from(parsedEvent.event, 'base64');
         const fillEvent: FillEvent = PerpEventLayout.decode(fillBytes).fill;
-        const bidFill = fillEvent.makerClientOrderId.toString() == gammaBidID.toString()
-          || fillEvent.takerClientOrderId.toString() == gammaBidID.toString();
+        const bidFill = fillEvent.makerClientOrderId.toString() === gammaBidID.toString()
+          || fillEvent.takerClientOrderId.toString() === gammaBidID.toString();
         const askFill = fillEvent.makerClientOrderId.toString() == gammaAskID.toString()
-          || fillEvent.takerClientOrderId.toString() == gammaAskID.toString();
+          || fillEvent.takerClientOrderId.toString() === gammaAskID.toString();
         if (bidFill || askFill) {
           console.log(this.symbol, 'Gamma Filled', bidFill ? 'BID' : 'ASK', new Date().toUTCString());
           fillFeed.removeEventListener('message', gammaFillListener);
@@ -535,7 +533,7 @@ export class Scalper {
     this.serumVialClient.removeAnyListeners();
     let spotMarket: Market;
     let jupiter: Jupiter;
-    try{
+    try {
       spotMarket = await Market.load(
         this.connection,
         new PublicKey(OPENBOOK_MKT_MAP.get(this.symbol)),
@@ -543,7 +541,7 @@ export class Scalper {
         OPENBOOK_FORK_ID,
       );
     } catch (err) {
-      console.log(this.symbol, "No OpenBook Market Found", err)
+      console.log(this.symbol, 'No OpenBook Market Found', err);
       return;
     }
 
@@ -551,14 +549,14 @@ export class Scalper {
       console.log(this.symbol, 'Loading Jupiter');
       jupiter = await Jupiter.load({
         connection: this.connection,
-        cluster: cluster,
+        cluster,
         user: this.owner,
         wrapUnwrapSOL: false,
         restrictIntermediateTokens: true,
         shouldLoadSerumOpenOrders: false,
       });
     } catch (err) {
-      console.log(this.symbol, "Jupiter Failed", err)
+      console.log(this.symbol, 'Jupiter Failed', err);
       return;
     }
     if (this.mode == 0) {
@@ -597,10 +595,9 @@ export class Scalper {
     spotMarket: Market,
     jupiter: Jupiter,
   ): Promise<void> {
-
     // Clean the state by cancelling all existing open orders.
     const cancelDelta = await cancelTxOpenBookOrders(this.connection, this.owner, spotMarket, this.symbol);
-    if (cancelDelta != undefined) {
+    if (cancelDelta !== undefined) {
       try {
         await sendAndConfirmTransaction(this.connection, setPriorityFee(cancelDelta), [this.owner]);
       } catch (err) {
@@ -612,7 +609,7 @@ export class Scalper {
     try {
       const settleTransaction = await settleOpenBook(this.connection, this.owner, spotMarket, this.symbol, 'USDC');
       // If there are funds ready to be settled, settle them
-      if (settleTransaction != undefined) {
+      if (settleTransaction !== undefined) {
         await sendAndConfirmTransaction(this.connection, setPriorityFee(settleTransaction), [this.owner]);
       }
     } catch (err) {
@@ -719,8 +716,8 @@ export class Scalper {
     const dipDeltaDiff = slippageDIPDelta - dipTotalDelta;
     hedgeDeltaTotal += dipDeltaDiff;
     console.log(this.symbol, 'Adjust Slippage Delta by', dipDeltaDiff, 'to', -hedgeDeltaTotal);
-    if (((-hedgeDeltaTotal * fairValue) < (deltaThreshold * fairValue) && (hedgeSide == 'buy'))
-       || ((-hedgeDeltaTotal * fairValue) > (deltaThreshold * fairValue) && (hedgeSide == 'sell'))) {
+    if (((-hedgeDeltaTotal * fairValue) < (deltaThreshold * fairValue) && (hedgeSide === 'buy'))
+       || ((-hedgeDeltaTotal * fairValue) > (deltaThreshold * fairValue) && (hedgeSide === 'sell'))) {
       console.log(this.symbol, 'Delta Netural: Slippage', deltaThreshold);
       return;
     }
@@ -788,8 +785,12 @@ export class Scalper {
     }
 
     try {
-      const amountDelta = Math.round(Math.abs(hedgeDeltaClip) * (1 / this.minSpotSize)) / (1 / this.minSpotSize);
-      const priceDelta = Math.floor(Math.abs(hedgePrice) * (1 / this.tickSize)) / (1 / this.tickSize);
+      const amountDelta = Math.round(
+        Math.abs(hedgeDeltaClip) * (1 / this.minSpotSize),
+      ) / (1 / this.minSpotSize);
+      const priceDelta = Math.floor(
+        Math.abs(hedgePrice) * (1 / this.tickSize),
+      ) / (1 / this.tickSize);
       const payerAccount = getPayerAccount(hedgeSide, this.symbol, 'USDC');
       console.log(this.symbol, hedgeSide, 'OpenBook-SPOT', amountDelta, 'Limit:', priceDelta, '#', deltaHedgeCount, 'ID', deltaID.toString());
       const deltaOrderTx = new Transaction();
@@ -803,7 +804,7 @@ export class Scalper {
         clientId: deltaID,
         selfTradeBehavior: 'abortTransaction',
       });
-      deltaOrderTx.add(deltaTx.transaction)
+      deltaOrderTx.add(deltaTx.transaction);
       await sendAndConfirmTransaction(this.connection, setPriorityFee(deltaOrderTx), [this.owner]);
     } catch (err) {
       console.log(this.symbol, 'Delta Hedge', err, err.stack);
@@ -867,7 +868,7 @@ export class Scalper {
         if (message.makerClientId == backBidID.toString()) {
           console.log(this.symbol, 'Back Bid Fill!!!', message.size, message.market, message.price, message.makerClientId, message.timestamp);
           return;
-        } else if (message.makerClientId == backAskID.toString()) {
+        } if (message.makerClientId == backAskID.toString()) {
           console.log(this.symbol, 'Back Ask Fill!!!', message.size, message.market, message.price, message.makerClientId, message.timestamp);
           return;
         }
@@ -888,7 +889,7 @@ export class Scalper {
             gammaScalpCount,
             fillPrice,
             spotMarket,
-            jupiter
+            jupiter,
           );
         } else {
           console.log('Gamma Partially Filled', gammaFillQty, 'of', amountGamma);
@@ -897,7 +898,7 @@ export class Scalper {
     );
     // Clean the state by cancelling all existing open orders.
     const cancelGammaStart = await cancelTxOpenBookOrders(this.connection, this.owner, spotMarket, this.symbol);
-    if (cancelGammaStart != undefined) {
+    if (cancelGammaStart !== undefined) {
       try {
         await sendAndConfirmTransaction(this.connection, setPriorityFee(cancelGammaStart), [this.owner]);
       } catch (err) {
@@ -920,7 +921,7 @@ export class Scalper {
 
     // Find fair value.
     console.log(this.symbol, 'Loading Fair Value For Scalp', gammaScalpCount);
-    let fairValue;
+    let fairValue: number;
     if (priorFillPrice > 0) {
       fairValue = priorFillPrice;
       console.log(this.symbol, 'Fair Value Set to Prior Fill', fairValue);
@@ -928,21 +929,24 @@ export class Scalper {
       fairValue = await getFairValue(this.connection, spotMarket, this.symbol, jupiter);
     }
     for (let i = 0; i < gammaCycles; i++) {
-      if (fairValue == 0) {
+      if (fairValue === 0) {
         console.log(this.symbol, 'No Prices. Refreshing Gamma Scalp', i + 1, 'After', twapIntervalSec, 'Seconds');
         await sleepExact(twapIntervalSec);
         fairValue = await getFairValue(this.connection, spotMarket, this.symbol, jupiter);
       }
     }
-    if (fairValue == 0) {
+    if (fairValue === 0) {
       console.log(this.symbol, 'No Robust Pricing. Exiting Gamma Scalp', gammaScalpCount);
       return;
     }
     const dipTotalGamma = getDIPGamma(dipProduct, fairValue, this.symbol);
 
     // Calc scalperWindow std deviation spread from zScore & IV for gamma levels
-    const stdDevSpread = this.impliedVol / Math.sqrt((365 * 24 * 60 * 60) / scalperWindowSec) * this.zScore;
-    const netGamma = IS_DEV ? Math.max(0.01, dipTotalGamma * stdDevSpread * fairValue) : dipTotalGamma * stdDevSpread * fairValue;
+    const stdDevSpread = (this.impliedVol / Math.sqrt((365 * 24 * 60 * 60) / scalperWindowSec))
+    * this.zScore;
+    const netGamma = IS_DEV
+      ? Math.max(0.01, dipTotalGamma * stdDevSpread * fairValue)
+      : dipTotalGamma * stdDevSpread * fairValue;
 
     const widenSpread = (gammaScalpCount - 1) / gammaCycles;
     const gammaBid = fairValue * (1 - stdDevSpread - stdDevSpread * widenSpread);
@@ -960,10 +964,10 @@ export class Scalper {
     const dimQty = maxBackGammaMultiple * netGamma;
     let bidDepth = 0;
     let whaleBidPrice : number;
-    for (let i = 0; i < numBids; i++){
-      bidDepth = bids.getL2(i+1)[i][1] + bidDepth;
-      if (bidDepth >= dimQty){
-        whaleBidPrice = bids.getL2(i+1)[i][0];
+    for (let i = 0; i < numBids; i++) {
+      bidDepth = bids.getL2(i + 1)[i][1] + bidDepth;
+      if (bidDepth >= dimQty) {
+        [whaleBidPrice] = bids.getL2(i + 1)[i];
         break;
       }
     }
@@ -971,16 +975,19 @@ export class Scalper {
     const numAsks = asks.getL2(maxOrderBookSearchDepth).length;
     let askDepth = 0;
     let whaleAskPrice : number;
-    for (let i = 0; i < numAsks; i++){
-      askDepth = asks.getL2(i+1)[i][1] + askDepth;
-      if (askDepth >= dimQty){
-        whaleAskPrice = asks.getL2(i+1)[i][0];
+    for (let i = 0; i < numAsks; i++) {
+      askDepth = asks.getL2(i + 1)[i][1] + askDepth;
+      if (askDepth >= dimQty) {
+        [whaleAskPrice] = asks.getL2(i + 1)[i];
         break;
       }
     }
-    console.log(this.symbol, "Whale Bid",  whaleBidPrice, "Ask", whaleAskPrice, "Spread %", (whaleAskPrice - whaleBidPrice) / fairValue * 100);
+    console.log(`${this.symbol} Whale Bid: ${whaleBidPrice} Ask ${whaleAskPrice} \
+Spread % ${(whaleAskPrice - whaleBidPrice) / fairValue * 100}`);
 
-    const amountGamma = Math.round(Math.abs(netGamma) * (1 / this.minSpotSize)) / (1 / this.minSpotSize);
+    const amountGamma = Math.round(
+      Math.abs(netGamma) * (1 / this.minSpotSize),
+    ) / (1 / this.minSpotSize);
     const priceBid = Math.floor(Math.abs(gammaBid) * (1 / this.tickSize)) / (1 / this.tickSize);
     const priceAsk = Math.floor(Math.abs(gammaAsk) * (1 / this.tickSize)) / (1 / this.tickSize);
     const bidAccount = getPayerAccount('buy', this.symbol, 'USDC');
@@ -1012,21 +1019,29 @@ export class Scalper {
       console.log(this.symbol, 'Gamma', amountGamma, 'Bid', priceBid, 'BidID', bidID.toString());
       console.log(this.symbol, 'Gamma', amountGamma, 'Ask', priceAsk, 'AskID', askID.toString());
     }
-    // Calculate effective gamma subject to max at price & round to nearest tick size for order entry
+
+    // Calculate effective gamma subject to max at price & round to nearest tick
+    // size for order entry
     const whaleBidDiff = fairValue - whaleBidPrice;
     const whaleAskDiff = whaleAskPrice - fairValue;
-    const backBidPrice = whaleBidDiff > fairValue - gammaBid ? 
-      Math.floor((whaleBidPrice + this.tickSize) * (1 / this.tickSize)) / (1 / this.tickSize) : undefined;
-    const backAskPrice = whaleAskDiff > gammaAsk - fairValue ? 
-      Math.floor((whaleAskPrice - this.tickSize) * (1 / this.tickSize)) / (1 / this.tickSize) : undefined;
+    const backBidPrice = whaleBidDiff > fairValue - gammaBid
+      ? Math.floor((whaleBidPrice + this.tickSize) * (1 / this.tickSize)) / (1 / this.tickSize)
+      : undefined;
+    const backAskPrice = whaleAskDiff > gammaAsk - fairValue
+      ? Math.floor((whaleAskPrice - this.tickSize) * (1 / this.tickSize)) / (1 / this.tickSize)
+      : undefined;
     const whaleBidGammaQty = Math.min(netGamma * (maxBackGammaMultiple - 1), dipTotalGamma * whaleBidDiff - netGamma);
     const whaleAskGammaQty = Math.min(netGamma * (maxBackGammaMultiple - 1), dipTotalGamma * whaleAskDiff - netGamma);
-    const backBidQty = Math.round(Math.abs(whaleBidGammaQty) * (1 / this.minSpotSize)) / (1 / this.minSpotSize);
-    const backAskQty = Math.round(Math.abs(whaleAskGammaQty) * (1 / this.minSpotSize)) / (1 / this.minSpotSize);
+    const backBidQty = Math.round(
+      Math.abs(whaleBidGammaQty) * (1 / this.minSpotSize),
+    ) / (1 / this.minSpotSize);
+    const backAskQty = Math.round(
+      Math.abs(whaleAskGammaQty) * (1 / this.minSpotSize),
+    ) / (1 / this.minSpotSize);
 
-    //Enter bid & offer if outside of range from gamma orders
+    // Enter bid & offer if outside of range from gamma orders
     if (backBidPrice != undefined) {
-      console.log(this.symbol, "Back", backBidQty, "Bid", backBidPrice, backBidID.toString())
+      console.log(this.symbol, 'Back', backBidQty, 'Bid', backBidPrice, backBidID.toString());
       const whaleBidTx = await spotMarket.makePlaceOrderTransaction(this.connection, {
         owner: this.owner.publicKey,
         payer: bidAccount,
@@ -1040,7 +1055,7 @@ export class Scalper {
       gammaOrders.add(whaleBidTx.transaction);
     }
     if (backAskPrice != undefined) {
-      console.log(this.symbol, "Back", backAskQty, "Ask", backAskPrice, backAskID.toString())
+      console.log(this.symbol, 'Back', backAskQty, 'Ask', backAskPrice, backAskID.toString());
       const whaleAskTx = await spotMarket.makePlaceOrderTransaction(this.connection, {
         owner: this.owner.publicKey,
         payer: askAccount,
@@ -1059,40 +1074,27 @@ export class Scalper {
     } catch (err) {
       console.log(this.symbol, 'Gamma Order', err, err.stack);
     }
-    console.log(this.symbol, 'Gamma Spread %', (priceAsk - priceBid) / fairValue * 100, 'Liquidity $', (amountGamma * 2 + backBidQty + backAskQty) * fairValue);
-    if (gammaScalpCount == 1) {
-      await waitForGamma((_) => gammaScalpCount == gammaCycles);
-      const scalpPnL = ((1 + 1 / (2 * gammaCycles)) * (gammaScalpCount - 1) * stdDevSpread * fairValue) * netGamma * gammaScalpCount
-        + ((1 + 1 / (2 * gammaCycles)) * (gammaScalpCount - 1) * stdDevSpread * fairValue) * gammaFillQty;
-      const thetaPnL = getDIPTheta(dipProduct, fairValue, this.symbol) / (24 * 60 * 60 / scalperWindowSec);
+    console.log(
+      this.symbol,
+      'Gamma Spread %',
+      (priceAsk - priceBid) / fairValue * 100,
+      'Liquidity $',
+      (amountGamma * 2 + backBidQty + backAskQty) * fairValue,
+    );
+    if (gammaScalpCount === 1) {
+      await waitForGamma((_) => gammaScalpCount === gammaCycles);
+      const scalpPnL = (
+        (1 + 1 / (2 * gammaCycles)) * (gammaScalpCount - 1) * stdDevSpread * fairValue)
+        * netGamma * gammaScalpCount
+        + ((1 + 1 / (2 * gammaCycles)) * (gammaScalpCount - 1) * stdDevSpread * fairValue)
+        * gammaFillQty;
+      const thetaPnL = getDIPTheta(dipProduct, fairValue, this.symbol)
+        / ((24 * 60 * 60) / scalperWindowSec);
       const estTotalPnL = scalpPnL + thetaPnL;
-      console.log(this.symbol, 'Estimated Total PnL', estTotalPnL, 'Scalp PnL', scalpPnL, 'Theta PnL', thetaPnL, 'Total Scalps', gammaScalpCount - 1);
+      console.log(
+        `${this.symbol} Estimated Total PnL ${estTotalPnL} Scalp PnL ${scalpPnL} \
+Theta PnL ${thetaPnL} Total Scalps ${gammaScalpCount - 1}`,
+      );
     }
   }
-}
-
-function waitForFill(conditionFunction) {
-  let pollCount = 0;
-  const resolvePeriodMs = 100;
-  const poll = (resolve) => {
-    pollCount += 1;
-    if (pollCount > twapIntervalSec * resolvePeriodMs / 10) resolve();
-    else if (conditionFunction()) resolve();
-    else setTimeout((_) => poll(resolve), resolvePeriodMs);
-  };
-  return new Promise(poll);
-}
-
-// Wait for enough scalps or scalper window to expire
-function waitForGamma(conditionFunction) {
-  let pollCount = 0;
-  const resolvePeriodMs = 100;
-  const maxScalpWindow = (1 + percentDrift) * scalperWindowSec;
-  const poll = (resolve) => {
-    pollCount += 1;
-    if (pollCount > maxScalpWindow * resolvePeriodMs / 10) resolve();
-    else if (conditionFunction()) resolve();
-    else setTimeout((_) => poll(resolve), resolvePeriodMs);
-  };
-  return new Promise(poll);
 }

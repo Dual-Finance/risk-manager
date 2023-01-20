@@ -29,6 +29,10 @@ import {
   THEO_VOL_MAP,
   jupiterSlippageBps,
   PRIORITY_FEE,
+  twapIntervalSec,
+  gammaCycles,
+  percentDrift,
+  scalperWindowSec,
 } from './config';
 import {
   decimalsBaseSPL, getChainlinkPrice, getPythPrice, getSwitchboardPrice, splMintToToken, tokenToSplMint,
@@ -464,4 +468,30 @@ export function setPriorityFee(
   tx.add(modifyComputeUnits);
   tx.add(addPriorityFee);
   return tx;
+}
+
+export function waitForFill(conditionFunction) {
+  let pollCount = 0;
+  const resolvePeriodMs = 100;
+  const poll = (resolve) => {
+    pollCount += 1;
+    if (pollCount > (twapIntervalSec * resolvePeriodMs) / gammaCycles) resolve();
+    else if (conditionFunction()) resolve();
+    else setTimeout((_) => poll(resolve), resolvePeriodMs);
+  };
+  return new Promise(poll);
+}
+
+// Wait for enough scalps or scalper window to expire
+export function waitForGamma(conditionFunction) {
+  let pollCount = 0;
+  const resolvePeriodMs = 100;
+  const maxScalpWindow = (1 + percentDrift) * scalperWindowSec;
+  const poll = (resolve) => {
+    pollCount += 1;
+    if (pollCount > (maxScalpWindow * resolvePeriodMs) / gammaCycles) resolve();
+    else if (conditionFunction()) resolve();
+    else setTimeout((_) => poll(resolve), resolvePeriodMs);
+  };
+  return new Promise(poll);
 }

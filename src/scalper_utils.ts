@@ -358,8 +358,8 @@ export async function getJupiterPrice(
 }
 
 export async function getFairValue(
-  connection : Connection,
-  spotMarket : Market,
+  connection: Connection,
+  spotMarket: Market,
   symbol: string,
   jupiter: Jupiter,
 ) {

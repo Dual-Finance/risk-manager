@@ -2,6 +2,7 @@
 import { Commitment, Connection, PublicKey } from '@solana/web3.js';
 import fetch from 'cross-fetch';
 import { blackScholes } from 'black-scholes';
+import { getAssociatedTokenAddress } from '@project-serum/associated-token';
 import {
   DIPDeposit,
 } from './common';
@@ -18,6 +19,7 @@ import {
   minExecutionPremium,
   volSpread,
   NUM_DIP_ATOMS_PER_TOKEN,
+  rfRate,
 } from './config';
 import Poller from './poller';
 import {
@@ -27,84 +29,87 @@ import {
   splMintToToken,
   tokenToSplMint,
 } from './utils';
-import { getAssociatedTokenAddress } from '@project-serum/associated-token';
 import * as apiSecret from '../apiSecret.json';
 
 const crypto = require('crypto');
 
 export class Router {
-  mm_callback: (d: DIPDeposit[]) => void;
+  mmCallback: (d: DIPDeposit[]) => void;
 
-  risk_manager_callback: (d: DIPDeposit[]) => void;
+  riskManagerCallback: (d: DIPDeposit[]) => void;
 
   dips: { [name: string]: DIPDeposit };
 
   token: string;
 
   constructor(
-    mm_callback: (d: DIPDeposit[]) => void,
-    risk_manager_callback: (d: DIPDeposit[]) => void,
+    mmCallback: (d: DIPDeposit[]) => void,
+    riskManagerCallback: (d: DIPDeposit[]) => void,
     token: string,
   ) {
-    this.mm_callback = mm_callback;
-    this.risk_manager_callback = risk_manager_callback;
+    this.mmCallback = mmCallback;
+    this.riskManagerCallback = riskManagerCallback;
     this.dips = {};
     this.token = token;
   }
 
   // Accepts a DIP Deposit and decides whether to send it to the mm_callback
   // or risk_manager_callback
-  route(dip_deposit: DIPDeposit): void {
-    const date = new Date(dip_deposit.expirationMs);
+  route(dipDeposit: DIPDeposit): void {
+    const date = new Date(dipDeposit.expirationMs);
 
     // TODO: Update this for other types of assets
 
-    const symbol = `${dip_deposit.splTokenName},USDC,${date.getUTCFullYear()}-${
+    const symbol = `${dipDeposit.splTokenName},USDC,${date.getUTCFullYear()}-${
       date.getUTCMonth() + 1
-    }-${date.getUTCDate()},${dip_deposit.strikeUsdcPerToken * 1_000_000},UPSIDE,E,P`;
+    }-${date.getUTCDate()},${dipDeposit.strikeUsdcPerToken * 1_000_000},UPSIDE,E,P`;
     console.log('++++++++++++++++++++++++++++++++++++++++++++++++++++');
-    console.log('Routing for', symbol, 'Deposit:', dip_deposit, new Date().toUTCString());
+    console.log('Routing for', symbol, 'Deposit:', dipDeposit, new Date().toUTCString());
 
     // This happens after sending tokens to a MM. Exit early.
-    if (dip_deposit.qtyTokens == 0) {
+    if (dipDeposit.qtyTokens === 0) {
       this.dips[
-        this.dip_to_string(dip_deposit.expirationMs / 1_000, dip_deposit.strikeUsdcPerToken)
-      ] = dip_deposit;
+        this.dipToString(dipDeposit.expirationMs / 1_000, dipDeposit.strikeUsdcPerToken)
+      ] = dipDeposit;
       console.log('DIP Deposit quantity zero. No Rerun');
       return;
     }
     this.fetchMMOrder(symbol).then(async (order) => {
       // Run the risk manager if there is no MM order
       // @ts-ignore
-      if (!order || Number(order.remainingQuantity) < dip_deposit.qtyTokens) {
+      if (!order || Number(order.remainingQuantity) < dipDeposit.qtyTokens) {
         this.dips[
-          this.dip_to_string(
-            dip_deposit.expirationMs / 1_000,
-            dip_deposit.strikeUsdcPerToken,
+          this.dipToString(
+            dipDeposit.expirationMs / 1_000,
+            dipDeposit.strikeUsdcPerToken,
           )
-        ] = dip_deposit;
+        ] = dipDeposit;
         this.run_risk_manager();
         console.log('No available MM bid', order);
         return;
       }
 
-      const currentPrice = await getPythPrice(new PublicKey(tokenToSplMint(dip_deposit.splTokenName)));
-      const fractionOfYear = (dip_deposit.expirationMs - Date.now() ) / (365 * 24 * 60 * 60 * 1_000);
-      const vol = BVE_VOL_MAP.get(dip_deposit.splTokenName) * (1 + volSpread + Math.random() * volSpread);
-      const thresholdPrice = blackScholes(currentPrice, dip_deposit.strikeUsdcPerToken, fractionOfYear, vol, 0.01, 'call');
+      const currentPrice = await getPythPrice(
+        new PublicKey(tokenToSplMint(dipDeposit.splTokenName)),
+      );
+      const fractionOfYear = (dipDeposit.expirationMs - Date.now()) / (365 * 24 * 60 * 60 * 1_000);
+      const vol = BVE_VOL_MAP.get(
+        dipDeposit.splTokenName,
+      ) * (1 + volSpread + Math.random() * volSpread);
+      const thresholdPrice = blackScholes(currentPrice, dipDeposit.strikeUsdcPerToken, fractionOfYear, vol, 0.01, 'call');
       // @ts-ignore
       const { price } = order;
       console.log('MM price:', price, 'BVE Re-Route price:', thresholdPrice);
-      const userPremium = price * dip_deposit.qtyTokens;
+      const userPremium = price * dipDeposit.qtyTokens;
       if (userPremium < minExecutionPremium) {
         // If user premium is too small don't bother spamming MM
         console.log('Not routing too small of a trade:', userPremium, minExecutionPremium);
         this.dips[
-          this.dip_to_string(
-            dip_deposit.expirationMs / 1_000,
-            dip_deposit.strikeUsdcPerToken,
+          this.dipToString(
+            dipDeposit.expirationMs / 1_000,
+            dipDeposit.strikeUsdcPerToken,
           )
-        ] = dip_deposit;
+        ] = dipDeposit;
         this.run_risk_manager();
         return;
       }
@@ -114,23 +119,23 @@ export class Router {
         // like there is no MM bid.
         console.log('Not routing to MM due to price:', thresholdPrice, price);
         this.dips[
-          this.dip_to_string(
-            dip_deposit.expirationMs / 1_000,
-            dip_deposit.strikeUsdcPerToken,
+          this.dipToString(
+            dipDeposit.expirationMs / 1_000,
+            dipDeposit.strikeUsdcPerToken,
           )
-        ] = dip_deposit;
+        ] = dipDeposit;
         this.run_risk_manager();
         return;
       }
 
-      const client_order_id = `clientOrderId${Date.now()}`;
+      const clientOrderId = `clientOrderId${Date.now()}`;
       const side = 'SELL';
-      const quantity = dip_deposit.qtyTokens;
+      const quantity = dipDeposit.qtyTokens;
       // @ts-ignore
       const secret = apiSecret.default;
 
-      const request = `clientOrderId=${client_order_id}&symbol=${symbol}&price=${price}&quantity=${quantity}&side=${side}`;
-      const calculated_hash = crypto
+      const request = `clientOrderId=${clientOrderId}&symbol=${symbol}&price=${price}&quantity=${quantity}&side=${side}`;
+      const calculatedHash = crypto
         .createHmac('SHA256', secret)
         .update(Buffer.from(request))
         .digest('hex');
@@ -140,8 +145,8 @@ export class Router {
         price,
         quantity,
         side,
-        clientOrderId: client_order_id,
-        signature: calculated_hash,
+        clientOrderId,
+        signature: calculatedHash,
       };
 
       console.log('Creating api order for buy', data);
@@ -160,46 +165,51 @@ export class Router {
   // Todo use this routing logic only once for reruns and new trades
   // Reads all DIP Deposits and decides whether to send it to the mm_callback
   async checkMMPrices(): Promise<void> {
-    for (const dip_deposit of Object.values(this.dips)) {
-      if (dip_deposit.qtyTokens > 0) {
-        const date = new Date(dip_deposit.expirationMs);
+    for (const dipDeposit of Object.values(this.dips)) {
+      if (dipDeposit.qtyTokens > 0) {
+        const date = new Date(dipDeposit.expirationMs);
         // TODO: Update this for other types of assets
-        const symbol = `${dip_deposit.splTokenName},USDC,${date.getUTCFullYear()}-${
+        const symbol = `${dipDeposit.splTokenName},USDC,${date.getUTCFullYear()}-${
           date.getUTCMonth() + 1
-        }-${date.getUTCDate()},${dip_deposit.strikeUsdcPerToken * 1_000_000},UPSIDE,E,P`;
+        }-${date.getUTCDate()},${dipDeposit.strikeUsdcPerToken * 1_000_000},UPSIDE,E,P`;
         console.log('######################################################################');
-        console.log('Checking MM Quotes vs ', symbol, 'Deposit:', dip_deposit, new Date().toUTCString());
+        console.log('Checking MM Quotes vs ', symbol, 'Deposit:', dipDeposit, new Date().toUTCString());
 
         this.fetchMMOrder(symbol).then(async (order) => {
           // @ts-ignore
-          if (!order || Number(order.remainingQuantity) < dip_deposit.qtyTokens) {
+          if (!order || Number(order.remainingQuantity) < dipDeposit.qtyTokens) {
             this.dips[
-              this.dip_to_string(
-                dip_deposit.expirationMs / 1_000,
-                dip_deposit.strikeUsdcPerToken,
+              this.dipToString(
+                dipDeposit.expirationMs / 1_000,
+                dipDeposit.strikeUsdcPerToken,
               )
-            ] = dip_deposit;
+            ] = dipDeposit;
             console.log('No available MM bid', order);
             return;
           }
 
-          const currentPrice = await getPythPrice(new PublicKey(tokenToSplMint(dip_deposit.splTokenName)));
-          const fractionOfYear = (dip_deposit.expirationMs - Date.now() ) / (365 * 24 * 60 * 60 * 1_000);
-          const vol = BVE_VOL_MAP.get(dip_deposit.splTokenName) * (1 + volSpread + Math.random() * volSpread);
-          const thresholdPrice = blackScholes(currentPrice, dip_deposit.strikeUsdcPerToken, fractionOfYear, vol, 0.01, 'call');
+          const currentPrice = await getPythPrice(
+            new PublicKey(tokenToSplMint(dipDeposit.splTokenName)),
+          );
+          const fractionOfYear = (
+            dipDeposit.expirationMs - Date.now()) / (365 * 24 * 60 * 60 * 1_000);
+          const vol = BVE_VOL_MAP.get(dipDeposit.splTokenName)
+            * (1 + volSpread + Math.random() * volSpread);
+          const thresholdPrice = blackScholes(
+            currentPrice, dipDeposit.strikeUsdcPerToken, fractionOfYear, vol, rfRate, 'call');
           // @ts-ignore
           const { price } = order;
           console.log('MM price:', price, 'BVE price:', thresholdPrice);
-          const userPremium = price * dip_deposit.qtyTokens;
+          const userPremium = price * dipDeposit.qtyTokens;
           if (userPremium < minExecutionPremium) {
             // If user premium is too small don't bother spamming MM
             console.log('Not routing too small of a trade:', userPremium, minExecutionPremium);
             this.dips[
-              this.dip_to_string(
-                dip_deposit.expirationMs / 1_000,
-                dip_deposit.strikeUsdcPerToken,
+              this.dipToString(
+                dipDeposit.expirationMs / 1_000,
+                dipDeposit.strikeUsdcPerToken,
               )
-            ] = dip_deposit;
+            ] = dipDeposit;
             return;
           }
 
@@ -208,22 +218,22 @@ export class Router {
             // like there is no MM bid.
             console.log('Not routing to MM due to price:', thresholdPrice, price);
             this.dips[
-              this.dip_to_string(
-                dip_deposit.expirationMs / 1_000,
-                dip_deposit.strikeUsdcPerToken,
+              this.dipToString(
+                dipDeposit.expirationMs / 1_000,
+                dipDeposit.strikeUsdcPerToken,
               )
-            ] = dip_deposit;
+            ] = dipDeposit;
             return;
           }
 
-          const client_order_id = `clientOrderId${Date.now()}`;
+          const clientOrderId = `clientOrderId${Date.now()}`;
           const side = 'SELL';
-          const quantity = dip_deposit.qtyTokens;
+          const quantity = dipDeposit.qtyTokens;
           // @ts-ignore
           const secret = apiSecret.default;
 
-          const request = `clientOrderId=${client_order_id}&symbol=${symbol}&price=${price}&quantity=${quantity}&side=${side}`;
-          const calculated_hash = crypto
+          const request = `clientOrderId=${clientOrderId}&symbol=${symbol}&price=${price}&quantity=${quantity}&side=${side}`;
+          const calculatedHash = crypto
             .createHmac('SHA256', secret)
             .update(Buffer.from(request))
             .digest('hex');
@@ -233,8 +243,8 @@ export class Router {
             price,
             quantity,
             side,
-            clientOrderId: client_order_id,
-            signature: calculated_hash,
+            clientOrderId,
+            signature: calculatedHash,
           };
 
           console.log('Creating api order for buy', data);
@@ -253,7 +263,7 @@ export class Router {
   }
 
   run_risk_manager(): void {
-    this.risk_manager_callback(Object.values(this.dips));
+    this.riskManagerCallback(Object.values(this.dips));
   }
 
   async fetchMMOrder(symbol: string): Promise<number> {
@@ -293,7 +303,7 @@ export class Router {
     );
     const balance = await connection.getTokenAccountBalance(mmOptionAccount);
 
-    this.dips[this.dip_to_string(expirationSec, strike)] = {
+    this.dips[this.dipToString(expirationSec, strike)] = {
       splTokenName: splMintToToken(splMint),
       premiumAssetName: 'USDC',
       expirationMs: expirationSec * 1_000,
@@ -303,7 +313,7 @@ export class Router {
     };
   }
 
-  dip_to_string(expirationSec: number, strike: number): string {
+  dipToString(expirationSec: number, strike: number): string {
     return `Expiration:${expirationSec}_Strike:${strike}`;
   }
 
@@ -329,8 +339,8 @@ export class Router {
           continue;
         }
 
-        if (splMintToToken(splMint) == this.token) {
-          const alreadyPolled: boolean = this.dip_to_string(expirationSec, strike) in this.dips;
+        if (splMintToToken(splMint) === this.token) {
+          const alreadyPolled: boolean = this.dipToString(expirationSec, strike) in this.dips;
 
           // Always run add_dip since it refreshes the values if the subscribe
           // fails. Can fail in devnet because some incorrectly defined DIPs.

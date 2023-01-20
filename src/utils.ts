@@ -1,3 +1,4 @@
+/* eslint-disable */
 import * as os from 'os';
 import * as fs from 'fs';
 import { Connection, PublicKey } from '@solana/web3.js';
@@ -193,7 +194,7 @@ export function tokenToPythSymbol(token: string) {
   return undefined;
 }
 
-export async function getPythPrice(splMint: PublicKey) {
+export async function getPythPrice(splMint: PublicKey): Promise<number | undefined> {
   const connection: Connection = new Connection(API_URL);
   const pythPublicKey = getPythProgramKeyForCluster(
     IS_DEV ? 'devnet' : 'mainnet-beta',
@@ -203,8 +204,8 @@ export async function getPythPrice(splMint: PublicKey) {
   for (const symbol of data.symbols) {
     const price = data.productPrice.get(symbol)!;
     if (tokenToPythSymbol(splMintToToken(splMint)) === symbol) {
-      if (price == undefined){
-        return;
+      if (price === undefined) {
+        return undefined;
       }
       return price.price;
     }

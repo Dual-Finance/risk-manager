@@ -19,6 +19,7 @@ import {
   minExecutionPremium,
   volSpread,
   NUM_DIP_ATOMS_PER_TOKEN,
+  rfRate,
 } from './config';
 import Poller from './poller';
 import {
@@ -194,7 +195,8 @@ export class Router {
             dipDeposit.expirationMs - Date.now()) / (365 * 24 * 60 * 60 * 1_000);
           const vol = BVE_VOL_MAP.get(dipDeposit.splTokenName)
             * (1 + volSpread + Math.random() * volSpread);
-          const thresholdPrice = blackScholes(currentPrice, dipDeposit.strikeUsdcPerToken, fractionOfYear, vol, 0.01, 'call');
+          const thresholdPrice = blackScholes(
+            currentPrice, dipDeposit.strikeUsdcPerToken, fractionOfYear, vol, rfRate, 'call');
           // @ts-ignore
           const { price } = order;
           console.log('MM price:', price, 'BVE price:', thresholdPrice);

@@ -11,7 +11,7 @@ import {
   API_URL,
   cluster,
   DUAL_API,
-  usdcMintPk,
+  usdcPk,
   BVE_VOL_MAP,
   minExecutionPremium,
   volSpread,
@@ -291,7 +291,7 @@ export class Router {
       strike * NUM_DIP_ATOMS_PER_TOKEN,
       expirationSec,
       splMint,
-      usdcMintPk,
+      usdcPk,
       dualMarketProgramID,
     );
     const mmOptionAccount = await getAssociatedTokenAddress(
@@ -357,7 +357,7 @@ export class Router {
             strike * 1_000_000,
             expiration,
             splMint,
-            usdcMintPk,
+            usdcPk,
             dualMarketProgramID,
           );
           const mmOptionAccount = await getAssociatedTokenAddress(

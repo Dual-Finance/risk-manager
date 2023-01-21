@@ -14,9 +14,9 @@ import {
   percentDrift,
   API_URL,
   IS_DEV,
-  usdcMintPk,
+  usdcPk,
 } from './config';
-import { bonkPK, CHAINLINK_PROGRAM_ID, mngoPK, soBtcPk, soEthPk, wsolPk } from './constants';
+import { bonkPk, CHAINLINK_PROGRAM_ID, mngoPk, soBtcPk, soEthPk, wsolPk } from './constants';
 
 export function readKeypair() {
   return JSON.parse(
@@ -136,13 +136,13 @@ export function splMintToToken(splMint: PublicKey) {
   if (splMint.toBase58() === soEthPk.toBase58()) {
     return 'ETH';
   }
-  if (splMint.toBase58() === mngoPK.toBase58()) {
+  if (splMint.toBase58() === mngoPk.toBase58()) {
     return 'MNGO';
   }
-  if (splMint.toBase58() === bonkPK.toBase58()) {
+  if (splMint.toBase58() === bonkPk.toBase58()) {
     return 'BONK';
   }
-  if (splMint.toBase58() === usdcMintPk.toBase58()) {
+  if (splMint.toBase58() === usdcPk.toBase58()) {
     return 'USDC';
   }
   return 'UNKNOWN_TOKEN';
@@ -159,13 +159,13 @@ export function tokenToSplMint(token: string) {
     return soEthPk;
   }
   if (token === 'MNGO') {
-    return mngoPK;
+    return mngoPk;
   }
   if (token === 'BONK') {
-    return bonkPK;
+    return bonkPk;
   }
   if (token === 'USDC') {
-    return usdcMintPk;
+    return usdcPk;
   }
   return undefined;
 }

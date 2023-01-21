@@ -1,5 +1,6 @@
-import { Cluster, PublicKey } from '@solana/web3.js';
+import { Cluster } from '@solana/web3.js';
 import { CallOrPut, DIPDeposit } from './common';
+import { openbookDevnetId, openbookMainnetId, usdcDevnetPk, usdcMainnetPk } from './constants';
 
 export const IS_DEV = process.env.DEV !== 'false';
 export const API_URL = process.env.RPC;
@@ -59,10 +60,8 @@ export const networkName = IS_DEV ? 'devnet.2' : 'mainnet.1';
 export const cluster: Cluster = IS_DEV ? 'devnet' : 'mainnet-beta';
 export const DUAL_API = IS_DEV ? 'https://dev.api.dual.finance' : 'https://api.dual.finance';
 export const FILLS_URL = IS_DEV ? 'ws://api.mngo.cloud:2082' : 'ws://v3.mngo.cloud:8080';
-export const usdcMintPk = IS_DEV ? new PublicKey('HJiQv33nKujRmZQ3sJBSosXgCEmiHs3mG1yd9VcLawPM') : new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
-
-export const OPENBOOK_FORK_ID = IS_DEV ? new PublicKey('EoTcMgcDRTJVZDMZWBoU6rhYHZfkNTVEAfz3uUJRcYGj')
-  : new PublicKey('srmqPvymJeFKQ4zGQed1GFppgkRHL9kaELCbyksJtPX');
+export const usdcPk = IS_DEV ? usdcDevnetPk: usdcMainnetPk;
+export const OPENBOOK_FORK_ID = IS_DEV ? openbookDevnetId : openbookMainnetId;
 
 export const ACCOUNT_MAP = new Map<string, string>([
   ['BTC', '79ee6JPqTPUDzX4FeAWSntFatmpb5BY5LQrXzMX3aAE6'], ['ETH', 'F7qSsLofbpZBfZ11wkajX9JPshSEeyGpaFvDeuur2mNW'],
@@ -94,7 +93,7 @@ export const BVE_VOL_MAP = new Map<string, number>([
   ['BTC', 0.3], ['ETH', 0.4], ['SOL', 0.5], ['MNGO', 0.6], ['BONK', 1.0],
 ]); // BVE vol keep alligned with app & contract vol
 
-// Enter any Staking Options Owned and to be hedged from the treasury
+// Enter any Staking Options owned and to be hedged from the treasury
 export const treasuryPositions: DIPDeposit[] = [({
   splTokenName: 'MNGO',
   premiumAssetName: 'USDC',

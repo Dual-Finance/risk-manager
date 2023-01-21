@@ -1,7 +1,5 @@
-/* eslint-disable */
 import WebSocket from 'ws';
-
-const WS_URL = 'wss://vial.mngo.cloud/v1/ws';
+import { VIAL_WS_URL } from './config';
 
 export type SerumVialTradeMessage = {
   readonly type: 'trade';
@@ -49,7 +47,7 @@ export class SerumVialClient {
       }
     };
 
-    this.ws.onclose = (ev) => {
+    this.ws.onclose = (_ev) => {
       if (this.disposed) {
         return;
       }
@@ -84,7 +82,7 @@ export class SerumVialClient {
   }
 
   public openSerumVial() {
-    this.ws = new WebSocket(WS_URL);
+    this.ws = new WebSocket(VIAL_WS_URL);
   }
 
   public closeSerumVial() {

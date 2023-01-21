@@ -12,14 +12,9 @@ import {
   cluster,
   DUAL_API,
   usdcMintPk,
-  dualMarketProgramID,
-  optionVaultPk,
-  OPTION_MINT_ADDRESS_SEED,
-  PROTCOL_API_KEY,
   BVE_VOL_MAP,
   minExecutionPremium,
   volSpread,
-  NUM_DIP_ATOMS_PER_TOKEN,
   rfRate,
 } from './config';
 import Poller from './poller';
@@ -31,6 +26,7 @@ import {
   tokenToSplMint,
 } from './utils';
 import * as apiSecret from '../apiSecret.json';
+import { dualMarketProgramID, NUM_DIP_ATOMS_PER_TOKEN, optionVaultPk, OPTION_MINT_ADDRESS_SEED, PROTCOL_API_KEY } from './constants';
 
 const crypto = require('crypto');
 

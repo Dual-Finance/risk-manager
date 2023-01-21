@@ -150,7 +150,7 @@ export class Router {
         signature: calculatedHash,
       };
 
-      console.log('Creating api order for buy', data);
+      console.log('Creating api order to sell', data);
       const response = await fetch(`${DUAL_API}/orders/createorder`, {
         method: 'post',
         headers: {
@@ -248,7 +248,7 @@ export class Router {
             signature: calculatedHash,
           };
 
-          console.log('Creating api order for buy', data);
+          console.log('Creating api order to sell', data);
           const response = await fetch(`${DUAL_API}/orders/createorder`, {
             method: 'post',
             headers: {
@@ -270,14 +270,16 @@ export class Router {
   async fetchMMOrder(symbol: string): Promise<number> {
     // TODO: Lookup in the pricing object on chain
     try {
+      const url = `${DUAL_API}/symbols/getprice?symbol=${symbol}`;
       const order = (
         await (
-          await fetch(`${DUAL_API}/symbols/getprice?symbol=${symbol}`, {
+          await fetch(url, {
             method: 'get',
             headers: { 'Content-Type': 'application/json' },
           })
         ).json()
       )[0];
+      console.log('API Order URL:', url);
       return order;
     } catch (err) {
       return undefined;

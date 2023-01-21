@@ -16,8 +16,8 @@ import {
   ZSCORE, MinContractSize, TickSize, FILLS_URL, IS_DEV, gammaThreshold,
   maxDeltaHedges, percentDrift, DELTA_OFFSET, MANGO_DOWNTIME_THRESHOLD_MIN,
   perpFundingRateThreshold, gammaCycles, MinOpenBookSize, OPENBOOK_FORK_ID,
-  OPENBOOK_MKT_MAP, treasuryPositions, slippageMax, gammaCompleteThresholdPct,
-  cluster, maxOrderBookSearchDepth, maxBackGammaMultiple, API_URL, MODE,
+  treasuryPositions, slippageMax, gammaCompleteThresholdPct, cluster,
+  maxOrderBookSearchDepth, maxBackGammaMultiple, API_URL, MODE,
 } from './config';
 import { DIPDeposit } from './common';
 import { readKeypair, sleepExact, sleepRandom } from './utils';
@@ -27,6 +27,7 @@ import {
   getFairValue, getPayerAccount, getSpotDelta, loadPrices, orderSpliceMango,
   liquidityCheckAndNumSplices, settleOpenBook, setPriorityFee, waitForGamma, waitForFill,
 } from './scalper_utils';
+import { OPENBOOK_MKT_MAP } from './constants';
 
 export class Scalper {
   client: MangoClient;

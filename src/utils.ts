@@ -11,17 +11,12 @@ import SwitchboardProgram from '@switchboard-xyz/sbv2-lite';
 import * as anchor from '@project-serum/anchor';
 import { OCR2Feed } from '@chainlink/solana-sdk';
 import {
-  soBTCPk,
-  soETHPk,
-  wSOLPk,
   percentDrift,
   API_URL,
   IS_DEV,
-  mngoPK,
-  bonkPK,
-  CHAINLINK_PROGRAM_ID,
-  usdcMintPk,
+  usdcPk,
 } from './config';
+import { bonkPk, CHAINLINK_PROGRAM_ID, mngoPk, soBtcPk, soEthPk, wsolPk } from './constants';
 
 export function readKeypair() {
   return JSON.parse(
@@ -132,22 +127,22 @@ export function timeSinceMidDay() {
 }
 
 export function splMintToToken(splMint: PublicKey) {
-  if (splMint.toBase58() === wSOLPk.toBase58()) {
+  if (splMint.toBase58() === wsolPk.toBase58()) {
     return 'SOL';
   }
-  if (splMint.toBase58() === soBTCPk.toBase58()) {
+  if (splMint.toBase58() === soBtcPk.toBase58()) {
     return 'BTC';
   }
-  if (splMint.toBase58() === soETHPk.toBase58()) {
+  if (splMint.toBase58() === soEthPk.toBase58()) {
     return 'ETH';
   }
-  if (splMint.toBase58() === mngoPK.toBase58()) {
+  if (splMint.toBase58() === mngoPk.toBase58()) {
     return 'MNGO';
   }
-  if (splMint.toBase58() === bonkPK.toBase58()) {
+  if (splMint.toBase58() === bonkPk.toBase58()) {
     return 'BONK';
   }
-  if (splMint.toBase58() === usdcMintPk.toBase58()) {
+  if (splMint.toBase58() === usdcPk.toBase58()) {
     return 'USDC';
   }
   return 'UNKNOWN_TOKEN';
@@ -155,22 +150,22 @@ export function splMintToToken(splMint: PublicKey) {
 
 export function tokenToSplMint(token: string) {
   if (token === 'SOL') {
-    return wSOLPk;
+    return wsolPk;
   }
   if (token === 'BTC') {
-    return soBTCPk;
+    return soBtcPk;
   }
   if (token === 'ETH') {
-    return soETHPk;
+    return soEthPk;
   }
   if (token === 'MNGO') {
-    return mngoPK;
+    return mngoPk;
   }
   if (token === 'BONK') {
-    return bonkPK;
+    return bonkPk;
   }
   if (token === 'USDC') {
-    return usdcMintPk;
+    return usdcPk;
   }
   return undefined;
 }

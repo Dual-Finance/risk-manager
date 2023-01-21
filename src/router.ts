@@ -11,15 +11,10 @@ import {
   API_URL,
   cluster,
   DUAL_API,
-  usdcMintPk,
-  dualMarketProgramID,
-  optionVaultPk,
-  OPTION_MINT_ADDRESS_SEED,
-  PROTCOL_API_KEY,
+  usdcPk,
   BVE_VOL_MAP,
   minExecutionPremium,
   volSpread,
-  NUM_DIP_ATOMS_PER_TOKEN,
   rfRate,
 } from './config';
 import Poller from './poller';
@@ -31,6 +26,7 @@ import {
   tokenToSplMint,
 } from './utils';
 import * as apiSecret from '../apiSecret.json';
+import { dualMarketProgramID, NUM_DIP_ATOMS_PER_TOKEN, optionVaultPk, OPTION_MINT_ADDRESS_SEED, PROTCOL_API_KEY } from './constants';
 
 const crypto = require('crypto');
 
@@ -297,7 +293,7 @@ export class Router {
       strike * NUM_DIP_ATOMS_PER_TOKEN,
       expirationSec,
       splMint,
-      usdcMintPk,
+      usdcPk,
       dualMarketProgramID,
     );
     const mmOptionAccount = await getAssociatedTokenAddress(
@@ -363,7 +359,7 @@ export class Router {
             strike * 1_000_000,
             expiration,
             splMint,
-            usdcMintPk,
+            usdcPk,
             dualMarketProgramID,
           );
           const mmOptionAccount = await getAssociatedTokenAddress(

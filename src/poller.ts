@@ -9,7 +9,8 @@ import {
 } from '@solana/web3.js';
 import { AccountLayout, u64 } from '@solana/spl-token';
 import { CallOrPut, DIPDeposit } from './common';
-import { API_URL, NUM_DIP_ATOMS_PER_TOKEN } from './config';
+import { API_URL } from './config';
+import { NUM_DIP_ATOMS_PER_TOKEN } from './constants';
 
 class Poller {
   cluster: Cluster;

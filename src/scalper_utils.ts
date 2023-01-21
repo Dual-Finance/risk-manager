@@ -17,12 +17,9 @@ import { DIPDeposit, RouteDetails } from './common';
 import {
   ACCOUNT_MAP,
   JUPITER_LIQUIDITY,
-  mangoTesterPk,
   maxMktSpreadPctForPricing,
-  optionVaultPk,
   jupiterSearchSteps,
   rfRate,
-  riskManagerPk,
   slippageMax,
   THEO_VOL_MAP,
   jupiterSlippageBps,
@@ -36,6 +33,7 @@ import {
   decimalsBaseSPL, getChainlinkPrice, getPythPrice, getSwitchboardPrice,
   splMintToToken, tokenToSplMint,
 } from './utils';
+import { mangoTesterPk, optionVaultPk, riskManagerPk } from './constants';
 
 export async function loadPrices(
   mangoGroup: MangoGroup,

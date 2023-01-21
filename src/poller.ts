@@ -46,9 +46,9 @@ class Poller {
       accountInfo: solanaAccountInfo<Buffer>,
       _context: Context,
     ) => {
-      const newAmountAtoms: number = u64.fromBuffer(
+      const newAmountAtoms: number = Number(
         AccountLayout.decode(accountInfo.data).amount,
-      ).toNumber();
+      );
 
       const dipDeposit: DIPDeposit = {
         splTokenName: this.splTokenName,
@@ -56,7 +56,7 @@ class Poller {
         expirationMs: this.expirationSec * 1_000,
         strikeUsdcPerToken: this.strikeTokens,
         callOrPut: this.callOrPut,
-        qtyTokens: newAmountAtoms / 10 ** NUM_DIP_ATOMS_PER_TOKEN,
+        qtyTokens: newAmountAtoms / NUM_DIP_ATOMS_PER_TOKEN,
       };
       this.callback(dipDeposit);
     };

@@ -65,7 +65,8 @@ async function main() {
   if (productStatus.get('SOL')) {
     await solRouter.refresh_dips();
     console.log('Check SOL Position vs MM Quotes', new Date().toUTCString());
-    solRouter.checkMMPrices();
+    await solRouter.checkMMPrices();
+    // TODO: Make sure scalper gets an updated DIP position after routing
     console.log('Run SOL Risk Manager', new Date().toUTCString());
     solRouter.run_risk_manager();
     await sleepExact(productStaggerSec);
@@ -73,7 +74,7 @@ async function main() {
   if (productStatus.get('BTC')) {
     await btcRouter.refresh_dips();
     console.log('Check BTC Position vs MM Quotes', new Date().toUTCString());
-    btcRouter.checkMMPrices();
+    await btcRouter.checkMMPrices();
     console.log('Run BTC Risk Manager', new Date().toUTCString());
     btcRouter.run_risk_manager();
     await sleepExact(productStaggerSec);
@@ -81,7 +82,7 @@ async function main() {
   if (productStatus.get('ETH')) {
     await ethRouter.refresh_dips();
     console.log('Check ETH Position vs MM Quotes', new Date().toUTCString());
-    ethRouter.checkMMPrices();
+    await ethRouter.checkMMPrices();
     console.log('Run ETH Risk Manager', new Date().toUTCString());
     ethRouter.run_risk_manager();
     await sleepExact(productStaggerSec);
@@ -89,7 +90,7 @@ async function main() {
   if (productStatus.get('BONK')) {
     await bonkRouter.refresh_dips();
     console.log('Check BONK Position vs MM Quotes', new Date().toUTCString());
-    bonkRouter.checkMMPrices();
+    await bonkRouter.checkMMPrices();
     console.log('Run BONK Risk Manager', new Date().toUTCString());
     bonkRouter.run_risk_manager();
     await sleepExact(productStaggerSec);
@@ -97,7 +98,7 @@ async function main() {
   if (productStatus.get('MNGO')) {
     await mngoRouter.refresh_dips();
     console.log('Check MNGO Position vs MM Quotes', new Date().toUTCString());
-    mngoRouter.checkMMPrices();
+    await mngoRouter.checkMMPrices();
     console.log('Run MNGO Risk Manager', new Date().toUTCString());
     mngoRouter.run_risk_manager();
   }
@@ -106,46 +107,46 @@ async function main() {
     try {
       if (productStatus.get('SOL')) {
         console.log('------------------------------------------------');
-        console.log('Re-Check SOL Position vs MM Quotes', new Date().toUTCString());
-        solRouter.checkMMPrices();
         console.log('RERUN SOL Risk Manager', new Date().toUTCString());
         await solRouter.refresh_dips();
+        console.log('Re-Check SOL Position vs MM Quotes', new Date().toUTCString());
+        await solRouter.checkMMPrices();
         solRouter.run_risk_manager();
         await sleepExact(productStaggerSec);
       }
       if (productStatus.get('BTC')) {
         console.log('------------------------------------------------');
-        console.log('Re-Check BTC Position vs MM Quotes', new Date().toUTCString());
-        btcRouter.checkMMPrices();
         console.log('RERUN BTC Risk Manager', new Date().toUTCString());
         await btcRouter.refresh_dips();
+        console.log('Re-Check BTC Position vs MM Quotes', new Date().toUTCString());
+        await btcRouter.checkMMPrices();
         btcRouter.run_risk_manager();
         await sleepExact(productStaggerSec);
       }
       if (productStatus.get('ETH')) {
         console.log('------------------------------------------------');
-        console.log('Re-Check ETH Position vs MM Quotes', new Date().toUTCString());
-        ethRouter.checkMMPrices();
         console.log('RERUN ETH Risk Manager', new Date().toUTCString());
         await ethRouter.refresh_dips();
+        console.log('Re-Check ETH Position vs MM Quotes', new Date().toUTCString());
+        await ethRouter.checkMMPrices();
         ethRouter.run_risk_manager();
         await sleepExact(productStaggerSec);
       }
       if (productStatus.get('BONK')) {
         console.log('------------------------------------------------');
-        console.log('Re-Check BONK Position vs MM Quotes', new Date().toUTCString());
-        bonkRouter.checkMMPrices();
         console.log('RERUN BONK Risk Manager', new Date().toUTCString());
         await bonkRouter.refresh_dips();
+        console.log('Re-Check BONK Position vs MM Quotes', new Date().toUTCString());
+        await bonkRouter.checkMMPrices();
         bonkRouter.run_risk_manager();
         await sleepExact(productStaggerSec);
       }
       if (productStatus.get('MNGO')) {
         console.log('------------------------------------------------');
-        console.log('Re-Check MNGO Position vs MM Quotes', new Date().toUTCString());
-        mngoRouter.checkMMPrices();
         console.log('RERUN MNGO Risk Manager', new Date().toUTCString());
         await mngoRouter.refresh_dips();
+        console.log('Re-Check MNGO Position vs MM Quotes', new Date().toUTCString());
+        await mngoRouter.checkMMPrices();
         mngoRouter.run_risk_manager();
       }
     } catch (err) {

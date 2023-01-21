@@ -56,7 +56,7 @@ class Poller {
         expirationMs: this.expirationSec * 1_000,
         strikeUsdcPerToken: this.strikeTokens,
         callOrPut: this.callOrPut,
-        qtyTokens: newAmountAtoms / 10 ** NUM_DIP_ATOMS_PER_TOKEN,
+        qtyTokens: newAmountAtoms / NUM_DIP_ATOMS_PER_TOKEN,
       };
       this.callback(dipDeposit);
     };

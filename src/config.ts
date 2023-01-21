@@ -1,5 +1,5 @@
-import { PublicKey } from '@solana/web3.js';
-import { DIPDeposit } from './common';
+import { Cluster, PublicKey } from '@solana/web3.js';
+import { CallOrPut, DIPDeposit } from './common';
 
 export const IS_DEV = process.env.DEV !== 'false';
 export const API_URL = process.env.RPC;
@@ -56,7 +56,7 @@ export const MODE = new Map<string, number>([
 export const ENVIRONMENT: string = IS_DEV ? 'DEVNET' : 'MAINNET';
 
 export const networkName = IS_DEV ? 'devnet.2' : 'mainnet.1';
-export const cluster = IS_DEV ? 'devnet' : 'mainnet-beta';
+export const cluster: Cluster = IS_DEV ? 'devnet' : 'mainnet-beta';
 export const DUAL_API = IS_DEV ? 'https://dev.api.dual.finance' : 'https://api.dual.finance';
 export const FILLS_URL = IS_DEV ? 'ws://api.mngo.cloud:2082' : 'ws://v3.mngo.cloud:8080';
 export const usdcMintPk = IS_DEV ? new PublicKey('HJiQv33nKujRmZQ3sJBSosXgCEmiHs3mG1yd9VcLawPM') : new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
@@ -143,7 +143,7 @@ export const treasuryPositions: DIPDeposit[] = [({
   premiumAssetName: 'USDC',
   expirationMs: 1677672000000,
   strikeUsdcPerToken: 0.018,
-  callOrPut: 'put',
+  callOrPut: CallOrPut.Put,
   qtyTokens: 6944444,
 }),
 ({
@@ -151,7 +151,7 @@ export const treasuryPositions: DIPDeposit[] = [({
   premiumAssetName: 'USDC',
   expirationMs: 1675252800000,
   strikeUsdcPerToken: 0.020,
-  callOrPut: 'put',
+  callOrPut: CallOrPut.Put,
   qtyTokens: 6250000,
 }),
 ({
@@ -159,7 +159,7 @@ export const treasuryPositions: DIPDeposit[] = [({
   premiumAssetName: 'USDC',
   expirationMs: 1675166400000,
   strikeUsdcPerToken: 0.0000005,
-  callOrPut: 'call',
+  callOrPut: CallOrPut.Call,
   qtyTokens: 10000150,
 }), // Actually GSO Position
 ({
@@ -167,7 +167,7 @@ export const treasuryPositions: DIPDeposit[] = [({
   premiumAssetName: 'USDC',
   expirationMs: 1676462400000,
   strikeUsdcPerToken: 0.000003,
-  callOrPut: 'call',
+  callOrPut: CallOrPut.Call,
   qtyTokens: 10000000,
 }), // Running this until EOM
 ];

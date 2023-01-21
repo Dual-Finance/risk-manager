@@ -1,11 +1,16 @@
 import { Transaction } from '@solana/web3.js';
 
+export enum CallOrPut {
+  Call = 'call',
+  Put = 'put'
+}
+
 export interface DIPDeposit {
   splTokenName: string;
   premiumAssetName: string;
   expirationMs: number;
   strikeUsdcPerToken: number;
-  callOrPut: string;
+  callOrPut: CallOrPut;
   qtyTokens: number;
 }
 

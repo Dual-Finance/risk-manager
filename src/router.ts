@@ -4,6 +4,7 @@ import fetch from 'cross-fetch';
 import { blackScholes } from 'black-scholes';
 import { getAssociatedTokenAddress } from '@project-serum/associated-token';
 import {
+  CallOrPut,
   DIPDeposit,
 } from './common';
 import {
@@ -308,7 +309,7 @@ export class Router {
       premiumAssetName: 'USDC',
       expirationMs: expirationSec * 1_000,
       strikeUsdcPerToken: strike,
-      callOrPut: 'call',
+      callOrPut: CallOrPut.Call,
       qtyTokens: Number(balance.value.uiAmount),
     };
   }
@@ -375,7 +376,7 @@ export class Router {
             'USDC',
             expirationSec,
             strike,
-            'call',
+            CallOrPut.Call,
             (deposit: DIPDeposit) => {
               this.route(deposit);
             },

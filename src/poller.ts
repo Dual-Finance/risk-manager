@@ -5,33 +5,28 @@ import {
   AccountInfo as solanaAccountInfo,
   Context,
   Commitment,
+  Cluster,
 } from '@solana/web3.js';
 import { AccountLayout, u64 } from '@solana/spl-token';
-import { DIPDeposit } from './common';
+import { CallOrPut, DIPDeposit } from './common';
 import { API_URL, NUM_DIP_ATOMS_PER_TOKEN } from './config';
 
 class Poller {
-  cluster: string;
-
+  cluster: Cluster;
   callback: (deposit: DIPDeposit) => void;
-
   splTokenName: string;
-
   premiumAssetName: string;
-
   expirationSec: number;
-
   strikeTokens: number;
-
-  callOrPut: string;
+  callOrPut: CallOrPut;
 
   constructor(
-    cluster: string,
+    cluster: Cluster,
     splTokenName: string,
     premiumAssetName: string,
     expirationSec: number,
     strikeTokens: number,
-    callOrPut: string,
+    callOrPut: CallOrPut,
     callback: (deposit: DIPDeposit) => void,
   ) {
     this.cluster = cluster;
@@ -51,7 +46,7 @@ class Poller {
       accountInfo: solanaAccountInfo<Buffer>,
       _context: Context,
     ) => {
-      const newAmount: number = u64.fromBuffer(
+      const newAmountAtoms: number = u64.fromBuffer(
         AccountLayout.decode(accountInfo.data).amount,
       ).toNumber();
 
@@ -61,12 +56,11 @@ class Poller {
         expirationMs: this.expirationSec * 1_000,
         strikeUsdcPerToken: this.strikeTokens,
         callOrPut: this.callOrPut,
-        qtyTokens: newAmount / 10 ** NUM_DIP_ATOMS_PER_TOKEN,
+        qtyTokens: newAmountAtoms / 10 ** NUM_DIP_ATOMS_PER_TOKEN,
       };
       this.callback(dipDeposit);
     };
 
-    // Watch the option token account
     try {
       connection.onAccountChange(new PublicKey(address), callback);
     } catch (err) {

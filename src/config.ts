@@ -1,6 +1,8 @@
 import { Cluster } from '@solana/web3.js';
 import { CallOrPut, DIPDeposit } from './common';
-import { openbookDevnetId, openbookMainnetId, usdcDevnetPk, usdcMainnetPk } from './constants';
+import {
+  openbookDevnetId, openbookMainnetId, usdcDevnetPk, usdcMainnetPk,
+} from './constants';
 
 export const IS_DEV = process.env.DEV !== 'false';
 export const API_URL = process.env.RPC;
@@ -60,7 +62,8 @@ export const networkName = IS_DEV ? 'devnet.2' : 'mainnet.1';
 export const cluster: Cluster = IS_DEV ? 'devnet' : 'mainnet-beta';
 export const DUAL_API = IS_DEV ? 'https://dev.api.dual.finance' : 'https://api.dual.finance';
 export const FILLS_URL = IS_DEV ? 'ws://api.mngo.cloud:2082' : 'ws://v3.mngo.cloud:8080';
-export const usdcPk = IS_DEV ? usdcDevnetPk: usdcMainnetPk;
+export const VIAL_WS_URL = 'wss://vial.mngo.cloud/v1/ws';
+export const usdcPk = IS_DEV ? usdcDevnetPk : usdcMainnetPk;
 export const OPENBOOK_FORK_ID = IS_DEV ? openbookDevnetId : openbookMainnetId;
 
 export const ACCOUNT_MAP = new Map<string, string>([

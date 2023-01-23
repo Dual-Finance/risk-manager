@@ -169,3 +169,5 @@ export const maxOrderBookSearchDepth = 100;
 export const maxBackGammaMultiple = 5;
 // IV spread market maker at minimum must beat backstop to take fills
 export const volSpread = 0.05;
+// Max % spread to allow whale bid/ask
+export const whaleMaxSpread = 0.4;

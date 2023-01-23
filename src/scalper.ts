@@ -17,9 +17,9 @@ import {
   maxDeltaHedges, percentDrift, DELTA_OFFSET, MANGO_DOWNTIME_THRESHOLD_MIN,
   perpFundingRateThreshold, gammaCycles, MinOpenBookSize, OPENBOOK_FORK_ID,
   treasuryPositions, slippageMax, gammaCompleteThresholdPct, cluster,
-  maxOrderBookSearchDepth, maxBackGammaMultiple, API_URL, MODE,
+  maxOrderBookSearchDepth, maxBackGammaMultiple, API_URL, MODE, whaleMaxSpread,
 } from './config';
-import { DIPDeposit } from './common';
+import { CallOrPut, DIPDeposit } from './common';
 import { readKeypair, sleepExact, sleepRandom } from './utils';
 import { SerumVialClient, SerumVialTradeMessage } from './serumVial';
 import {
@@ -1030,10 +1030,10 @@ Spread % ${(whaleAskPrice - whaleBidPrice) / fairValue * 100}`);
     const whaleBidDiff = fairValue - whaleBidPrice;
     const whaleAskDiff = whaleAskPrice - fairValue;
     const backBidPrice = whaleBidDiff > fairValue - gammaBid
-      ? Math.floor((whaleBidPrice + this.tickSize) * (1 / this.tickSize)) / (1 / this.tickSize)
+      ? Math.max(Math.floor((whaleBidPrice + this.tickSize) * (1 / this.tickSize)) / (1 / this.tickSize), gammaBid * (1 - whaleMaxSpread))
       : undefined;
     const backAskPrice = whaleAskDiff > gammaAsk - fairValue
-      ? Math.floor((whaleAskPrice - this.tickSize) * (1 / this.tickSize)) / (1 / this.tickSize)
+      ? Math.min(Math.floor((whaleAskPrice - this.tickSize) * (1 / this.tickSize)) / (1 / this.tickSize), gammaAsk * (1 + whaleMaxSpread))
       : undefined;
     const whaleBidGammaQty = Math.min(netGamma * (maxBackGammaMultiple - 1), dipTotalGamma * whaleBidDiff - netGamma);
     const whaleAskGammaQty = Math.min(netGamma * (maxBackGammaMultiple - 1), dipTotalGamma * whaleAskDiff - netGamma);

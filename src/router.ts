@@ -171,7 +171,7 @@ export class Router {
     }
     // On startup run risk manager when there is no position
     if (openPositionCount === 0) {
-      console.log('No Positions. Run SOL Risk Manager', new Date().toUTCString());
+      console.log('No Positions. Run Risk Manager', new Date().toUTCString());
       this.run_risk_manager();
     } else {
       console.log('Open DIP Positions', openPositionCount);

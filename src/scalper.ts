@@ -107,7 +107,11 @@ export class Scalper {
         dipProduct.push(positions);
       }
     }
-    console.log(this.symbol, 'Active Positions', dipProduct);
+    console.log(this.symbol, 'Tracking Positions', dipProduct.length);
+    for (const dip of dipProduct) {
+      console.log(dip.splTokenName, dip.premiumAssetName, new Date(dip.expirationMs).toDateString(), 
+        dip.strikeUsdcPerToken, dip.callOrPut, dip.qtyTokens);
+    }
 
     this.marketIndex = this.perpMarketConfig.marketIndex;
     if (this.marketIndex === undefined) {

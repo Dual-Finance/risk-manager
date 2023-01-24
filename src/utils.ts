@@ -1,4 +1,3 @@
-/* eslint-disable */
 import * as os from 'os';
 import * as fs from 'fs';
 import { Connection, PublicKey } from '@solana/web3.js';
@@ -11,13 +10,11 @@ import SwitchboardProgram from '@switchboard-xyz/sbv2-lite';
 import * as anchor from '@project-serum/anchor';
 import { OCR2Feed } from '@chainlink/solana-sdk';
 import {
-  percentDrift,
-  API_URL,
-  IS_DEV,
-  usdcPk,
-  SYMBOL,
+  percentDrift, API_URL, IS_DEV, usdcPk, SYMBOL,
 } from './config';
-import { bonkPk, CHAINLINK_PROGRAM_ID, mngoPk, soBtcPk, soEthPk, wsolPk } from './constants';
+import {
+  bonkPk, CHAINLINK_PROGRAM_ID, mngoPk, soBtcPk, soEthPk, wsolPk,
+} from './constants';
 
 export function readKeypair() {
   return JSON.parse(
@@ -41,27 +38,9 @@ export function sleepExact(period: number) {
   });
 }
 
-export function readBigUInt64LE(buffer: Buffer, inputOffset = 0) {
-  let offset = inputOffset;
-  const first = buffer[offset];
-  const last = buffer[offset + 7];
-  if (first === undefined || last === undefined) {
-    throw new Error();
-  }
-  const lo = first
-    + buffer[++offset] * 2 ** 8
-    + buffer[++offset] * 2 ** 16
-    + buffer[++offset] * 2 ** 24;
-  const hi = buffer[++offset]
-    + buffer[++offset] * 2 ** 8
-    + buffer[++offset] * 2 ** 16
-    + last * 2 ** 24;
-  return BigInt(lo) + (BigInt(hi) << BigInt(32));
-}
-
 export function parseDipState(buf: Buffer) {
-  const strike = Number(readBigUInt64LE(buf, 8));
-  const expiration = Number(readBigUInt64LE(buf, 16));
+  const strike = Number(buf.readBigUInt64LE(8));
+  const expiration = Number(buf.readBigUInt64LE(16));
   const splMint = new PublicKey(buf.slice(24, 56));
   const vaultMint = new PublicKey(buf.slice(56, 88));
   const vaultMintBump = Number(buf.readUInt8(88));
@@ -123,11 +102,11 @@ export function timeSinceMidDay() {
   const month = timeNow.getUTCMonth();
   const day = timeNow.getUTCDate();
   const timeCheckUTC = Date.UTC(year, month, day, 12, 0, 0, 0);
-  const diff = (timeNow.getTime() - timeCheckUTC) / 1000;
+  const diff = (timeNow.getTime() - timeCheckUTC) / 1_000;
   return diff;
 }
 
-export function splMintToToken(splMint: PublicKey) {
+export function splMintToToken(splMint: PublicKey): SYMBOL {
   if (splMint.toBase58() === wsolPk.toBase58()) {
     return 'SOL';
   }
@@ -262,8 +241,11 @@ export async function getSwitchboardPrice(splMint: PublicKey) {
 // TODO: Fail after a few tries if chainlink is stuck
 function waitFor(conditionFunction) {
   const poll = (resolve) => {
-    if (conditionFunction()) resolve();
-    else setTimeout((_) => poll(resolve), 400);
+    if (conditionFunction()) {
+      resolve();
+    } else {
+      setTimeout((_: any) => poll(resolve), 400);
+    }
   };
   return new Promise(poll);
 }
@@ -288,25 +270,29 @@ export function tokenToChainlinkSymbol(token: SYMBOL) {
 }
 
 export function decimalsBaseSPL(token: SYMBOL) {
-  if (token === 'SOL') {
-    return 9;
+  switch (token) {
+    case 'SOL': {
+      return 9;
+    }
+    case 'BTC': {
+      return 8;
+    }
+    case 'ETH': {
+      return 8;
+    }
+    case 'MNGO': {
+      return 6;
+    }
+    case 'BONK': {
+      return 5;
+    }
+    case 'USDC': {
+      return 6;
+    }
+    default: {
+      return undefined;
+    }
   }
-  if (token === 'BTC') {
-    return 8;
-  }
-  if (token === 'ETH') {
-    return 8;
-  }
-  if (token === 'MNGO') {
-    return 6;
-  }
-  if (token === 'BONK') {
-    return 5;
-  }
-  if (token === 'USDC') {
-    return 6;
-  }
-  return undefined;
 }
 
 export async function getChainlinkPrice(splMint: PublicKey) {

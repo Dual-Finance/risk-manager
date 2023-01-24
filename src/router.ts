@@ -15,6 +15,7 @@ import {
   minExecutionPremium,
   volSpread,
   rfRate,
+  SYMBOL,
 } from './config';
 import Poller from './poller';
 import {
@@ -26,7 +27,7 @@ import {
 } from './utils';
 import * as apiSecret from '../apiSecret.json';
 import {
-  dualMarketProgramID, NUM_DIP_ATOMS_PER_TOKEN, optionVaultPk,
+  dualMarketProgramID, MS_PER_YEAR, NUM_DIP_ATOMS_PER_TOKEN, optionVaultPk,
   OPTION_MINT_ADDRESS_SEED, PROTCOL_API_KEY,
 } from './constants';
 import { dipToString, fetchMMOrder } from './router_utils';
@@ -35,17 +36,14 @@ const crypto = require('crypto');
 
 class Router {
   mmCallback: (d: DIPDeposit[]) => void;
-
   riskManagerCallback: (d: DIPDeposit[]) => void;
-
   dips: { [name: string]: DIPDeposit };
-
-  token: string;
+  token: SYMBOL;
 
   constructor(
     mmCallback: (d: DIPDeposit[]) => void,
     riskManagerCallback: (d: DIPDeposit[]) => void,
-    token: string,
+    token: SYMBOL,
   ) {
     this.mmCallback = mmCallback;
     this.riskManagerCallback = riskManagerCallback;
@@ -94,7 +92,7 @@ class Router {
       const currentPrice = await getPythPrice(
         new PublicKey(tokenToSplMint(dipDeposit.splTokenName)),
       );
-      const fractionOfYear = (dipDeposit.expirationMs - Date.now()) / (365 * 24 * 60 * 60 * 1_000);
+      const fractionOfYear = (dipDeposit.expirationMs - Date.now()) / MS_PER_YEAR;
       const vol = BVE_VOL_MAP.get(
         dipDeposit.splTokenName,
       ) * (1 + volSpread + Math.random() * volSpread);

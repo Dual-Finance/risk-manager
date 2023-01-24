@@ -1,5 +1,5 @@
 import { DIPDeposit } from './common';
-import { Scalper } from './scalper';
+import Scalper from './scalper';
 import Router from './router';
 import {
   percentDrift, scalperWindowSec, cluster, productStaggerSec, productStatus,

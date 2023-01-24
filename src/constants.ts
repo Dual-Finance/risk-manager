@@ -27,3 +27,5 @@ export const CHAINLINK_PROGRAM_ID = new PublicKey('cjg3oHmg9uuPsP8D6g29NWvhySJkd
 export const optionVaultPk = new PublicKey('9SgZKdeTMaNuEZnhccK2crHxi1grXRmZKQCvNSKgVrCQ');
 export const riskManagerPk = new PublicKey('FCsXUii28gmnKQCZV1vGMZPqF2LCRCr3pqErQcskgr8W');
 export const mangoTesterPk = new PublicKey('CkcJx7Uwgxck5zm3DqUp2N1ikkkoPn2wA8zf7oS4tFSZ');
+
+export const MS_PER_YEAR = 365 * 60 * 60 * 24 * 1_000;

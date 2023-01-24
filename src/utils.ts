@@ -15,6 +15,7 @@ import {
   API_URL,
   IS_DEV,
   usdcPk,
+  SYMBOL,
 } from './config';
 import { bonkPk, CHAINLINK_PROGRAM_ID, mngoPk, soBtcPk, soEthPk, wsolPk } from './constants';
 
@@ -145,10 +146,11 @@ export function splMintToToken(splMint: PublicKey) {
   if (splMint.toBase58() === usdcPk.toBase58()) {
     return 'USDC';
   }
+  console.log(`Unknown token: ${splMint.toBase58()}`);
   return 'UNKNOWN_TOKEN';
 }
 
-export function tokenToSplMint(token: string) {
+export function tokenToSplMint(token: SYMBOL) {
   if (token === 'SOL') {
     return wsolPk;
   }
@@ -170,7 +172,7 @@ export function tokenToSplMint(token: string) {
   return undefined;
 }
 
-export function tokenToPythSymbol(token: string) {
+export function tokenToPythSymbol(token: SYMBOL) {
   if (token === 'SOL') {
     return 'Crypto.SOL/USD';
   }
@@ -208,7 +210,7 @@ export async function getPythPrice(splMint: PublicKey): Promise<number | undefin
   return 0;
 }
 
-export function tokenToSBSymbol(token: string) {
+export function tokenToSBSymbol(token: SYMBOL) {
   if (token === 'SOL') {
     return 'GvDMxPzN1sCj7L26YDK2HnMRXEQmQ2aemov8YBtPS7vR';
   }
@@ -266,7 +268,7 @@ function waitFor(conditionFunction) {
   return new Promise(poll);
 }
 
-export function tokenToChainlinkSymbol(token: string) {
+export function tokenToChainlinkSymbol(token: SYMBOL) {
   if (token === 'SOL') {
     return 'B4vR6BW4WpLh1mFs6LL6iqL4nydbmE5Uzaz2LLsoAXqk';
   }
@@ -285,7 +287,7 @@ export function tokenToChainlinkSymbol(token: string) {
   return undefined;
 }
 
-export function decimalsBaseSPL(token: string) {
+export function decimalsBaseSPL(token: SYMBOL) {
   if (token === 'SOL') {
     return 9;
   }

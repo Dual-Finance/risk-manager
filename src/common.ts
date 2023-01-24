@@ -1,4 +1,5 @@
 import { Transaction } from '@solana/web3.js';
+import { SYMBOL } from './config';
 
 export enum CallOrPut {
   Call = 'call',
@@ -6,7 +7,7 @@ export enum CallOrPut {
 }
 
 export interface DIPDeposit {
-  splTokenName: string;
+  splTokenName: SYMBOL;
   premiumAssetName: string;
   expirationMs: number;
   strikeUsdcPerToken: number;

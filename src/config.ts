@@ -144,7 +144,7 @@ export const gammaThreshold = 0.05;
 // Maximum amount of orders to delta hedge across
 export const maxDeltaHedges = 4;
 // Number cycles to scalp gamma
-export const gammaCycles = 10;
+export const gammaCycles: number = 10;
 // Seconds to wait between reruns of each product
 export const productStaggerSec = 30;
 // Time in minutes of downtime to stop routing transactions to mango

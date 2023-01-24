@@ -13,7 +13,7 @@ import { getAssociatedTokenAddress } from '@project-serum/associated-token';
 import fetch from 'node-fetch';
 import { Jupiter } from '@jup-ag/core';
 import JSBI from 'jsbi';
-import { DIPDeposit, RouteDetails } from './common';
+import { DIPDeposit, RouteDetails, SYMBOL } from './common';
 import {
   ACCOUNT_MAP,
   JUPITER_LIQUIDITY,
@@ -28,7 +28,6 @@ import {
   gammaCycles,
   percentDrift,
   scalperWindowSec,
-  SYMBOL,
 } from './config';
 import {
   decimalsBaseSPL, getChainlinkPrice, getPythPrice, getSwitchboardPrice,

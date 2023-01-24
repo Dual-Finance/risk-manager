@@ -21,6 +21,11 @@ export type SerumVialTradeMessage = {
   readonly makerFeeCost: number;
 };
 
+export function tradeMessageToString(message: SerumVialTradeMessage) {
+  return `size: ${message.size} market: ${message.market} price: ${message.price} \
+makerId: ${message.makerClientId} takerId: ${message.takerClientId} time: ${message.timestamp}`;
+}
+
 export class SerumVialClient {
   private ws: WebSocket | undefined = undefined;
 

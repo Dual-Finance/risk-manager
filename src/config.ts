@@ -1,5 +1,5 @@
 import { Cluster } from '@solana/web3.js';
-import { CallOrPut, DIPDeposit } from './common';
+import { CallOrPut, DIPDeposit, SYMBOL } from './common';
 import {
   openbookDevnetId, openbookMainnetId, usdcDevnetPk, usdcMainnetPk,
 } from './constants';
@@ -14,7 +14,6 @@ const ethVars = process.env.ETH.split(',');
 const mngoVars = process.env.MNGO.split(',');
 const bonkVars = process.env.BONK.split(',');
 
-export type SYMBOL = 'BTC' | 'ETH' | 'SOL' | 'MNGO' | 'BONK' | 'USDC' | 'UNKNOWN_TOKEN';
 export const productStatus = new Map<SYMBOL, boolean>([
   ['BTC', btcVars[0] === 'ON'],
   ['ETH', ethVars[0] === 'ON'],

@@ -24,7 +24,7 @@ async function main() {
     },
     'SOL',
   );
-  // TODO test BTC & ETH after sollet is resolved
+  // TODO: Test BTC & ETH after sollet is resolved
   const btcRouter: Router = new Router(
     (deposit: DIPDeposit[]) => {
       console.log('Route to MM', deposit);

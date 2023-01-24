@@ -10,11 +10,12 @@ import SwitchboardProgram from '@switchboard-xyz/sbv2-lite';
 import * as anchor from '@project-serum/anchor';
 import { OCR2Feed } from '@chainlink/solana-sdk';
 import {
-  percentDrift, API_URL, IS_DEV, usdcPk, SYMBOL,
+  percentDrift, API_URL, IS_DEV, usdcPk,
 } from './config';
 import {
   bonkPk, CHAINLINK_PROGRAM_ID, mngoPk, soBtcPk, soEthPk, wsolPk,
 } from './constants';
+import { SYMBOL } from './common';
 
 export function readKeypair() {
   return JSON.parse(

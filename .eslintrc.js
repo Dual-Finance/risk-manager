@@ -20,6 +20,7 @@ module.exports = {
     "no-console": 0,
     "no-bitwise": 0,
     "no-plusplus": 0,
+    "no-continue": 0,
     "no-promise-executor-return": 0,
     "no-unused-vars": "off",
     "@typescript-eslint/no-unused-vars": [

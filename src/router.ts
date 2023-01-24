@@ -1,4 +1,3 @@
-/* eslint-disable */
 import { Commitment, Connection, PublicKey } from '@solana/web3.js';
 import fetch from 'cross-fetch';
 import { blackScholes } from 'black-scholes';
@@ -26,11 +25,15 @@ import {
   tokenToSplMint,
 } from './utils';
 import * as apiSecret from '../apiSecret.json';
-import { dualMarketProgramID, NUM_DIP_ATOMS_PER_TOKEN, optionVaultPk, OPTION_MINT_ADDRESS_SEED, PROTCOL_API_KEY } from './constants';
+import {
+  dualMarketProgramID, NUM_DIP_ATOMS_PER_TOKEN, optionVaultPk,
+  OPTION_MINT_ADDRESS_SEED, PROTCOL_API_KEY,
+} from './constants';
+import { dipToString, fetchMMOrder } from './router_utils';
 
 const crypto = require('crypto');
 
-export class Router {
+class Router {
   mmCallback: (d: DIPDeposit[]) => void;
 
   riskManagerCallback: (d: DIPDeposit[]) => void;
@@ -66,18 +69,19 @@ export class Router {
     // This happens after sending tokens to a MM. Exit early.
     if (dipDeposit.qtyTokens === 0) {
       this.dips[
-        this.dipToString(dipDeposit.expirationMs / 1_000, dipDeposit.strikeUsdcPerToken)
+        dipToString(dipDeposit.expirationMs / 1_000, dipDeposit.strikeUsdcPerToken)
       ] = dipDeposit;
       console.log('DIP Deposit quantity zero. Rerun');
-      this.run_risk_manager;
+      this.run_risk_manager();
       return;
     }
-    await this.fetchMMOrder(symbol).then(async (order) => {
+
+    await fetchMMOrder(symbol).then(async (order) => {
       // Run the risk manager if there is no MM order
       // @ts-ignore
       if (!order || Number(order.remainingQuantity) < dipDeposit.qtyTokens) {
         this.dips[
-          this.dipToString(
+          dipToString(
             dipDeposit.expirationMs / 1_000,
             dipDeposit.strikeUsdcPerToken,
           )
@@ -103,7 +107,7 @@ export class Router {
         // If user premium is too small don't bother spamming MM
         console.log('Not routing too small of a trade:', userPremium, minExecutionPremium);
         this.dips[
-          this.dipToString(
+          dipToString(
             dipDeposit.expirationMs / 1_000,
             dipDeposit.strikeUsdcPerToken,
           )
@@ -117,7 +121,7 @@ export class Router {
         // like there is no MM bid.
         console.log('Not routing to MM due to price:', thresholdPrice, price);
         this.dips[
-          this.dipToString(
+          dipToString(
             dipDeposit.expirationMs / 1_000,
             dipDeposit.strikeUsdcPerToken,
           )
@@ -182,25 +186,6 @@ export class Router {
     this.riskManagerCallback(Object.values(this.dips));
   }
 
-  async fetchMMOrder(symbol: string): Promise<number> {
-    // TODO: Lookup in the pricing object on chain
-    try {
-      const url = `${DUAL_API}/symbols/getprice?symbol=${symbol}`;
-      const order = (
-        await (
-          await fetch(url, {
-            method: 'get',
-            headers: { 'Content-Type': 'application/json' },
-          })
-        ).json()
-      )[0];
-      console.log('API Order URL:', url);
-      return order;
-    } catch (err) {
-      return undefined;
-    }
-  }
-
   async add_dip(
     expirationSec: number,
     strike: number,
@@ -221,7 +206,7 @@ export class Router {
     );
     const balance = await connection.getTokenAccountBalance(mmOptionAccount);
 
-    this.dips[this.dipToString(expirationSec, strike)] = {
+    this.dips[dipToString(expirationSec, strike)] = {
       splTokenName: splMintToToken(splMint),
       premiumAssetName: 'USDC',
       expirationMs: expirationSec * 1_000,
@@ -229,10 +214,6 @@ export class Router {
       callOrPut: CallOrPut.Call,
       qtyTokens: Number(balance.value.uiAmount),
     };
-  }
-
-  dipToString(expirationSec: number, strike: number): string {
-    return `Expiration:${expirationSec}_Strike:${strike}`;
   }
 
   async refresh_dips() {
@@ -258,7 +239,7 @@ export class Router {
         }
 
         if (splMintToToken(splMint) === this.token) {
-          const alreadyPolled: boolean = this.dipToString(expirationSec, strike) in this.dips;
+          const alreadyPolled: boolean = dipToString(expirationSec, strike) in this.dips;
 
           // Always run add_dip since it refreshes the values if the subscribe
           // fails. Can fail in devnet because some incorrectly defined DIPs.
@@ -306,3 +287,5 @@ export class Router {
     });
   }
 }
+
+export default Router;

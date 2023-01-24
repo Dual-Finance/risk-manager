@@ -16,7 +16,7 @@ import {
   maxDeltaHedges, percentDrift, DELTA_OFFSET, MANGO_DOWNTIME_THRESHOLD_MIN,
   perpFundingRateThreshold, gammaCycles, MinOpenBookSize, OPENBOOK_FORK_ID,
   treasuryPositions, slippageMax, gammaCompleteThresholdPct, cluster,
-  maxOrderBookSearchDepth, maxBackGammaMultiple, API_URL, MODE, whaleMaxSpread,
+  maxOrderBookSearchDepth, maxBackGammaMultiple, API_URL, MODE, whaleMaxSpread, SYMBOL,
 } from './config';
 import { DIPDeposit } from './common';
 import { readKeypair, sleepExact, sleepRandom } from './utils';
@@ -34,7 +34,7 @@ class Scalper {
   groupConfig: GroupConfig;
   config: Config;
   owner: Keypair;
-  symbol: string;
+  symbol: SYMBOL;
   impliedVol: number;
   minSize: number;
   minSpotSize: number;
@@ -47,7 +47,7 @@ class Scalper {
   openBookAccount: string;
   serumVialClient: SerumVialClient;
 
-  constructor(symbol: string) {
+  constructor(symbol: SYMBOL) {
     // Setup Client
     this.config = new Config(configFile);
     this.groupConfig = this.config.getGroupWithName(networkName) as GroupConfig;

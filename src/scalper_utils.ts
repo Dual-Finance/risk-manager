@@ -28,12 +28,15 @@ import {
   gammaCycles,
   percentDrift,
   scalperWindowSec,
+  SYMBOL,
 } from './config';
 import {
   decimalsBaseSPL, getChainlinkPrice, getPythPrice, getSwitchboardPrice,
   splMintToToken, tokenToSplMint,
 } from './utils';
-import { mangoTesterPk, optionVaultPk, riskManagerPk } from './constants';
+import {
+  mangoTesterPk, MS_PER_YEAR, optionVaultPk, riskManagerPk,
+} from './constants';
 
 export async function loadPrices(
   mangoGroup: MangoGroup,
@@ -48,14 +51,14 @@ export async function loadPrices(
 export function getDIPDelta(
   dipProduct: DIPDeposit[],
   fairValue: number,
-  symbol: string,
+  symbol: SYMBOL,
 ) {
   const impliedVol = THEO_VOL_MAP.get(symbol);
   let yearsUntilMaturity: number;
   let deltaSum = 0;
   for (const dip of dipProduct) {
-    yearsUntilMaturity = (dip.expirationMs - Date.now()) / (365 * 60 * 60 * 24 * 1_000);
-    deltaSum = greeks.getDelta(
+    yearsUntilMaturity = (dip.expirationMs - Date.now()) / MS_PER_YEAR;
+    deltaSum += greeks.getDelta(
       fairValue,
       dip.strikeUsdcPerToken,
       yearsUntilMaturity,
@@ -63,8 +66,7 @@ export function getDIPDelta(
       rfRate,
       dip.callOrPut,
     )
-        * dip.qtyTokens
-      + deltaSum;
+        * dip.qtyTokens;
   }
   return deltaSum;
 }
@@ -82,27 +84,18 @@ export function orderSpliceMango(
   const [_, nativeQty] = market.uiToNativePriceQuantity(0, qty);
   if (qty > 0 && side.getImpactPriceUi(nativeQty) < price * (1 - slippage)) {
     spliceFactor = Math.max((qty * price) / notionalMax, 1);
-    console.log(
-      'Sell Price Impact: ',
-      side.getImpactPriceUi(nativeQty),
-      'High Slippage!',
-      spliceFactor,
-    );
+    console.log(`Sell Price Impact: ${side.getImpactPriceUi(nativeQty)} High Slippage!`);
   } else if (
     qty < 0
     && side.getImpactPriceUi(nativeQty) > price * (1 + slippage)
   ) {
     spliceFactor = Math.max((qty * price) / notionalMax, 1);
-    console.log(
-      'Buy Price Impact: ',
-      side.getImpactPriceUi(nativeQty),
-      'High Slippage!',
-      spliceFactor,
-    );
+    console.log(`Buy Price Impact: ${side.getImpactPriceUi(nativeQty)} High Slippage!`);
   } else {
     spliceFactor = 1;
-    console.log('Slippage Tolerable', side.getImpactPriceUi(nativeQty));
+    console.log(`Slippage Tolerable ${side.getImpactPriceUi(nativeQty)}`);
   }
+  console.log(`Splice factor: ${spliceFactor}`);
   return spliceFactor;
 }
 
@@ -119,13 +112,13 @@ export function liquidityCheckAndNumSplices(
   if (hedgeSide === 'sell') {
     for (const bid of bids) {
       if (bid.price > price) {
-        depth = bid.size + depth;
+        depth += bid.size;
       }
     }
   } else if (hedgeSide === 'buy') {
     for (const ask of asks) {
       if (ask.price < price) {
-        depth = ask.size + depth;
+        depth += ask.size;
       }
     }
   }
@@ -138,14 +131,14 @@ export function liquidityCheckAndNumSplices(
 export function getDIPGamma(
   dipProduct: DIPDeposit[],
   fairValue: number,
-  symbol: string,
+  symbol: SYMBOL,
 ) {
   const impliedVol = THEO_VOL_MAP.get(symbol);
   let yearsUntilMaturity: number;
   let gammaSum = 0;
   for (const dip of dipProduct) {
-    yearsUntilMaturity = (dip.expirationMs - Date.now()) / (365 * 60 * 60 * 24 * 1_000);
-    gammaSum = greeks.getGamma(
+    yearsUntilMaturity = (dip.expirationMs - Date.now()) / MS_PER_YEAR;
+    gammaSum += greeks.getGamma(
       fairValue,
       dip.strikeUsdcPerToken,
       yearsUntilMaturity,
@@ -153,8 +146,7 @@ export function getDIPGamma(
       rfRate,
       dip.callOrPut,
     )
-        * dip.qtyTokens
-      + gammaSum;
+        * dip.qtyTokens;
   }
   return gammaSum;
 }
@@ -162,14 +154,14 @@ export function getDIPGamma(
 export function getDIPTheta(
   dipProduct: DIPDeposit[],
   fairValue: number,
-  symbol: string,
+  symbol: SYMBOL,
 ) {
   const impliedVol = THEO_VOL_MAP.get(symbol);
   let yearsUntilMaturity: number;
   let thetaSum = 0;
   for (const dip of dipProduct) {
-    yearsUntilMaturity = (dip.expirationMs - Date.now()) / (365 * 60 * 60 * 24 * 1_000);
-    thetaSum = greeks.getTheta(
+    yearsUntilMaturity = (dip.expirationMs - Date.now()) / MS_PER_YEAR;
+    thetaSum += greeks.getTheta(
       fairValue,
       dip.strikeUsdcPerToken,
       yearsUntilMaturity,
@@ -177,8 +169,7 @@ export function getDIPTheta(
       rfRate,
       dip.callOrPut,
     )
-        * dip.qtyTokens
-        + thetaSum;
+        * dip.qtyTokens;
   }
   return thetaSum;
 }
@@ -208,7 +199,7 @@ export async function fillSize(
 
 // TODO: Update this to also take into account the openbook position
 // Get Spot Balance
-export async function getSpotDelta(connection: Connection, symbol: string) {
+export async function getSpotDelta(connection: Connection, symbol: SYMBOL) {
   let mainDelta = 0;
   let tokenDelta = 0;
   let spotDelta = 0;
@@ -239,8 +230,8 @@ export async function settleOpenBook(
   connection : Connection,
   owner: Keypair,
   market : Market,
-  base: string,
-  quote: string,
+  base: SYMBOL,
+  quote: SYMBOL,
 ) {
   const settleTx = new Transaction();
   for (const openOrders of await market.findOpenOrdersAccountsForOwner(
@@ -264,7 +255,7 @@ export async function settleOpenBook(
   return settleTx;
 }
 
-export function getPayerAccount(hedgeSide, base, quote) {
+export function getPayerAccount(hedgeSide: 'buy' | 'sell', base, quote) {
   // spl-token accounts to which to use for trading
   const baseTokenAccount = new PublicKey(ACCOUNT_MAP.get(base));
   const quoteTokenAccount = new PublicKey(ACCOUNT_MAP.get(quote));
@@ -278,7 +269,7 @@ export async function cancelTxOpenBookOrders(
   connection: Connection,
   owner: Keypair,
   spotMarket: Market,
-  symbol: string,
+  symbol: SYMBOL,
 ):Promise<Transaction | undefined> {
   const myOrders = await spotMarket.loadOrdersForOwner(connection, owner.publicKey);
   if (myOrders.length === 0) {
@@ -293,8 +284,8 @@ export async function cancelTxOpenBookOrders(
 }
 
 export async function getJupiterPrice(
-  base: string,
-  quote: string,
+  base: SYMBOL,
+  quote: SYMBOL,
   jupiter: Jupiter,
 ) {
   // Check asks
@@ -358,7 +349,7 @@ export async function getJupiterPrice(
 export async function getFairValue(
   connection: Connection,
   spotMarket: Market,
-  symbol: string,
+  symbol: SYMBOL,
   jupiter: Jupiter,
 ) {
   let fairValue = 0; // Fail to return a zero price
@@ -403,8 +394,8 @@ export async function getFairValue(
 
 export async function jupiterHedge(
   hedgeSide: string,
-  base: string,
-  quote: string,
+  base: SYMBOL,
+  quote: SYMBOL,
   hedgeDelta: number,
   hedgePrice: number,
   jupiter: Jupiter,

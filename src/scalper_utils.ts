@@ -13,7 +13,7 @@ import { getAssociatedTokenAddress } from '@project-serum/associated-token';
 import fetch from 'node-fetch';
 import { Jupiter } from '@jup-ag/core';
 import JSBI from 'jsbi';
-import { DIPDeposit, RouteDetails } from './common';
+import { CallOrPut, DIPDeposit, RouteDetails } from './common';
 import {
   ACCOUNT_MAP,
   JUPITER_LIQUIDITY,
@@ -519,4 +519,35 @@ export function waitForGamma(conditionFunction) {
     else setTimeout((_) => poll(resolve), resolvePeriodMs);
   };
   return new Promise(poll);
+}
+
+// Find the max strike of a set of DIPs/SOs
+export function findMaxStrike(dipProduct: DIPDeposit[]) {
+  let strikeMax = dipProduct[0].strikeUsdcPerToken;
+  for (const dip of dipProduct) {
+    if (dip.strikeUsdcPerToken > strikeMax) { strikeMax = dip.strikeUsdcPerToken; }
+  }
+  return strikeMax;
+}
+
+// Find the min strike of a set of DIPs/SOs
+export function findMinStrike(dipProduct: DIPDeposit[]) {
+  let strikeMin = dipProduct[0].strikeUsdcPerToken;
+  for (const dip of dipProduct) {
+    if (dip.strikeUsdcPerToken < strikeMin) { strikeMin = dip.strikeUsdcPerToken; }
+  }
+  return strikeMin;
+}
+
+// Find the nearest strike of a set of DIPs/SOs
+export function findNearestStrikeType(dipProduct: DIPDeposit[], fairValue: number) {
+  let nearestStrike = dipProduct[0].strikeUsdcPerToken;
+  let nearStrikeType: CallOrPut;
+  for (const dip of dipProduct) {
+    if (Math.abs(dip.strikeUsdcPerToken - fairValue) < Math.abs(nearestStrike - fairValue)) {
+      nearestStrike = dip.strikeUsdcPerToken;
+      nearStrikeType = dip.callOrPut;
+    }
+  }
+  return nearStrikeType;
 }

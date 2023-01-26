@@ -16,11 +16,11 @@ import {
   maxDeltaHedges, percentDrift, DELTA_OFFSET, MANGO_DOWNTIME_THRESHOLD_MIN,
   perpFundingRateThreshold, gammaCycles, MinOpenBookSize, OPENBOOK_FORK_ID,
   treasuryPositions, slippageMax, gammaCompleteThresholdPct, cluster,
-  maxOrderBookSearchDepth, maxBackGammaMultiple, API_URL, MODE, whaleMaxSpread, SYMBOL,
+  maxOrderBookSearchDepth, maxBackGammaMultiple, API_URL, MODE, whaleMaxSpread,
 } from './config';
-import { CallOrPut, DIPDeposit } from './common';
+import { CallOrPut, DIPDeposit, SYMBOL } from './common';
 import { readKeypair, sleepExact, sleepRandom } from './utils';
-import { SerumVialClient, SerumVialTradeMessage } from './serumVial';
+import { SerumVialClient, SerumVialTradeMessage, tradeMessageToString } from './serumVial';
 import {
   jupiterHedge, cancelTxOpenBookOrders, getDIPDelta, getDIPGamma, getDIPTheta,
   getFairValue, getPayerAccount, getSpotDelta, loadPrices, orderSpliceMango,
@@ -663,27 +663,9 @@ class Scalper {
       [deltaID.toString()],
       (message: SerumVialTradeMessage) => {
         if (message.makerClientId === deltaID.toString()) {
-          console.log(
-            this.symbol,
-            'Delta Fill Maker!',
-            hedgeSide,
-            message.size,
-            message.market,
-            message.price,
-            message.makerClientId,
-            message.timestamp,
-          );
+          console.log(this.symbol, 'Delta Fill Maker!', hedgeSide, tradeMessageToString(message));
         } else if (message.takerClientId === deltaID.toString()) {
-          console.log(
-            this.symbol,
-            'Delta Fill Taker!',
-            hedgeSide,
-            message.size,
-            message.market,
-            message.price,
-            message.takerClientId,
-            message.timestamp,
-          );
+          console.log(this.symbol, 'Delta Fill Taker!', hedgeSide, tradeMessageToString(message));
         }
         const fillQty = (hedgeSide === 'buy' ? 1 : -1) * message.size;
         hedgeDeltaTotal += fillQty;
@@ -924,59 +906,19 @@ class Scalper {
       gammaIds,
       (message: SerumVialTradeMessage) => {
         if (message.makerClientId === backBidID.toString()) {
-          console.log(
-            this.symbol,
-            'Back Bid Fill!!!',
-            message.size,
-            message.market,
-            message.price,
-            message.makerClientId,
-            message.timestamp,
-          );
+          console.log(this.symbol, 'Back Bid Fill!!!', tradeMessageToString(message));
           return;
         } if (message.makerClientId === backAskID.toString()) {
-          console.log(
-            this.symbol,
-            'Back Ask Fill!!!',
-            message.size,
-            message.market,
-            message.price,
-            message.makerClientId,
-            message.timestamp,
-          );
+          console.log(this.symbol, 'Back Ask Fill!!!', tradeMessageToString(message));
           return;
         }
         gammaFillQty += Math.abs(message.size);
         if (message.makerClientId === bidID.toString()) {
-          console.log(
-            this.symbol,
-            'Gamma Bid Fill!',
-            message.size,
-            message.market,
-            message.price,
-            message.makerClientId,
-            message.timestamp,
-          );
+          console.log(this.symbol, 'Gamma Bid Fill!', tradeMessageToString(message));
         } else if (message.makerClientId === askID.toString()) {
-          console.log(
-            this.symbol,
-            'Gamma Ask Fill!',
-            message.size,
-            message.market,
-            message.price,
-            message.makerClientId,
-            message.timestamp,
-          );
+          console.log(this.symbol, 'Gamma Ask Fill!', tradeMessageToString(message));
         } else {
-          console.log(
-            this.symbol,
-            'Gamma Scalp Fill From Taker?!',
-            message.size,
-            message.market,
-            message.price,
-            message.takerClientId,
-            message.timestamp,
-          );
+          console.log(this.symbol, 'Gamma Scalp Fill From Taker?!', tradeMessageToString(message));
         }
         if (gammaFillQty > amountGamma * gammaCompleteThresholdPct) {
           gammaFillQty = 0;

@@ -13,7 +13,9 @@ import { getAssociatedTokenAddress } from '@project-serum/associated-token';
 import fetch from 'node-fetch';
 import { Jupiter } from '@jup-ag/core';
 import JSBI from 'jsbi';
-import { CallOrPut, DIPDeposit, RouteDetails, SYMBOL } from './common';
+import {
+  CallOrPut, DIPDeposit, RouteDetails, SYMBOL,
+} from './common';
 import {
   ACCOUNT_MAP,
   JUPITER_LIQUIDITY,

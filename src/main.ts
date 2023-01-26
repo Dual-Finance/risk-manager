@@ -1,8 +1,8 @@
-import { DIPDeposit } from './common';
+import { DIPDeposit, SYMBOL } from './common';
 import Scalper from './scalper';
 import Router from './router';
 import {
-  scalperWindowSec, cluster, productStaggerSec, productStatus, SYMBOL,
+  scalperWindowSec, cluster, productStaggerSec, productStatus,
 } from './config';
 import { sleepExact } from './utils';
 

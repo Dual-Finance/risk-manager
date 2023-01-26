@@ -27,8 +27,9 @@ import {
 } from './utils';
 import * as apiSecret from '../apiSecret.json';
 import {
+  DIP_STATE_LENGTH,
   dualMarketProgramID, MS_PER_YEAR, NUM_DIP_ATOMS_PER_TOKEN, optionVaultPk,
-  OPTION_MINT_ADDRESS_SEED, PROTCOL_API_KEY,
+  OPTION_MINT_ADDRESS_SEED, PROTCOL_API_KEY, SIX_MONTHS_IN_MS,
 } from './constants';
 import { dipToString, fetchMMOrder } from './router_utils';
 
@@ -223,28 +224,28 @@ class Router {
 
     await programAccountsPromise.then(async (data) => {
       for (const programAccount of data) {
-        if (programAccount.account.data.length !== 260) {
+        if (programAccount.account.data.length !== DIP_STATE_LENGTH) {
           continue;
         }
         const dipState = parseDipState(programAccount.account.data);
 
-        const strike: number = dipState.strike / 1_000_000;
+        const strikeTokensPerToken: number = dipState.strikeAtomsPerToken / NUM_DIP_ATOMS_PER_TOKEN;
         const { expiration } = dipState;
         const expirationSec = expiration;
         const { splMint } = dipState;
 
         const durationMs = expirationSec * 1_000 - Date.now();
-        if (durationMs < 0 || durationMs > 1_000 * 60 * 60 * 24 * 30 * 6) {
+        if (durationMs < 0 || durationMs > SIX_MONTHS_IN_MS) {
           continue;
         }
 
         if (splMintToToken(splMint) === this.token) {
-          const alreadyPolled: boolean = dipToString(expirationSec, strike) in this.dips;
+          const alreadyPolled: boolean = dipToString(expirationSec, strikeTokensPerToken) in this.dips;
 
           // Always run add_dip since it refreshes the values if the subscribe
           // fails. Can fail in devnet because some incorrectly defined DIPs.
           try {
-            await this.add_dip(expirationSec, strike, splMint, connection);
+            await this.add_dip(expirationSec, strikeTokensPerToken, splMint, connection);
           } catch (err) {
             console.log('Failed to add dip');
             continue;
@@ -256,7 +257,7 @@ class Router {
 
           const [optionMint] = await findProgramAddressWithMintAndStrikeAndExpiration(
             OPTION_MINT_ADDRESS_SEED,
-            strike * 1_000_000,
+            strikeTokensPerToken * NUM_DIP_ATOMS_PER_TOKEN,
             expiration,
             splMint,
             usdcPk,
@@ -273,7 +274,7 @@ class Router {
             this.token,
             'USDC',
             expirationSec,
-            strike,
+            strikeTokensPerToken,
             CallOrPut.Call,
             (deposit: DIPDeposit) => {
               this.route(deposit);

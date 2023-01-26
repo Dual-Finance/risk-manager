@@ -22,7 +22,7 @@ async function main() {
       (deposits: DIPDeposit[]) => {
         scalpers[symbol].pickAndRunScalper(deposits);
       },
-      'SOL',
+      symbol,
     ),
   ]));
   for (const [symbol, router] of routers) {

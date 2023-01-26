@@ -5,6 +5,7 @@ import { getAssociatedTokenAddress } from '@project-serum/associated-token';
 import {
   CallOrPut,
   DIPDeposit,
+  SYMBOL,
 } from './common';
 import {
   API_URL,
@@ -15,7 +16,6 @@ import {
   minExecutionPremium,
   volSpread,
   rfRate,
-  SYMBOL,
 } from './config';
 import Poller from './poller';
 import {

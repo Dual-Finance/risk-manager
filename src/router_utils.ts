@@ -1,9 +1,10 @@
 import { DUAL_API } from './config';
+import fetch from 'cross-fetch';
 
-export async function fetchMMOrder(symbol: string): Promise<number> {
+export async function fetchMMOrder(apiSymbol: string): Promise<number> {
   // TODO: Lookup in the pricing object on chain
   try {
-    const url = `${DUAL_API}/symbols/getprice?symbol=${symbol}`;
+    const url = `${DUAL_API}/symbols/getprice?symbol=${apiSymbol}`;
     const order = (
       await (
         await fetch(url, {

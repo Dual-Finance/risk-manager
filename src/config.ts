@@ -54,7 +54,7 @@ export const MODE = new Map<SYMBOL, number>([
   ['SOL', parseFloat(solVars[4]) > 0 ? parseFloat(solVars[4]) : 0],
   ['MNGO', parseFloat(mngoVars[4]) > 0 ? parseFloat(mngoVars[4]) : 0],
   ['BONK', parseFloat(bonkVars[4]) > 0 ? parseFloat(bonkVars[4]) : 0],
-]); // 0 - Normal 1 - Gamma+Back 2- Back Only
+]); // 0 - Normal 1 - Gamma+Back 2 - Gamma+Back w/ Strike Adjustment 3- Back Only
 
 export const ENVIRONMENT: string = IS_DEV ? 'DEVNET' : 'MAINNET';
 

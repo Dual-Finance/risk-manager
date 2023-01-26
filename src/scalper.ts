@@ -18,13 +18,14 @@ import {
   treasuryPositions, slippageMax, gammaCompleteThresholdPct, cluster,
   maxOrderBookSearchDepth, maxBackGammaMultiple, API_URL, MODE, whaleMaxSpread,
 } from './config';
-import { DIPDeposit, SYMBOL } from './common';
+import { CallOrPut, DIPDeposit, SYMBOL } from './common';
 import { readKeypair, sleepExact, sleepRandom } from './utils';
 import { SerumVialClient, SerumVialTradeMessage, tradeMessageToString } from './serumVial';
 import {
   jupiterHedge, cancelTxOpenBookOrders, getDIPDelta, getDIPGamma, getDIPTheta,
   getFairValue, getPayerAccount, getSpotDelta, loadPrices, orderSpliceMango,
   liquidityCheckAndNumSplices, settleOpenBook, setPriorityFee, waitForGamma, waitForFill,
+  findMaxStrike, findMinStrike, findNearestStrikeType,
 } from './scalper_utils';
 import { OPENBOOK_MKT_MAP } from './constants';
 
@@ -992,8 +993,56 @@ class Scalper {
       : dipTotalGamma * stdDevSpread * fairValue;
 
     const widenSpread = (gammaScalpCount - 1) / gammaCycles;
-    const gammaBid = fairValue * (1 - stdDevSpread - stdDevSpread * widenSpread);
-    const gammaAsk = fairValue * (1 + stdDevSpread + stdDevSpread * widenSpread);
+    let gammaBid = fairValue * (1 - stdDevSpread - stdDevSpread * widenSpread);
+    let gammaAsk = fairValue * (1 + stdDevSpread + stdDevSpread * widenSpread);
+
+    // Adjust gamma prices based on strike
+    // TODO: Determine if should always have this on or only on products we can't get delta neutral
+    if (this.mode === 2) {
+      const dipTotalDelta = getDIPDelta(dipProduct, fairValue, this.symbol);
+      const spotDelta = await getSpotDelta(this.connection, this.symbol);
+      const isShort = dipTotalDelta + spotDelta + this.deltaOffset < 0;
+      // TODO: Create a gamma table to find relevant long & short strikes
+      const nearStrikeType = findNearestStrikeType(dipProduct, fairValue);
+      console.log(this.symbol, 'Delta Position', dipTotalDelta + spotDelta + this.deltaOffset, nearStrikeType, 'isShort', isShort);
+      if (nearStrikeType === CallOrPut.Put) {
+        const isOTM = (fairValue > dipProduct[0].strikeUsdcPerToken);
+        const maxStrike = findMaxStrike(dipProduct);
+        if (isOTM && isShort) {
+          gammaBid = Math.min(
+            maxStrike * (1 - stdDevSpread - stdDevSpread * widenSpread),
+            gammaBid,
+          );
+          console.log('Strike Adjusted Gamma Bid', gammaBid, maxStrike);
+        }
+        if (!isOTM && isShort) {
+          gammaAsk = Math.max(
+            maxStrike * (1 + stdDevSpread + stdDevSpread * widenSpread),
+            gammaAsk,
+          );
+          console.log('Strike Adjusted Gamma Ask', gammaAsk, maxStrike);
+        }
+      }
+      // TODO: Check All Call Adjustment logic
+      if (nearStrikeType === CallOrPut.Call) {
+        const isOTM = (fairValue < dipProduct[0].strikeUsdcPerToken);
+        const minStrike = findMinStrike(dipProduct);
+        if (isOTM && !isShort) {
+          gammaAsk = Math.max(
+            minStrike * (1 + stdDevSpread + stdDevSpread * widenSpread),
+            gammaAsk,
+          );
+          console.log('Strike Adjusted Gamma Ask', gammaAsk, minStrike);
+        }
+        if (!isOTM && !isShort) {
+          gammaBid = Math.min(
+            minStrike * (1 - stdDevSpread - stdDevSpread * widenSpread),
+            gammaBid,
+          );
+          console.log('Strike Adjusted Gamma Bid', gammaBid, minStrike);
+        }
+      }
+    }
 
     console.log(this.symbol, 'Position Gamma Γ:', netGamma, 'Fair Value', fairValue);
     if ((netGamma * fairValue) < (this.minSpotSize * fairValue)) {
@@ -1036,7 +1085,7 @@ Spread % ${((whaleAskPrice - whaleBidPrice) / fairValue) * 100}`);
     const bidAccount = getPayerAccount('buy', this.symbol, 'USDC');
     const askAccount = getPayerAccount('sell', this.symbol, 'USDC');
     const gammaOrders = new Transaction();
-    if (this.mode < 2) {
+    if (this.mode < 3) {
       const gammaBidTx = await spotMarket.makePlaceOrderTransaction(this.connection, {
         owner: this.owner.publicKey,
         payer: bidAccount,

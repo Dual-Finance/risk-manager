@@ -77,7 +77,9 @@ class Router {
     await fetchMMOrder(symbol).then(async (order) => {
       // Run the risk manager if there is no MM order
       // @ts-ignore
-      if (!order || Number(order.remainingQuantity) < dipDeposit.qtyTokens) {
+      if (!order || order.price === undefined
+        // @ts-ignore
+        || Number(order.remainingQuantity) < dipDeposit.qtyTokens) {
         this.dips[
           dipToString(
             dipDeposit.expirationMs / 1_000,

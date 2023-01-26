@@ -138,8 +138,6 @@ export const rfRate = 0.03;
 export const twapIntervalSec = 15;
 // Number of seconds for each gamma scalping window
 export const scalperWindowSec = 600;
-// Percentage of time to allow drift of the timed actions
-export const percentDrift = 0.05;
 // Percentage of gamma to calc delta hedge threshold
 export const gammaThreshold = 0.05;
 // Maximum amount of orders to delta hedge across

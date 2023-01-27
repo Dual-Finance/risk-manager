@@ -10,7 +10,7 @@ import SwitchboardProgram from '@switchboard-xyz/sbv2-lite';
 import * as anchor from '@project-serum/anchor';
 import { OCR2Feed } from '@chainlink/solana-sdk';
 import {
-  API_URL, IS_DEV, usdcPk,
+  API_URL, IS_DEV, RANDOM_SLEEP_RANGE, usdcPk,
 } from './config';
 import {
   bonkPk, CHAINLINK_PROGRAM_ID, mngoPk, soBtcPk, soEthPk, wsolPk,
@@ -24,11 +24,11 @@ export function readKeypair() {
   );
 }
 
-// Sleep time with some slight randomness to the time
-export function sleepRandom(period: number) {
-  const randomDrift = (Math.random() * 2 - 1) * period;
+// Sleep time with some slight randomness.
+export function sleepRandom(periodSec: number) {
+  const randomDriftSec = (Math.random() * 2 - 1) * periodSec * RANDOM_SLEEP_RANGE;
   return new Promise((resolve) => {
-    setTimeout(resolve, (period + randomDrift) * 1_000);
+    setTimeout(resolve, (periodSec + randomDriftSec) * 1_000);
   });
 }
 

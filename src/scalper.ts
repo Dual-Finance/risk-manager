@@ -1087,9 +1087,9 @@ Spread % ${((whaleAskPrice - whaleBidPrice) / fairValue) * 100}`);
     const gammaOrders = new Transaction();
     if (this.mode != ScalperMode.BackOnly) {
       const gammaBidTx = await spotMarket.makePlaceOrderTransaction(this.connection, {
-      owner: this.owner.publicKey,
-      payer: bidAccount,
-      side: 'buy',
+        owner: this.owner.publicKey,
+        payer: bidAccount,
+        side: 'buy',
         price: priceBid,
         size: amountGamma,
         orderType: 'limit',

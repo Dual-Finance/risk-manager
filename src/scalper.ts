@@ -16,7 +16,7 @@ import {
   maxDeltaHedges, DELTA_OFFSET, MANGO_DOWNTIME_THRESHOLD_MIN,
   perpFundingRateThreshold, gammaCycles, MinOpenBookSize, OPENBOOK_FORK_ID,
   treasuryPositions, slippageMax, gammaCompleteThresholdPct, cluster,
-  maxOrderBookSearchDepth, maxBackGammaMultiple, API_URL, MODE, whaleMaxSpread,
+  maxOrderBookSearchDepth, maxBackGammaMultiple, API_URL, MODE_BY_SYMBOL, whaleMaxSpread, ScalperMode,
 } from './config';
 import { CallOrPut, DIPDeposit, SYMBOL } from './common';
 import { readKeypair, sleepExact, sleepRandom } from './utils';
@@ -44,7 +44,7 @@ class Scalper {
   marketIndex: number;
   deltaOffset: number;
   zScore: number;
-  mode: number;
+  mode: ScalperMode;
   openBookAccount: string;
   serumVialClient: SerumVialClient;
 
@@ -71,7 +71,7 @@ class Scalper {
     this.tickSize = TickSize.get(symbol);
     this.deltaOffset = DELTA_OFFSET.get(symbol);
     this.zScore = ZSCORE.get(symbol);
-    this.mode = MODE.get(symbol);
+    this.mode = MODE_BY_SYMBOL.get(symbol);
 
     this.serumVialClient = new SerumVialClient();
     this.serumVialClient.openSerumVial();
@@ -586,7 +586,7 @@ class Scalper {
       console.log(this.symbol, 'Jupiter Failed', err);
       return;
     }
-    if (this.mode === 0) {
+    if (this.mode === ScalperMode.Normal) {
       try {
         await this.deltaHedgeOpenBook(
           dipProduct,
@@ -998,7 +998,7 @@ class Scalper {
 
     // Adjust gamma prices based on strike
     // TODO: Determine if should always have this on or only on products we can't get delta neutral
-    if (this.mode === 2) {
+    if (this.mode === ScalperMode.GammaBackStrikeAdjustment) {
       const dipTotalDelta = getDIPDelta(dipProduct, fairValue, this.symbol);
       const spotDelta = await getSpotDelta(this.connection, this.symbol);
       const isShort = dipTotalDelta + spotDelta + this.deltaOffset < 0;
@@ -1085,11 +1085,11 @@ Spread % ${((whaleAskPrice - whaleBidPrice) / fairValue) * 100}`);
     const bidAccount = getPayerAccount('buy', this.symbol, 'USDC');
     const askAccount = getPayerAccount('sell', this.symbol, 'USDC');
     const gammaOrders = new Transaction();
-    if (this.mode < 3) {
+    if (this.mode != ScalperMode.BackOnly) {
       const gammaBidTx = await spotMarket.makePlaceOrderTransaction(this.connection, {
-        owner: this.owner.publicKey,
-        payer: bidAccount,
-        side: 'buy',
+      owner: this.owner.publicKey,
+      payer: bidAccount,
+      side: 'buy',
         price: priceBid,
         size: amountGamma,
         orderType: 'limit',

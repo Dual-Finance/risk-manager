@@ -10,7 +10,7 @@ import SwitchboardProgram from '@switchboard-xyz/sbv2-lite';
 import * as anchor from '@project-serum/anchor';
 import { OCR2Feed } from '@chainlink/solana-sdk';
 import {
-  API_URL, IS_DEV, RANDOM_SLEEP_RANGE as RANDOM_SLEEP_MULTIPLIER, usdcPk,
+  API_URL, IS_DEV, RANDOM_SLEEP_MULTIPLIER, usdcPk,
 } from './config';
 import {
   bonkPk, CHAINLINK_PROGRAM_ID, mngoPk, soBtcPk, soEthPk, wsolPk,

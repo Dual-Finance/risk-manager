@@ -132,7 +132,7 @@ export const treasuryPositions: DIPDeposit[] = [({
 ];
 
 // Amount to vary the sleep on a random sleep.
-export const RANDOM_SLEEP_RANGE = .05;
+export const RANDOM_SLEEP_MULTIPLIER = .05;
 // Risk Free Rate of Return ~ T-Bill Rate
 export const rfRate = 0.03;
 // Number of seconds to space spliced delta orders across

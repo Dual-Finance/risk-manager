@@ -1,5 +1,5 @@
-import { DUAL_API } from './config';
 import fetch from 'cross-fetch';
+import { DUAL_API } from './config';
 
 export async function fetchMMOrder(apiSymbol: string): Promise<number> {
   // TODO: Lookup in the pricing object on chain

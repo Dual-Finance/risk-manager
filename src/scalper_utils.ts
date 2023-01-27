@@ -1,9 +1,6 @@
 import * as greeks from 'greeks';
 import {
-  BookSide,
-  MangoCache,
-  MangoGroup,
-  PerpMarket,
+  BookSide, MangoCache, MangoGroup, PerpMarket,
 } from '@blockworks-foundation/mango-client';
 import {
   ComputeBudgetProgram, Connection, Keypair, LAMPORTS_PER_SOL, PublicKey, Transaction,
@@ -17,18 +14,9 @@ import {
   CallOrPut, DIPDeposit, RouteDetails, SYMBOL,
 } from './common';
 import {
-  ACCOUNT_MAP,
-  JUPITER_LIQUIDITY,
-  maxMktSpreadPctForPricing,
-  jupiterSearchSteps,
-  rfRate,
-  slippageMax,
-  THEO_VOL_MAP,
-  jupiterSlippageBps,
-  PRIORITY_FEE,
-  twapIntervalSec,
-  gammaCycles,
-  scalperWindowSec,
+  ACCOUNT_MAP, JUPITER_LIQUIDITY, maxMktSpreadPctForPricing, jupiterSearchSteps,
+  rfRate, slippageMax, THEO_VOL_MAP, jupiterSlippageBps, PRIORITY_FEE,
+  gammaCycles, resolvePeriodMs,
 } from './config';
 import {
   decimalsBaseSPL, getChainlinkPrice, getPythPrice, getSwitchboardPrice,
@@ -54,10 +42,9 @@ export function getDIPDelta(
   symbol: SYMBOL,
 ) {
   const impliedVol = THEO_VOL_MAP.get(symbol);
-  let yearsUntilMaturity: number;
   let deltaSum = 0;
   for (const dip of dipProduct) {
-    yearsUntilMaturity = (dip.expirationMs - Date.now()) / MS_PER_YEAR;
+    const yearsUntilMaturity = (dip.expirationMs - Date.now()) / MS_PER_YEAR;
     deltaSum += greeks.getDelta(
       fairValue,
       dip.strikeUsdcPerToken,
@@ -69,6 +56,50 @@ export function getDIPDelta(
         * dip.qtyTokens;
   }
   return deltaSum;
+}
+
+export function getDIPGamma(
+  dipProduct: DIPDeposit[],
+  fairValue: number,
+  symbol: SYMBOL,
+) {
+  const impliedVol = THEO_VOL_MAP.get(symbol);
+  let gammaSum = 0;
+  for (const dip of dipProduct) {
+    const yearsUntilMaturity = (dip.expirationMs - Date.now()) / MS_PER_YEAR;
+    gammaSum += greeks.getGamma(
+      fairValue,
+      dip.strikeUsdcPerToken,
+      yearsUntilMaturity,
+      impliedVol,
+      rfRate,
+      dip.callOrPut,
+    )
+        * dip.qtyTokens;
+  }
+  return gammaSum;
+}
+
+export function getDIPTheta(
+  dipProduct: DIPDeposit[],
+  fairValue: number,
+  symbol: SYMBOL,
+) {
+  const impliedVol = THEO_VOL_MAP.get(symbol);
+  let thetaSum = 0;
+  for (const dip of dipProduct) {
+    const yearsUntilMaturity = (dip.expirationMs - Date.now()) / MS_PER_YEAR;
+    thetaSum += greeks.getTheta(
+      fairValue,
+      dip.strikeUsdcPerToken,
+      yearsUntilMaturity,
+      impliedVol,
+      rfRate,
+      dip.callOrPut,
+    )
+        * dip.qtyTokens;
+  }
+  return thetaSum;
 }
 
 // Splice delta hedge orders if available mango liquidity not supportive
@@ -128,52 +159,6 @@ export function liquidityCheckAndNumSplices(
   return Math.max((Math.abs(qty) * price) / notionalMax, 1);
 }
 
-export function getDIPGamma(
-  dipProduct: DIPDeposit[],
-  fairValue: number,
-  symbol: SYMBOL,
-) {
-  const impliedVol = THEO_VOL_MAP.get(symbol);
-  let yearsUntilMaturity: number;
-  let gammaSum = 0;
-  for (const dip of dipProduct) {
-    yearsUntilMaturity = (dip.expirationMs - Date.now()) / MS_PER_YEAR;
-    gammaSum += greeks.getGamma(
-      fairValue,
-      dip.strikeUsdcPerToken,
-      yearsUntilMaturity,
-      impliedVol,
-      rfRate,
-      dip.callOrPut,
-    )
-        * dip.qtyTokens;
-  }
-  return gammaSum;
-}
-
-export function getDIPTheta(
-  dipProduct: DIPDeposit[],
-  fairValue: number,
-  symbol: SYMBOL,
-) {
-  const impliedVol = THEO_VOL_MAP.get(symbol);
-  let yearsUntilMaturity: number;
-  let thetaSum = 0;
-  for (const dip of dipProduct) {
-    yearsUntilMaturity = (dip.expirationMs - Date.now()) / MS_PER_YEAR;
-    thetaSum += greeks.getTheta(
-      fairValue,
-      dip.strikeUsdcPerToken,
-      yearsUntilMaturity,
-      impliedVol,
-      rfRate,
-      dip.callOrPut,
-    )
-        * dip.qtyTokens;
-  }
-  return thetaSum;
-}
-
 // Fill Size from any perp orders
 export async function fillSize(
   perpMarket: PerpMarket,
@@ -181,7 +166,6 @@ export async function fillSize(
   orderID: number,
 ) {
   let filledQty = 0;
-  // Possible issue using loadFills instead of Websocket?
   for (const fill of await perpMarket.loadFills(connection)) {
     if (
       fill.makerClientOrderId.toString() === orderID.toString()
@@ -227,9 +211,9 @@ export async function getSpotDelta(connection: Connection, symbol: SYMBOL) {
 }
 
 export async function settleOpenBook(
-  connection : Connection,
+  connection: Connection,
   owner: Keypair,
-  market : Market,
+  market: Market,
   base: SYMBOL,
   quote: SYMBOL,
 ) {
@@ -239,15 +223,14 @@ export async function settleOpenBook(
     owner.publicKey,
   )) {
     if (openOrders.baseTokenFree.toNumber() > 0 || openOrders.quoteTokenFree.toNumber() > 0) {
-      // spl-token accounts to which to send the proceeds from trades
-      const baseTokenAccount = new PublicKey(ACCOUNT_MAP.get(base));
-      const quoteTokenAccount = new PublicKey(ACCOUNT_MAP.get(quote));
+      const baseRecipientAccount = new PublicKey(ACCOUNT_MAP.get(base));
+      const quoteRecipientAccount = new PublicKey(ACCOUNT_MAP.get(quote));
       const { transaction } = (
         await market.makeSettleFundsTransaction(
           connection,
           openOrders,
-          baseTokenAccount,
-          quoteTokenAccount,
+          baseRecipientAccount,
+          quoteRecipientAccount,
         ));
       settleTx.add(transaction);
     }
@@ -255,8 +238,7 @@ export async function settleOpenBook(
   return settleTx;
 }
 
-export function getPayerAccount(hedgeSide: 'buy' | 'sell', base, quote) {
-  // spl-token accounts to which to use for trading
+export function getPayerAccount(hedgeSide: 'buy' | 'sell', base: SYMBOL, quote: SYMBOL) {
   const baseTokenAccount = new PublicKey(ACCOUNT_MAP.get(base));
   const quoteTokenAccount = new PublicKey(ACCOUNT_MAP.get(quote));
   if (hedgeSide === 'buy') {
@@ -291,10 +273,9 @@ export async function getJupiterPrice(
   // Check asks
   const inputBuyToken = new PublicKey(tokenToSplMint(quote));
   const outputBuyToken = new PublicKey(tokenToSplMint(base));
-  const buyQty = Math.round(
-    JUPITER_LIQUIDITY
-    * (10 ** decimalsBaseSPL(splMintToToken(inputBuyToken))),
-  );
+  const inBuyAtomsPerToken = 10 ** decimalsBaseSPL(splMintToToken(inputBuyToken));
+  const outBuyAtomsPerToken = 10 ** decimalsBaseSPL(splMintToToken(outputBuyToken));
+  const buyQty = Math.round(JUPITER_LIQUIDITY * inBuyAtomsPerToken);
   const buyRoutes = await jupiter.computeRoutes({
     inputMint: inputBuyToken,
     outputMint: outputBuyToken,
@@ -304,24 +285,17 @@ export async function getJupiterPrice(
   });
   const buyPath = buyRoutes.routesInfos[0];
   const numBuyPath = buyPath.marketInfos.length;
-  const inBuyQty = JSBI.toNumber(
-    buyPath.marketInfos[0].inAmount,
-  )
-    / (10 ** decimalsBaseSPL(splMintToToken(inputBuyToken)));
-  const outBuyQty = JSBI.toNumber(
-    buyPath.marketInfos[numBuyPath - 1].outAmount,
-  )
-    / (10 ** decimalsBaseSPL(splMintToToken(outputBuyToken)));
+  const inBuyQty = JSBI.toNumber(buyPath.marketInfos[0].inAmount) / inBuyAtomsPerToken;
+  const outBuyQty = (JSBI.toNumber(buyPath.marketInfos[numBuyPath - 1].outAmount)
+    / outBuyAtomsPerToken);
   const buyPrice = inBuyQty / outBuyQty;
 
   // Check bids
   const inputSellToken = new PublicKey(tokenToSplMint(base));
   const outputSellToken = new PublicKey(tokenToSplMint(quote));
-  const sellQty = Math.round(
-    (JUPITER_LIQUIDITY
-    * (10 ** decimalsBaseSPL(splMintToToken(inputSellToken))))
-       / buyPrice,
-  );
+  const inSellAtomsPerToken = 10 ** decimalsBaseSPL(splMintToToken(inputSellToken));
+  const outSellAtomsPerToken = 10 ** decimalsBaseSPL(splMintToToken(outputSellToken));
+  const sellQty = Math.round((JUPITER_LIQUIDITY * inSellAtomsPerToken) / buyPrice);
   const sellRoutes = await jupiter.computeRoutes({
     inputMint: inputSellToken,
     outputMint: outputSellToken,
@@ -331,19 +305,48 @@ export async function getJupiterPrice(
   });
   const sellPath = sellRoutes.routesInfos[0];
   const numSellPath = sellPath.marketInfos.length;
-  const inSellQty = JSBI.toNumber(
-    sellPath.marketInfos[0].inAmount,
-  )
-    / (10 ** decimalsBaseSPL(splMintToToken(inputSellToken)));
-  const outSellQty = JSBI.toNumber(
-    sellPath.marketInfos[numSellPath - 1].outAmount,
-  )
-    / (10 ** decimalsBaseSPL(splMintToToken(outputSellToken)));
+  const inSellQty = JSBI.toNumber(sellPath.marketInfos[0].inAmount) / inSellAtomsPerToken;
+  const outSellQty = (JSBI.toNumber(sellPath.marketInfos[numSellPath - 1].outAmount)
+    / outSellAtomsPerToken);
   const sellPrice = outSellQty / inSellQty;
 
-  // Calc midpoint price of aggregtor
+  // Calculate midpoint price of aggregtor
   const midPrice = (buyPrice + sellPrice) / 2;
   return midPrice;
+}
+
+// Check oracles in order of preference and then use openbook midpoint if all fail.
+async function getOraclePrice(symbol: SYMBOL, connection: Connection, spotMarket: Market) {
+  const chainlinkPrice = await getChainlinkPrice(new PublicKey(tokenToSplMint(symbol)));
+  if (chainlinkPrice > 0) {
+    console.log(`${symbol}: Chainlink Price: ${chainlinkPrice}`);
+    return chainlinkPrice;
+  }
+
+  const sbPrice = await getSwitchboardPrice(new PublicKey(tokenToSplMint(symbol)));
+  if (sbPrice > 0) {
+    console.log(`${symbol}: Switchboard Price: ${sbPrice}`);
+    return sbPrice;
+  }
+
+  const pythPrice = await getPythPrice(new PublicKey(tokenToSplMint(symbol)));
+  if (pythPrice > 0) {
+    console.log(`${symbol}: Pyth Price: ${pythPrice}`);
+    return pythPrice;
+  }
+
+  const bids = await spotMarket.loadBids(connection);
+  const asks = await spotMarket.loadAsks(connection);
+  const [bidPrice, _bidSize] = bids.getL2(1)[0];
+  const [askPrice, _askSize] = asks.getL2(1)[0];
+  const midValue = (bidPrice + askPrice) / 2.0;
+  const mktSpread = (askPrice - bidPrice) / midValue;
+  if (mktSpread < maxMktSpreadPctForPricing) {
+    console.log(`${symbol}: Openbook Mid Price: ${midValue}`);
+    return midValue;
+  }
+
+  return 0;
 }
 
 export async function getFairValue(
@@ -352,42 +355,16 @@ export async function getFairValue(
   symbol: SYMBOL,
   jupiter: Jupiter,
 ) {
-  let fairValue = 0; // Fail to return a zero price
-  const chainlinkPrice = await getChainlinkPrice(new PublicKey(tokenToSplMint(symbol)));
-  if (chainlinkPrice > 0) {
-    fairValue = chainlinkPrice;
-    console.log(symbol, 'Chainlink Price', chainlinkPrice);
-  } else {
-    const sbPrice = await getSwitchboardPrice(new PublicKey(tokenToSplMint(symbol)));
-    if (sbPrice > 0) {
-      fairValue = sbPrice;
-      console.log(symbol, 'Switchboard Price', sbPrice);
-    } else {
-      const pythPrice = await getPythPrice(new PublicKey(tokenToSplMint(symbol)));
-      if (pythPrice > 0) {
-        fairValue = pythPrice;
-        console.log(symbol, 'Pyth Price', pythPrice);
-      } else {
-        const bids = await spotMarket.loadBids(connection);
-        const asks = await spotMarket.loadAsks(connection);
-        const [bidPrice, _bidSize] = bids.getL2(1)[0];
-        const [askPrice, _askSize] = asks.getL2(1)[0];
-        const midValue = (bidPrice + askPrice) / 2.0;
-        const mktSpread = (askPrice - bidPrice) / midValue;
-        if (mktSpread < maxMktSpreadPctForPricing) {
-          fairValue = midValue;
-          console.log(symbol, 'OpenBook Mid Price', midValue);
-        } else {
-          fairValue = 0;
-        }
-      }
-    }
-  }
+  const fairValue = await getOraclePrice(symbol, connection, spotMarket);
+
   const jupPrice = await getJupiterPrice(symbol, 'USDC', jupiter);
   const oracleSlippage = Math.abs(fairValue - jupPrice) / fairValue;
   if (oracleSlippage > slippageMax.get(symbol)) {
-    fairValue = jupPrice;
-    console.log(symbol, 'Using Jupiter Mid Price', jupPrice, 'Oracle Slippage', Math.round(oracleSlippage * 100 * 100));
+    const oracleSlippageBps = Math.round(oracleSlippage * 100 * 100);
+    console.log(
+      `${symbol}: Using Jupiter Mid Price ${jupPrice} Oracle Slippage: ${oracleSlippageBps}`,
+    );
+    return jupPrice;
   }
   return fairValue;
 }
@@ -415,12 +392,12 @@ export async function jupiterHedge(
   }
   const inputMaxQty = Math.round(hedgeAmount * (10 ** decimalsBaseSPL(splMintToToken(inputToken))));
 
-  // Sort through paths of swap qty efficiently
+  // Sort through paths of swap qty.
   let routeDetails: RouteDetails;
   let sortFactor = 2;
-  let lastSucess: Boolean;
+  let lastSucess: boolean;
   for (let i = 0; i < jupiterSearchSteps; i++) {
-    sortFactor = lastSucess ? sortFactor + 1 / (2 ** i) : sortFactor - 1 / (2 ** i);
+    sortFactor += lastSucess ? 1 / (2 ** i) : -1 / (2 ** i);
     lastSucess = false;
     const searchQty = Math.round(inputMaxQty * sortFactor);
     const routes = await jupiter.computeRoutes({
@@ -432,39 +409,27 @@ export async function jupiterHedge(
     });
     const bestRoute = routes.routesInfos[0];
     const numRoutes = bestRoute.marketInfos.length;
-    const inQty = JSBI.toNumber(
-      bestRoute.marketInfos[0].inAmount,
-    )
-      / (10 ** decimalsBaseSPL(splMintToToken(inputToken)));
-    const outQty = JSBI.toNumber(
-      bestRoute.marketInfos[numRoutes - 1].outAmount,
-    )
-      / (10 ** decimalsBaseSPL(splMintToToken(outputToken)));
+    const inAtomsPerToken = 10 ** decimalsBaseSPL(splMintToToken(inputToken));
+    const outAtomsPerToken = 10 ** decimalsBaseSPL(splMintToToken(outputToken));
+    const inQty = JSBI.toNumber(bestRoute.marketInfos[0].inAmount) / inAtomsPerToken;
+    const outQty = JSBI.toNumber(bestRoute.marketInfos[numRoutes - 1].outAmount) / outAtomsPerToken;
+
     const netPrice = hedgeSide === 'sell' ? outQty / inQty : inQty / outQty;
+    const venue = bestRoute.marketInfos[numRoutes - 1].amm.label;
+    const { transactions } = await jupiter.exchange({ routeInfo: routes.routesInfos[0] });
+
     if (hedgeSide === 'sell') {
       if (netPrice > hedgePrice) {
-        const swapQty = -searchQty / (10 ** decimalsBaseSPL(splMintToToken(inputToken)));
-        const venue = bestRoute.marketInfos[numRoutes - 1].amm.label;
-        const { transactions } = await jupiter.exchange({
-          routeInfo: routes.routesInfos[0],
-        });
-        routeDetails = {
-          price: netPrice, qty: swapQty, venue, txs: transactions,
-        };
+        const swapQty = -searchQty / inAtomsPerToken;
+        routeDetails = { price: netPrice, qty: swapQty, venue, txs: transactions };
         lastSucess = true;
         if (i === 0) {
           break;
         }
       }
     } else if (netPrice < hedgePrice) {
-      const swapQty = searchQty / (10 ** decimalsBaseSPL(splMintToToken(inputToken))) / hedgePrice;
-      const venue = bestRoute.marketInfos[numRoutes - 1].amm.label;
-      const { transactions } = await jupiter.exchange({
-        routeInfo: routes.routesInfos[0],
-      });
-      routeDetails = {
-        price: netPrice, qty: swapQty, venue, txs: transactions,
-      };
+      const swapQty = searchQty / inAtomsPerToken / hedgePrice;
+      routeDetails = { price: netPrice, qty: swapQty, venue, txs: transactions };
       lastSucess = true;
       if (i === 0) {
         break;
@@ -473,7 +438,8 @@ export async function jupiterHedge(
   }
   return routeDetails;
 }
-export async function getJupPriceAPI(baseMint: PublicKey) :Promise<number> {
+
+export async function getJupPriceAPI(baseMint: PublicKey): Promise<number> {
   const url = `https://quote-api.jup.ag/v3/price?ids=${baseMint}`;
   const { data } = await (await fetch(url)).json();
   const { price } = data[baseMint.toBase58()];
@@ -495,27 +461,17 @@ export function setPriorityFee(
   return tx;
 }
 
-export function waitForFill(conditionFunction) {
+export function waitForFill(conditionFunction, cycleDurationSec: number) {
   let pollCount = 0;
-  const resolvePeriodMs = 100;
   const poll = (resolve) => {
     pollCount += 1;
-    if (pollCount > (twapIntervalSec * resolvePeriodMs) / gammaCycles) resolve();
-    else if (conditionFunction()) resolve();
-    else setTimeout((_) => poll(resolve), resolvePeriodMs);
-  };
-  return new Promise(poll);
-}
-
-// Wait for enough scalps or scalper window to expire
-export function waitForGamma(conditionFunction) {
-  let pollCount = 0;
-  const resolvePeriodMs = 100;
-  const poll = (resolve) => {
-    pollCount += 1;
-    if (pollCount > (scalperWindowSec * resolvePeriodMs) / gammaCycles) resolve();
-    else if (conditionFunction()) resolve();
-    else setTimeout((_) => poll(resolve), resolvePeriodMs);
+    if (pollCount > (cycleDurationSec * resolvePeriodMs) / gammaCycles) {
+      resolve();
+    } else if (conditionFunction()) {
+      resolve();
+    } else {
+      setTimeout((_) => poll(resolve), resolvePeriodMs);
+    }
   };
   return new Promise(poll);
 }

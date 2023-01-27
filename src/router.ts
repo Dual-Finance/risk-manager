@@ -240,7 +240,7 @@ class Router {
         }
 
         if (splMintToToken(splMint) === this.token) {
-          const alreadyPolled: boolean = dipToString(expirationSec, strikeTokensPerToken) in this.dips;
+          const alreadyPolled = dipToString(expirationSec, strikeTokensPerToken) in this.dips;
 
           // Always run add_dip since it refreshes the values if the subscribe
           // fails. Can fail in devnet because some incorrectly defined DIPs.

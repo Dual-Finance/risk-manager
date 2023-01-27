@@ -16,7 +16,8 @@ import {
   maxDeltaHedges, DELTA_OFFSET, MANGO_DOWNTIME_THRESHOLD_MIN,
   perpFundingRateThreshold, gammaCycles, MinOpenBookSize, OPENBOOK_FORK_ID,
   treasuryPositions, slippageMax, gammaCompleteThresholdPct, cluster,
-  maxOrderBookSearchDepth, maxBackGammaMultiple, API_URL, MODE_BY_SYMBOL, whaleMaxSpread, ScalperMode,
+  maxOrderBookSearchDepth, maxBackGammaMultiple, API_URL, MODE_BY_SYMBOL,
+  whaleMaxSpread, ScalperMode,
 } from './config';
 import { CallOrPut, DIPDeposit, SYMBOL } from './common';
 import { readKeypair, sleepExact, sleepRandom } from './utils';
@@ -24,7 +25,7 @@ import { SerumVialClient, SerumVialTradeMessage, tradeMessageToString } from './
 import {
   jupiterHedge, cancelTxOpenBookOrders, getDIPDelta, getDIPGamma, getDIPTheta,
   getFairValue, getPayerAccount, getSpotDelta, loadPrices, orderSpliceMango,
-  liquidityCheckAndNumSplices, settleOpenBook, setPriorityFee, waitForGamma, waitForFill,
+  liquidityCheckAndNumSplices, settleOpenBook, setPriorityFee, waitForFill,
   findMaxStrike, findMinStrike, findNearestStrikeType,
 } from './scalper_utils';
 import { OPENBOOK_MKT_MAP } from './constants';
@@ -844,7 +845,7 @@ class Scalper {
         // Should fix this, but the unsafe behavior is actually used.
         // eslint-disable-next-line no-loop-func
         await waitForFill(() => (
-          Math.abs(hedgeDeltaTotal * fairValue) < (this.minSpotSize * fairValue)));
+          Math.abs(hedgeDeltaTotal * fairValue) < (this.minSpotSize * fairValue)), twapIntervalSec);
         if (Math.abs(hedgeDeltaTotal * fairValue) < (this.minSpotSize * fairValue)) {
           console.log(this.symbol, 'Delta Hedge Complete: SerumVial');
           return;
@@ -862,6 +863,7 @@ class Scalper {
       console.log(this.symbol, 'Scan Delta Fills for ~', twapIntervalSec, 'seconds');
       await waitForFill(
         (_) => Math.abs(hedgeDeltaTotal * fairValue) < (this.minSpotSize * fairValue),
+        twapIntervalSec,
       );
       if (Math.abs(hedgeDeltaTotal * fairValue) < (this.minSpotSize * fairValue)) {
         console.log(this.symbol, 'Delta Hedge Complete: SerumVial');
@@ -1085,7 +1087,7 @@ Spread % ${((whaleAskPrice - whaleBidPrice) / fairValue) * 100}`);
     const bidAccount = getPayerAccount('buy', this.symbol, 'USDC');
     const askAccount = getPayerAccount('sell', this.symbol, 'USDC');
     const gammaOrders = new Transaction();
-    if (this.mode != ScalperMode.BackOnly) {
+    if (this.mode !== ScalperMode.BackOnly) {
       const gammaBidTx = await spotMarket.makePlaceOrderTransaction(this.connection, {
         owner: this.owner.publicKey,
         payer: bidAccount,
@@ -1185,7 +1187,7 @@ Spread % ${((whaleAskPrice - whaleBidPrice) / fairValue) * 100}`);
       (amountGamma * 2 + backBidQty + backAskQty) * fairValue,
     );
     if (gammaScalpCount === 1) {
-      await waitForGamma((_) => gammaScalpCount === gammaCycles);
+      await waitForFill((_) => gammaScalpCount === gammaCycles, scalperWindowSec);
       const scalpPnL = (
         (1 + 1 / (2 * gammaCycles)) * (gammaScalpCount - 1) * stdDevSpread * fairValue)
         * netGamma * gammaScalpCount

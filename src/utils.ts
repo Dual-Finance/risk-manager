@@ -10,7 +10,7 @@ import SwitchboardProgram from '@switchboard-xyz/sbv2-lite';
 import * as anchor from '@project-serum/anchor';
 import { OCR2Feed } from '@chainlink/solana-sdk';
 import {
-  percentDrift, API_URL, IS_DEV, usdcPk,
+  API_URL, IS_DEV, RANDOM_SLEEP_MULTIPLIER, usdcPk,
 } from './config';
 import {
   bonkPk, CHAINLINK_PROGRAM_ID, mngoPk, soBtcPk, soEthPk, wsolPk,
@@ -24,15 +24,15 @@ export function readKeypair() {
   );
 }
 
-// Sleep Time with some slight randomness to the time
-export function sleepRandom(period: number) {
-  const randomDrift = (Math.random() * 2 - 1) * period * percentDrift;
+// Sleep time with some slight randomness.
+export function sleepRandom(periodSec: number) {
+  const randomDriftSec = (Math.random() * 2 - 1) * periodSec * RANDOM_SLEEP_MULTIPLIER;
   return new Promise((resolve) => {
-    setTimeout(resolve, (period + randomDrift) * 1_000);
+    setTimeout(resolve, (periodSec + randomDriftSec) * 1_000);
   });
 }
 
-// Sleep Exact Amount of Time
+// Sleep exact amount of time
 export function sleepExact(period: number) {
   return new Promise((resolve) => {
     setTimeout(resolve, period * 1_000);
@@ -40,7 +40,7 @@ export function sleepExact(period: number) {
 }
 
 export function parseDipState(buf: Buffer) {
-  const strike = Number(buf.readBigUInt64LE(8));
+  const strikeAtomsPerToken = Number(buf.readBigUInt64LE(8));
   const expiration = Number(buf.readBigUInt64LE(16));
   const splMint = new PublicKey(buf.slice(24, 56));
   const vaultMint = new PublicKey(buf.slice(56, 88));
@@ -53,7 +53,7 @@ export function parseDipState(buf: Buffer) {
   const vaultUsdcBump = Number(buf.readUInt8(187));
   const usdcMint = new PublicKey(buf.slice(188, 220));
   return {
-    strike,
+    strikeAtomsPerToken,
     expiration,
     splMint,
     vaultMint,
@@ -68,7 +68,7 @@ export function parseDipState(buf: Buffer) {
   };
 }
 
-export function toBytes(x: number): Uint8Array {
+function toBytes(x: number): Uint8Array {
   const y = Math.floor(x / 2 ** 32);
   return Uint8Array.from(
     [y, y << 8, y << 16, y << 24, x, x << 8, x << 16, x << 24].map(
@@ -95,16 +95,6 @@ export async function findProgramAddressWithMintAndStrikeAndExpiration(
     ],
     programId,
   );
-}
-
-export function timeSinceMidDay() {
-  const timeNow = new Date();
-  const year = timeNow.getUTCFullYear();
-  const month = timeNow.getUTCMonth();
-  const day = timeNow.getUTCDate();
-  const timeCheckUTC = Date.UTC(year, month, day, 12, 0, 0, 0);
-  const diff = (timeNow.getTime() - timeCheckUTC) / 1_000;
-  return diff;
 }
 
 export function splMintToToken(splMint: PublicKey): SYMBOL {
@@ -190,7 +180,7 @@ export async function getPythPrice(splMint: PublicKey): Promise<number | undefin
   return 0;
 }
 
-export function tokenToSBSymbol(token: SYMBOL) {
+function tokenToSBSymbol(token: SYMBOL) {
   if (token === 'SOL') {
     return 'GvDMxPzN1sCj7L26YDK2HnMRXEQmQ2aemov8YBtPS7vR';
   }
@@ -239,19 +229,7 @@ export async function getSwitchboardPrice(splMint: PublicKey) {
   }
 }
 
-// TODO: Fail after a few tries if chainlink is stuck
-function waitFor(conditionFunction) {
-  const poll = (resolve) => {
-    if (conditionFunction()) {
-      resolve();
-    } else {
-      setTimeout((_: any) => poll(resolve), 400);
-    }
-  };
-  return new Promise(poll);
-}
-
-export function tokenToChainlinkSymbol(token: SYMBOL) {
+function tokenToChainlinkSymbol(token: SYMBOL) {
   if (token === 'SOL') {
     return 'B4vR6BW4WpLh1mFs6LL6iqL4nydbmE5Uzaz2LLsoAXqk';
   }
@@ -296,6 +274,18 @@ export function decimalsBaseSPL(token: SYMBOL) {
   }
 }
 
+// TODO: Fail after a few tries if chainlink is stuck
+function waitFor(conditionFunction) {
+  const poll = (resolve) => {
+    if (conditionFunction()) {
+      resolve();
+    } else {
+      setTimeout((_: any) => poll(resolve), 400);
+    }
+  };
+  return new Promise(poll);
+}
+
 export async function getChainlinkPrice(splMint: PublicKey) {
   process.env.ANCHOR_PROVIDER_URL = API_URL;
   process.env.ANCHOR_WALLET = `${os.homedir()}/mango-explorer/id.json`;
@@ -314,7 +304,7 @@ export async function getChainlinkPrice(splMint: PublicKey) {
     dataFeed.removeListener(listener);
   });
 
-  await waitFor((_) => latestValue !== 0);
+  await waitFor(() => latestValue !== 0);
   const prettyLatestValue = latestValue / 10 ** decimalsBaseSPL(splMintToToken(splMint));
   // Chainlink SOL off by a factor of 10
   if (splMintToToken(splMint) === 'SOL') {

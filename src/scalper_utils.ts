@@ -28,7 +28,6 @@ import {
   PRIORITY_FEE,
   twapIntervalSec,
   gammaCycles,
-  percentDrift,
   scalperWindowSec,
 } from './config';
 import {
@@ -512,10 +511,9 @@ export function waitForFill(conditionFunction) {
 export function waitForGamma(conditionFunction) {
   let pollCount = 0;
   const resolvePeriodMs = 100;
-  const maxScalpWindow = (1 + percentDrift) * scalperWindowSec;
   const poll = (resolve) => {
     pollCount += 1;
-    if (pollCount > (maxScalpWindow * resolvePeriodMs) / gammaCycles) resolve();
+    if (pollCount > (scalperWindowSec * resolvePeriodMs) / gammaCycles) resolve();
     else if (conditionFunction()) resolve();
     else setTimeout((_) => poll(resolve), resolvePeriodMs);
   };

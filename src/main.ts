@@ -20,7 +20,7 @@ async function main() {
         console.log('Route to MM', deposit);
       },
       (deposits: DIPDeposit[]) => {
-        scalpers[symbol].pickAndRunScalper(deposits);
+        scalpers.get(symbol).pickAndRunScalper(deposits);
       },
       symbol,
     ),

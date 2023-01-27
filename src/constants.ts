@@ -29,3 +29,6 @@ export const riskManagerPk = new PublicKey('FCsXUii28gmnKQCZV1vGMZPqF2LCRCr3pqEr
 export const mangoTesterPk = new PublicKey('CkcJx7Uwgxck5zm3DqUp2N1ikkkoPn2wA8zf7oS4tFSZ');
 
 export const MS_PER_YEAR = 365 * 60 * 60 * 24 * 1_000;
+export const SIX_MONTHS_IN_MS = 1_000 * 60 * 60 * 24 * 30 * 6;
+
+export const DIP_STATE_LENGTH = 260;

@@ -13,7 +13,7 @@ import configFile from './ids.json';
 import {
   networkName, THEO_VOL_MAP, maxNotional, twapIntervalSec, scalperWindowSec,
   ZSCORE, MinContractSize, TickSize, FILLS_URL, IS_DEV, gammaThreshold,
-  maxDeltaHedges, percentDrift, DELTA_OFFSET, MANGO_DOWNTIME_THRESHOLD_MIN,
+  maxDeltaHedges, DELTA_OFFSET, MANGO_DOWNTIME_THRESHOLD_MIN,
   perpFundingRateThreshold, gammaCycles, MinOpenBookSize, OPENBOOK_FORK_ID,
   treasuryPositions, slippageMax, gammaCompleteThresholdPct, cluster,
   maxOrderBookSearchDepth, maxBackGammaMultiple, API_URL, MODE, whaleMaxSpread,
@@ -523,7 +523,7 @@ class Scalper {
     );
 
     // Sleep for the max time of the reruns then kill thread
-    await sleepExact((1 + percentDrift) * scalperWindowSec);
+    await sleepExact(scalperWindowSec);
     console.log(this.symbol, 'Remove stale gamma fill listener', gammaBidID, gammaAskID);
     fillFeed.removeEventListener('message', gammaFillListener);
   }

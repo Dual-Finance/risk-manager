@@ -47,14 +47,20 @@ export const ZSCORE = new Map<SYMBOL, number>([
   ['BONK', parseFloat(bonkVars[3]) > 0 ? parseFloat(bonkVars[3]) : 2.58],
 ]); // Corresponds to 80% CI by default
 
-// TODO: Make enum
-export const MODE = new Map<SYMBOL, number>([
-  ['BTC', parseFloat(btcVars[4]) > 0 ? parseFloat(btcVars[4]) : 0],
-  ['ETH', parseFloat(ethVars[4]) > 0 ? parseFloat(ethVars[4]) : 0],
-  ['SOL', parseFloat(solVars[4]) > 0 ? parseFloat(solVars[4]) : 0],
-  ['MNGO', parseFloat(mngoVars[4]) > 0 ? parseFloat(mngoVars[4]) : 0],
-  ['BONK', parseFloat(bonkVars[4]) > 0 ? parseFloat(bonkVars[4]) : 0],
-]); // 0 - Normal 1 - Gamma+Back 2 - Gamma+Back w/ Strike Adjustment 3- Back Only
+export enum ScalperMode {
+  Normal,
+  GammaBack,
+  GammaBackStrikeAdjustment,
+  BackOnly,
+}
+
+export const MODE_BY_SYMBOL = new Map<SYMBOL, ScalperMode>([
+  ['BTC', parseFloat(btcVars[4]) > 0 && parseFloat(btcVars[4]) < 4 ? parseFloat(btcVars[4]) : ScalperMode.Normal],
+  ['ETH', parseFloat(ethVars[4]) > 0 && parseFloat(ethVars[4]) < 4 ? parseFloat(ethVars[4]) : ScalperMode.Normal],
+  ['SOL', parseFloat(solVars[4]) > 0 && parseFloat(solVars[4]) < 4 ? parseFloat(solVars[4]) : ScalperMode.Normal],
+  ['MNGO', parseFloat(mngoVars[4]) > 0 && parseFloat(mngoVars[4]) < 4 ? parseFloat(mngoVars[4]) : ScalperMode.Normal],
+  ['BONK', parseFloat(bonkVars[4]) > 0 && parseFloat(bonkVars[4]) < 4 ? parseFloat(bonkVars[4]) : ScalperMode.Normal],
+]);
 
 export const ENVIRONMENT: string = IS_DEV ? 'DEVNET' : 'MAINNET';
 

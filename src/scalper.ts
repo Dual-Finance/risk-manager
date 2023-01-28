@@ -556,7 +556,7 @@ Limit: ${hedgePrice} # ${deltaHedgeCount} ID ${deltaOrderId}`);
       await this.gammaScalpOpenBook(
         dipProduct,
         1, /* gammaScalpCount */
-        0, /* priorFillPrice */
+        NO_FAIR_VALUE, /* priorFillPrice */
         spotMarket,
         jupiter,
       );
@@ -955,7 +955,7 @@ Spot Δ: ${spotDelta} Offset Δ ${this.deltaOffset} Fair Value: ${fairValue}`,
         }
       }
 
-      // TODO: Check lll call adjustment logic
+      // TODO: Check all call adjustment logic
       if (nearStrikeType === CallOrPut.Call) {
         const isOTM = (fairValue < dipProduct[0].strikeUsdcPerToken);
         const minStrike = findMinStrike(dipProduct);

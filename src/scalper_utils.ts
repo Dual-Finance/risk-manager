@@ -3,7 +3,8 @@ import {
   BookSide, MangoCache, MangoGroup, PerpMarket,
 } from '@blockworks-foundation/mango-client';
 import {
-  ComputeBudgetProgram, Connection, Keypair, LAMPORTS_PER_SOL, PublicKey, Transaction,
+  ComputeBudgetProgram, Connection, Keypair, LAMPORTS_PER_SOL, PublicKey,
+  sendAndConfirmTransaction, Transaction,
 } from '@solana/web3.js';
 import { Market } from '@project-serum/serum';
 import { getAssociatedTokenAddress } from '@project-serum/associated-token';
@@ -23,7 +24,7 @@ import {
   splMintToToken, tokenToSplMint,
 } from './utils';
 import {
-  mangoTesterPk, MS_PER_YEAR, optionVaultPk, riskManagerPk,
+  mangoTesterPk, MS_PER_YEAR, NO_FAIR_VALUE, optionVaultPk, riskManagerPk,
 } from './constants';
 
 export async function loadPrices(
@@ -100,6 +101,15 @@ export function getDIPTheta(
         * dip.qtyTokens;
   }
   return thetaSum;
+}
+
+export function getMangoHedgeProduct(hedgeSide: string, buySpot: boolean, sellSpot: boolean): '-SPOT' | '-PERP' {
+  if (hedgeSide === 'buy' && buySpot) {
+    return '-SPOT';
+  } if (hedgeSide === 'sell' && sellSpot) {
+    return '-SPOT';
+  }
+  return '-PERP';
 }
 
 // Splice delta hedge orders if available mango liquidity not supportive
@@ -210,6 +220,21 @@ export async function getSpotDelta(connection: Connection, symbol: SYMBOL) {
   return spotDelta;
 }
 
+// TODO: Refine logic & make dynamic.
+export function setPriorityFee(
+  tx: Transaction,
+) {
+  const modifyComputeUnits = ComputeBudgetProgram.setComputeUnitLimit({
+    units: 1_000_000,
+  });
+  const addPriorityFee = ComputeBudgetProgram.setComputeUnitPrice({
+    microLamports: PRIORITY_FEE,
+  });
+  tx.add(modifyComputeUnits);
+  tx.add(addPriorityFee);
+  return tx;
+}
+
 export async function settleOpenBook(
   connection: Connection,
   owner: Keypair,
@@ -234,6 +259,15 @@ export async function settleOpenBook(
         ));
       settleTx.add(transaction);
     }
+  }
+
+  // If there are funds ready to be settled, settle them
+  if (settleTx !== undefined) {
+    await sendAndConfirmTransaction(
+      connection,
+      setPriorityFee(settleTx),
+      [owner],
+    );
   }
   return settleTx;
 }
@@ -346,7 +380,7 @@ async function getOraclePrice(symbol: SYMBOL, connection: Connection, spotMarket
     return midValue;
   }
 
-  return 0;
+  return NO_FAIR_VALUE;
 }
 
 export async function getFairValue(
@@ -421,7 +455,9 @@ export async function jupiterHedge(
     if (hedgeSide === 'sell') {
       if (netPrice > hedgePrice) {
         const swapQty = -searchQty / inAtomsPerToken;
-        routeDetails = { price: netPrice, qty: swapQty, venue, txs: transactions };
+        routeDetails = {
+          price: netPrice, qty: swapQty, venue, txs: transactions,
+        };
         lastSucess = true;
         if (i === 0) {
           break;
@@ -429,7 +465,9 @@ export async function jupiterHedge(
       }
     } else if (netPrice < hedgePrice) {
       const swapQty = searchQty / inAtomsPerToken / hedgePrice;
-      routeDetails = { price: netPrice, qty: swapQty, venue, txs: transactions };
+      routeDetails = {
+        price: netPrice, qty: swapQty, venue, txs: transactions,
+      };
       lastSucess = true;
       if (i === 0) {
         break;
@@ -444,21 +482,6 @@ export async function getJupPriceAPI(baseMint: PublicKey): Promise<number> {
   const { data } = await (await fetch(url)).json();
   const { price } = data[baseMint.toBase58()];
   return price;
-}
-
-// TODO: Refine logic & make dynamic.
-export function setPriorityFee(
-  tx: Transaction,
-) {
-  const modifyComputeUnits = ComputeBudgetProgram.setComputeUnitLimit({
-    units: 1_000_000,
-  });
-  const addPriorityFee = ComputeBudgetProgram.setComputeUnitPrice({
-    microLamports: PRIORITY_FEE,
-  });
-  tx.add(modifyComputeUnits);
-  tx.add(addPriorityFee);
-  return tx;
 }
 
 export function waitForFill(conditionFunction, cycleDurationSec: number) {

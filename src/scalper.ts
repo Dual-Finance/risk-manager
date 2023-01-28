@@ -1008,8 +1008,8 @@ class Scalper {
       const nearStrikeType = findNearestStrikeType(dipProduct, fairValue);
       console.log(this.symbol, 'Delta Position', dipTotalDelta + spotDelta + this.deltaOffset, nearStrikeType, 'isShort', isShort);
       if (nearStrikeType === CallOrPut.Put) {
-        const isOTM = (fairValue > dipProduct[0].strikeUsdcPerToken);
         const maxStrike = findMaxStrike(dipProduct);
+        const isOTM = (fairValue > maxStrike);
         if (isOTM && isShort) {
           gammaBid = Math.min(
             maxStrike * (1 - stdDevSpread - stdDevSpread * widenSpread),
@@ -1027,8 +1027,8 @@ class Scalper {
       }
       // TODO: Check All Call Adjustment logic
       if (nearStrikeType === CallOrPut.Call) {
-        const isOTM = (fairValue < dipProduct[0].strikeUsdcPerToken);
         const minStrike = findMinStrike(dipProduct);
+        const isOTM = (fairValue < minStrike);
         if (isOTM && !isShort) {
           gammaAsk = Math.max(
             minStrike * (1 + stdDevSpread + stdDevSpread * widenSpread),

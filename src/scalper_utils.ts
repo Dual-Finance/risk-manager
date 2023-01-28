@@ -243,6 +243,7 @@ export async function settleOpenBook(
   quote: SYMBOL,
 ) {
   const settleTx = new Transaction();
+  let needSettle = false;
   for (const openOrders of await market.findOpenOrdersAccountsForOwner(
     connection,
     owner.publicKey,
@@ -258,11 +259,12 @@ export async function settleOpenBook(
           quoteRecipientAccount,
         ));
       settleTx.add(transaction);
+      needSettle = true;
     }
   }
 
   // If there are funds ready to be settled, settle them
-  if (settleTx !== undefined) {
+  if (needSettle) {
     await sendAndConfirmTransaction(
       connection,
       setPriorityFee(settleTx),

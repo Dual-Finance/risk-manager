@@ -236,7 +236,7 @@ class Scalper {
     }
     console.log(this.symbol, 'Above delta threshold:', deltaThreshold);
 
-    // Determing spot or perp order based on funding rate.
+    // Determine spot or perp order based on funding rate.
     const bidSide = await perpMarket.loadBids(this.connection);
     const askSide = await perpMarket.loadAsks(this.connection);
     const fundingRate = (24 * 365)

@@ -21,6 +21,7 @@ import {
 } from './config';
 import {
   decimalsBaseSPL, getChainlinkPrice, getPythPrice, getSwitchboardPrice,
+  sleepExact,
   splMintToToken, tokenToSplMint,
 } from './utils';
 import {
@@ -283,22 +284,27 @@ export function getPayerAccount(hedgeSide: 'buy' | 'sell', base: SYMBOL, quote: 
   return baseTokenAccount;
 }
 
-export async function cancelTxOpenBookOrders(
+export async function cancelOpenBookOrders(
   connection: Connection,
   owner: Keypair,
   spotMarket: Market,
   symbol: SYMBOL,
-):Promise<Transaction | undefined> {
+):Promise<void> {
   const myOrders = await spotMarket.loadOrdersForOwner(connection, owner.publicKey);
   if (myOrders.length === 0) {
-    return undefined;
+    return;
   }
   const cancelTx = new Transaction();
   for (const order of myOrders) {
     console.log(symbol, 'Cancelling OpenBook Orders', order.size, symbol, '@', order.price, order.clientId.toString());
     cancelTx.add(spotMarket.makeCancelOrderInstruction(connection, owner.publicKey, order));
   }
-  return cancelTx;
+
+  try {
+    await sendAndConfirmTransaction(connection, setPriorityFee(cancelTx), [owner]);
+  } catch (err) {
+    console.log(symbol, 'Cancel OpenBook Orders', err, err.stack);
+  }
 }
 
 export async function getJupiterPrice(
@@ -385,7 +391,7 @@ async function getOraclePrice(symbol: SYMBOL, connection: Connection, spotMarket
   return NO_FAIR_VALUE;
 }
 
-export async function getFairValue(
+async function getFairValue(
   connection: Connection,
   spotMarket: Market,
   symbol: SYMBOL,
@@ -401,6 +407,28 @@ export async function getFairValue(
       `${symbol}: Using Jupiter Mid Price ${jupPrice} Oracle Slippage: ${oracleSlippageBps}`,
     );
     return jupPrice;
+  }
+  return fairValue;
+}
+
+export async function findFairValue(
+  connection: Connection,
+  spotMarket: Market,
+  symbol: SYMBOL,
+  jupiter: Jupiter,
+  tries: number,
+  waitSecPerTry: number,
+) {
+  let fairValue = await getFairValue(connection, spotMarket, symbol, jupiter);
+  for (let i = 0; i < tries; i++) {
+    if (fairValue === NO_FAIR_VALUE) {
+      console.log(this.symbol, 'Cannot find fair value');
+      await sleepExact(waitSecPerTry);
+      fairValue = await getFairValue(this.connection, spotMarket, this.symbol, jupiter);
+    }
+  }
+  if (fairValue === NO_FAIR_VALUE) {
+    console.log(this.symbol, 'No Robust Pricing. Exiting Gamma Scalp', waitSecPerTry);
   }
   return fairValue;
 }
@@ -530,4 +558,12 @@ export function findNearestStrikeType(dipProduct: DIPDeposit[], fairValue: numbe
     }
   }
   return nearStrikeType;
+}
+
+export function roundPriceToTickSize(amount: number, tickSize: number) {
+  return Math.floor(amount * (1 / tickSize)) / (1 / tickSize);
+}
+
+export function roundQtyToSpotSize(amount: number, spotSize: number) {
+  return Math.floor(amount * (1 / spotSize)) / (1 / spotSize);
 }

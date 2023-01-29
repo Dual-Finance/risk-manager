@@ -21,8 +21,7 @@ import {
 } from './config';
 import {
   decimalsBaseSPL, getChainlinkPrice, getPythPrice, getSwitchboardPrice,
-  sleepExact,
-  splMintToToken, tokenToSplMint,
+  sleepExact, splMintToToken, tokenToSplMint,
 } from './utils';
 import {
   mangoTesterPk, MS_PER_YEAR, NO_FAIR_VALUE, optionVaultPk, riskManagerPk,

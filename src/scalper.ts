@@ -26,9 +26,9 @@ import {
   jupiterHedge, cancelTxOpenBookOrders, getDIPDelta, getDIPGamma, getDIPTheta,
   getFairValue, getPayerAccount, getSpotDelta, loadPrices, orderSpliceMango,
   liquidityCheckAndNumSplices, settleOpenBook, setPriorityFee, waitForFill,
-  findMaxStrike, findMinStrike, findNearestStrikeType,
+  findMaxStrike, findMinStrike, findNearestStrikeType, getMangoHedgeProduct,
 } from './scalper_utils';
-import { OPENBOOK_MKT_MAP } from './constants';
+import { NO_FAIR_VALUE, OPENBOOK_MKT_MAP, SEC_PER_YEAR } from './constants';
 
 class Scalper {
   client: MangoClient;
@@ -79,14 +79,7 @@ class Scalper {
   }
 
   async pickAndRunScalper(dipProduct: DIPDeposit[]): Promise<void> {
-    console.log(this.symbol, 'Choosing Market to Hedge');
-    this.perpMarketConfig = getMarketByBaseSymbolAndKind(
-      this.groupConfig,
-      this.symbol,
-      'perp',
-    );
-
-    // Add Any Treasury Positions from Staking Options
+    // Add any treasury positions from Staking Options.
     for (const positions of treasuryPositions) {
       if (this.symbol === positions.splTokenName) {
         dipProduct.push(positions);
@@ -104,6 +97,12 @@ class Scalper {
       );
     }
 
+    console.log(this.symbol, 'Choosing market to trade');
+    this.perpMarketConfig = getMarketByBaseSymbolAndKind(
+      this.groupConfig,
+      this.symbol,
+      'perp',
+    );
     this.marketIndex = this.perpMarketConfig.marketIndex;
     if (this.marketIndex === undefined) {
       console.log('No Mango Market Exists. Run OpenBook');
@@ -111,7 +110,6 @@ class Scalper {
       return;
     }
 
-    // Setup for scalping
     const mangoGroup: MangoGroup = await this.client.getMangoGroup(
       this.groupConfig.publicKey,
     );
@@ -132,14 +130,9 @@ class Scalper {
     }
   }
 
+  // Delta hedge and gamma scalp on mango.
   async scalperMango(dipProduct: DIPDeposit[]): Promise<void> {
     console.log(this.symbol, 'Hedging on Mango');
-    this.perpMarketConfig = getMarketByBaseSymbolAndKind(
-      this.groupConfig,
-      this.symbol,
-      'perp',
-    );
-    this.marketIndex = this.perpMarketConfig.marketIndex;
 
     // Setup for scalping
     const mangoGroup: MangoGroup = await this.client.getMangoGroup(this.groupConfig.publicKey);
@@ -167,7 +160,7 @@ class Scalper {
     };
 
     try {
-      await this.deltaHedge(
+      await this.deltaHedgeMango(
         dipProduct,
         mangoGroup,
         perpMarket,
@@ -175,7 +168,7 @@ class Scalper {
         fillFeed,
         1,
       );
-      await this.gammaScalp(
+      await this.gammaScalpMango(
         dipProduct,
         mangoGroup,
         perpMarket,
@@ -187,7 +180,7 @@ class Scalper {
     }
   }
 
-  async deltaHedge(
+  async deltaHedgeMango(
     dipProduct: DIPDeposit[],
     mangoGroup: MangoGroup,
     perpMarket: PerpMarket,
@@ -201,7 +194,7 @@ class Scalper {
     )[0];
 
     // Cleanup from previous runs.
-    await this.cancelStaleOrders(mangoAccount, mangoGroup, perpMarket);
+    await this.cancelStaleMangoOrders(mangoAccount, mangoGroup, perpMarket);
 
     // Avoid unsafe recursion.
     if (deltaHedgeCount > maxDeltaHedges) {
@@ -243,7 +236,7 @@ class Scalper {
     }
     console.log(this.symbol, 'Above delta threshold:', deltaThreshold);
 
-    // Funding Rate to determine spot or perp order
+    // Determine spot or perp order based on funding rate.
     const bidSide = await perpMarket.loadBids(this.connection);
     const askSide = await perpMarket.loadAsks(this.connection);
     const fundingRate = (24 * 365)
@@ -251,33 +244,12 @@ class Scalper {
     const buySpot = fundingRate > perpFundingRateThreshold;
     const sellSpot = -fundingRate < perpFundingRateThreshold;
     const hedgeSide = hedgeDeltaTotal < 0 ? 'buy' : 'sell'; // TODO Make Enum everywhere
-    let hedgeProduct: string;
-    if (hedgeSide === 'buy' && buySpot) {
-      hedgeProduct = '-SPOT';
-    } else if (hedgeSide === 'sell' && sellSpot) {
-      hedgeProduct = '-SPOT';
-    } else {
-      hedgeProduct = '-PERP';
-    }
+    const hedgeProduct = getMangoHedgeProduct(hedgeSide, buySpot, sellSpot);
 
     console.log(
-      this.symbol,
-      'Target Delta Hedge:',
-      hedgeSide,
-      hedgeProduct,
-      -hedgeDeltaTotal,
-      'DIP Δ:',
-      dipTotalDelta,
-      'Mango Perp Δ:',
-      mangoPerpDelta,
-      'Mango Spot Δ:',
-      mangoSpotDelta,
-      'Spot Δ:',
-      spotDelta,
-      'Offset Δ',
-      this.deltaOffset,
-      'Fair Value:',
-      fairValue,
+      `${this.symbol} Target Delta Hedge: ${hedgeSide} ${hedgeProduct} ${-hedgeDeltaTotal} \
+DIP Δ: ${dipTotalDelta} Mango Perp Δ: ${mangoPerpDelta} Mango Spot Δ: ${mangoSpotDelta} \
+Spot Δ: ${spotDelta} Offset Δ ${this.deltaOffset} Fair Value: ${fairValue}`,
     );
 
     // Determine what price to use for hedging depending on allowable slippage.
@@ -296,7 +268,6 @@ class Scalper {
         perpMarket,
       );
 
-    // Unique identifier for delta order.
     const deltaOrderId = new Date().getTime() * 2;
 
     // Start listening for Delta Hedge Fills
@@ -312,21 +283,10 @@ class Scalper {
           const fillQty = (hedgeSide === 'buy' ? 1 : -1) * fillEvent.quantity.toNumber() * this.minSize;
           const fillPrice = fillEvent.price.toNumber() * this.tickSize;
           hedgeDeltaTotal += fillQty;
-          console.log(
-            this.symbol,
-            'Delta Filled',
-            hedgeSide,
-            hedgeProduct,
-            'Qty',
-            fillQty,
-            'Price',
-            fillPrice,
-            'Remaining',
-            hedgeDeltaTotal,
-            'ID',
-            deltaOrderId,
-            new Date().toUTCString(),
-          );
+
+          console.log(`${this.symbol} Delta Filled ${hedgeSide} ${hedgeProduct} Qty ${fillQty} \
+Price ${fillPrice} Remaining ${hedgeDeltaTotal} ID ${deltaOrderId} ${new Date().toUTCString()}`);
+
           if (Math.abs(hedgeDeltaTotal * fairValue) < (this.minSize * fairValue)) {
             fillFeed.removeEventListener('message', deltaFillListener);
             console.log(this.symbol, 'Delta Hedge Complete: Websocket Fill');
@@ -343,18 +303,9 @@ class Scalper {
       console.log(this.symbol, 'Websocket State', fillFeed.readyState);
     }
 
-    console.log(
-      this.symbol,
-      hedgeSide,
-      hedgeProduct,
-      Math.abs(hedgeDeltaClip),
-      'Limit:',
-      hedgePrice,
-      '#',
-      deltaHedgeCount,
-      'ID',
-      deltaOrderId,
-    );
+    console.log(`${this.symbol} ${hedgeSide} ${hedgeProduct} ${Math.abs(hedgeDeltaClip)} \
+Limit: ${hedgePrice} # ${deltaHedgeCount} ID ${deltaOrderId}`);
+
     try {
       if (hedgeProduct === '-SPOT') {
         await this.client.placeSpotOrder2(
@@ -396,7 +347,7 @@ class Scalper {
     fillFeed.removeEventListener('message', deltaFillListener);
 
     // Recursive call. This happens when we are not getting fills to get to neutral.
-    await this.deltaHedge(
+    await this.deltaHedgeMango(
       dipProduct,
       mangoGroup,
       perpMarket,
@@ -406,7 +357,7 @@ class Scalper {
     );
   }
 
-  async gammaScalp(
+  async gammaScalpMango(
     dipProduct: DIPDeposit[],
     mangoGroup: MangoGroup,
     perpMarket: PerpMarket,
@@ -422,7 +373,7 @@ class Scalper {
 
     // Makes the recursive gamma scalps safer. Rerun will clear any stale
     // orders. Allows only 2 gamma orders at any time
-    await this.cancelStaleOrders(mangoAccount, mangoGroup, perpMarket);
+    await this.cancelStaleMangoOrders(mangoAccount, mangoGroup, perpMarket);
 
     // Avoid unsafe recursion.
     if (gammaScalpCount > gammaCycles) {
@@ -471,7 +422,7 @@ class Scalper {
           fillFeed.removeEventListener('message', gammaFillListener);
           // Do not need to remove the unfilled order since it will be cancelled
           // in the recursive call.
-          this.gammaScalp(
+          this.gammaScalpMango(
             dipProduct,
             mangoGroup,
             perpMarket,
@@ -529,7 +480,7 @@ class Scalper {
     fillFeed.removeEventListener('message', gammaFillListener);
   }
 
-  async cancelStaleOrders(
+  async cancelStaleMangoOrders(
     mangoAccount: MangoAccount,
     mangoGroup: MangoGroup,
     perpMarket: PerpMarket,
@@ -591,7 +542,7 @@ class Scalper {
       try {
         await this.deltaHedgeOpenBook(
           dipProduct,
-          1,
+          1 /* deltaHedgeCount */,
           spotMarket,
           jupiter,
         );
@@ -604,12 +555,11 @@ class Scalper {
     try {
       await this.gammaScalpOpenBook(
         dipProduct,
-        1,
-        0,
+        1, /* gammaScalpCount */
+        NO_FAIR_VALUE, /* priorFillPrice */
         spotMarket,
         jupiter,
       );
-      // TODO: OpenBook settlement to move to mango if needed
     } catch (err) {
       console.log(this.symbol, 'Main Gamma Error', err.stack);
     }
@@ -634,17 +584,8 @@ class Scalper {
       }
     }
 
-    // Settle Funds
     try {
-      const settleTransaction = await settleOpenBook(this.connection, this.owner, spotMarket, this.symbol, 'USDC');
-      // If there are funds ready to be settled, settle them
-      if (settleTransaction !== undefined) {
-        await sendAndConfirmTransaction(
-          this.connection,
-          setPriorityFee(settleTransaction),
-          [this.owner],
-        );
-      }
+      await settleOpenBook(this.connection, this.owner, spotMarket, this.symbol, 'USDC');
     } catch (err) {
       console.log(this.symbol, 'Settling Funds', err, err.stack);
     }
@@ -673,74 +614,60 @@ class Scalper {
       },
     );
 
-    // Find fair value.
-    console.log(this.symbol, 'Loading Fair Value...');
+    console.log(this.symbol, 'Loading Fair Value');
     let fairValue = await getFairValue(this.connection, spotMarket, this.symbol, jupiter);
     for (let i = 0; i < maxDeltaHedges; i++) {
-      if (fairValue === 0) {
-        console.log(this.symbol, 'No Prices Refreshing Delta Hedge', i + 1, 'After', twapIntervalSec, 'Seconds');
+      if (fairValue === NO_FAIR_VALUE) {
+        console.log(this.symbol, 'Could not find fair value after', twapIntervalSec * (i + 1), 'seconds');
         await sleepExact(twapIntervalSec);
         fairValue = await getFairValue(this.connection, spotMarket, this.symbol, jupiter);
       }
     }
-    if (fairValue === 0) {
+    if (fairValue === NO_FAIR_VALUE) {
       console.log(this.symbol, 'No Robust Pricing. Exiting Delta Hedge', deltaHedgeCount);
       return;
     }
 
-    // Get the DIP Delta
     const dipTotalDelta = getDIPDelta(dipProduct, fairValue, this.symbol);
-
-    // Get all spot positions Option Vault, Risk Manager, Mango Tester
     const spotDelta = await getSpotDelta(this.connection, this.symbol);
 
-    // Get Total Delta Position to hedge. Use .1 for DEV to force that it does something.
+    // Get total delta position to hedge. Use .1 for DEV to force that it does something.
     hedgeDeltaTotal = IS_DEV ? 0.1 : dipTotalDelta + spotDelta + this.deltaOffset;
     hedgeSide = hedgeDeltaTotal < 0 ? 'buy' : 'sell';
-    // TODO: Mango delta positions
+
     console.log(
-      this.symbol,
-      'Target Delta Hedge:',
-      hedgeSide,
-      'SPOT',
-      -hedgeDeltaTotal,
-      'DIP Δ:',
-      dipTotalDelta,
-      'Mango Perp Δ:',
-      0,
-      'Mango Spot Δ:',
-      0,
-      'Spot Δ:',
-      spotDelta,
-      'Offset Δ',
-      this.deltaOffset,
-      'Fair Value:',
-      fairValue,
+      `${this.symbol} Target Delta Hedge: ${hedgeSide} SPOT ${-hedgeDeltaTotal} DIP Δ: ${dipTotalDelta} \
+Spot Δ: ${spotDelta} Offset Δ ${this.deltaOffset} Fair Value: ${fairValue}`,
     );
 
     // Check whether we need to hedge.
     const dipTotalGamma = getDIPGamma(dipProduct, fairValue, this.symbol);
-    const stdDevSpread = (this.impliedVol / Math.sqrt((365 * 24 * 60 * 60) / scalperWindowSec))
+    const stdDevSpread = (this.impliedVol / Math.sqrt(SEC_PER_YEAR / scalperWindowSec))
     * this.zScore;
-    const slippageTolerance = Math.min(stdDevSpread / 2, slippageMax.get(this.symbol));
     const deltaThreshold = Math.max(
       dipTotalGamma * stdDevSpread * fairValue * gammaThreshold,
       this.minSpotSize,
     );
-    let hedgePrice = hedgeDeltaTotal < 0
-      ? fairValue * (1 + slippageTolerance)
-      : fairValue * (1 - slippageTolerance);
     if (Math.abs(hedgeDeltaTotal * fairValue) < (deltaThreshold * fairValue)) {
       console.log(this.symbol, 'Delta Netural Within', deltaThreshold);
       return;
     }
-    // Adjust delta for slippage allowed
+
+    // Adjust delta for slippage allowed.
+    const slippageTolerance = Math.min(stdDevSpread / 2, slippageMax.get(this.symbol));
+    let hedgePrice = hedgeDeltaTotal < 0
+      ? fairValue * (1 + slippageTolerance)
+      : fairValue * (1 - slippageTolerance);
     const slippageDIPDelta = getDIPDelta(dipProduct, hedgePrice, this.symbol);
     const dipDeltaDiff = slippageDIPDelta - dipTotalDelta;
     hedgeDeltaTotal += dipDeltaDiff;
     console.log(this.symbol, 'Adjust Slippage Delta by', dipDeltaDiff, 'to', -hedgeDeltaTotal);
-    if (((-hedgeDeltaTotal * fairValue) < (deltaThreshold * fairValue) && (hedgeSide === 'buy'))
-       || ((-hedgeDeltaTotal * fairValue) > (deltaThreshold * fairValue) && (hedgeSide === 'sell'))) {
+
+    // Check if we are within the delta threshold.
+    const notionalThreshold = deltaThreshold * fairValue;
+    const notionalAmount = -hedgeDeltaTotal * fairValue;
+    if ((notionalAmount < notionalThreshold && hedgeSide === 'buy')
+       || (notionalAmount > notionalThreshold && hedgeSide === 'sell')) {
       console.log(this.symbol, 'Delta Netural: Slippage', deltaThreshold);
       return;
     }
@@ -937,6 +864,7 @@ class Scalper {
         }
       },
     );
+
     // Clean the state by cancelling all existing open orders.
     const cancelGammaStart = (
       await cancelTxOpenBookOrders(this.connection, this.owner, spotMarket, this.symbol));
@@ -974,21 +902,22 @@ class Scalper {
     } else {
       fairValue = await getFairValue(this.connection, spotMarket, this.symbol, jupiter);
     }
+
     for (let i = 0; i < gammaCycles; i++) {
-      if (fairValue === 0) {
+      if (fairValue === NO_FAIR_VALUE) {
         console.log(this.symbol, 'No Prices. Refreshing Gamma Scalp', i + 1, 'After', twapIntervalSec, 'Seconds');
         await sleepExact(twapIntervalSec);
         fairValue = await getFairValue(this.connection, spotMarket, this.symbol, jupiter);
       }
     }
-    if (fairValue === 0) {
+    if (fairValue === NO_FAIR_VALUE) {
       console.log(this.symbol, 'No Robust Pricing. Exiting Gamma Scalp', gammaScalpCount);
       return;
     }
     const dipTotalGamma = getDIPGamma(dipProduct, fairValue, this.symbol);
 
     // Calc scalperWindow std deviation spread from zScore & IV for gamma levels
-    const stdDevSpread = (this.impliedVol / Math.sqrt((365 * 24 * 60 * 60) / scalperWindowSec))
+    const stdDevSpread = (this.impliedVol / Math.sqrt(SEC_PER_YEAR / scalperWindowSec))
     * this.zScore;
     const netGamma = IS_DEV
       ? Math.max(0.01, dipTotalGamma * stdDevSpread * fairValue)
@@ -1025,7 +954,8 @@ class Scalper {
           console.log('Strike Adjusted Gamma Ask', gammaAsk, maxStrike);
         }
       }
-      // TODO: Check All Call Adjustment logic
+
+      // TODO: Check all call adjustment logic
       if (nearStrikeType === CallOrPut.Call) {
         const minStrike = findMinStrike(dipProduct);
         const isOTM = (fairValue < minStrike);

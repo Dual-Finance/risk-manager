@@ -23,10 +23,11 @@ import { CallOrPut, DIPDeposit, SYMBOL } from './common';
 import { readKeypair, sleepExact, sleepRandom } from './utils';
 import { SerumVialClient, SerumVialTradeMessage, tradeMessageToString } from './serumVial';
 import {
-  jupiterHedge, cancelTxOpenBookOrders, getDIPDelta, getDIPGamma, getDIPTheta,
-  getFairValue, getPayerAccount, getSpotDelta, loadPrices, orderSpliceMango,
-  liquidityCheckAndNumSplices, settleOpenBook, setPriorityFee, waitForFill,
-  findMaxStrike, findMinStrike, findNearestStrikeType, getMangoHedgeProduct,
+  jupiterHedge, getDIPDelta, getDIPGamma, getDIPTheta, getPayerAccount,
+  getSpotDelta, loadPrices, orderSpliceMango, liquidityCheckAndNumSplices,
+  settleOpenBook, setPriorityFee, waitForFill, findMaxStrike, findMinStrike,
+  findNearestStrikeType, getMangoHedgeProduct, cancelOpenBookOrders,
+  findFairValue, roundPriceToTickSize, roundQtyToSpotSize,
 } from './scalper_utils';
 import { NO_FAIR_VALUE, OPENBOOK_MKT_MAP, SEC_PER_YEAR } from './constants';
 
@@ -223,7 +224,7 @@ class Scalper {
 
     // Check whether we need to hedge.
     const dipTotalGamma = getDIPGamma(dipProduct, fairValue, this.symbol);
-    const stdDevSpread = (this.impliedVol / Math.sqrt((365 * 24 * 60 * 60)
+    const stdDevSpread = (this.impliedVol / Math.sqrt(SEC_PER_YEAR
     / scalperWindowSec)) * this.zScore;
     const slippageTolerance = Math.min(stdDevSpread / 2, slippageMax.get(this.symbol));
     const deltaThreshold = Math.max(
@@ -386,7 +387,7 @@ Limit: ${hedgePrice} # ${deltaHedgeCount} ID ${deltaOrderId}`);
 
     // Calc scalperWindow std deviation spread from zScore & IV for gamma levels
     const stdDevSpread = (this.impliedVol
-    / Math.sqrt((365 * 24 * 60 * 60) / scalperWindowSec))
+    / Math.sqrt(SEC_PER_YEAR / scalperWindowSec))
     * this.zScore;
     const netGamma = IS_DEV
       ? Math.max(0.01, dipTotalGamma * stdDevSpread * fairValue)
@@ -407,39 +408,40 @@ Limit: ${hedgePrice} # ${deltaHedgeCount} ID ${deltaOrderId}`);
     fillFeed.removeAllListeners('message');
     const gammaFillListener = (event) => {
       const parsedEvent = JSON.parse(event.data);
-      if (
-        parsedEvent.status === 'New'
-        && parsedEvent.market === this.symbol.concat('-PERP')
-      ) {
-        const fillBytes = Buffer.from(parsedEvent.event, 'base64');
-        const fillEvent: FillEvent = PerpEventLayout.decode(fillBytes).fill;
-        const bidFill = fillEvent.makerClientOrderId.toString() === gammaBidID.toString()
-          || fillEvent.takerClientOrderId.toString() === gammaBidID.toString();
-        const askFill = fillEvent.makerClientOrderId.toString() === gammaAskID.toString()
-          || fillEvent.takerClientOrderId.toString() === gammaAskID.toString();
-        if (bidFill || askFill) {
-          console.log(this.symbol, 'Gamma Filled', bidFill ? 'BID' : 'ASK', new Date().toUTCString());
-          fillFeed.removeEventListener('message', gammaFillListener);
-          // Do not need to remove the unfilled order since it will be cancelled
-          // in the recursive call.
-          this.gammaScalpMango(
-            dipProduct,
-            mangoGroup,
-            perpMarket,
-            fillFeed,
-            gammaScalpCount + 1,
-          );
-        }
+      if (parsedEvent.status !== 'New' || parsedEvent.market !== this.symbol.concat('-PERP')) {
+        return;
       }
+      const fillBytes = Buffer.from(parsedEvent.event, 'base64');
+      const fillEvent: FillEvent = PerpEventLayout.decode(fillBytes).fill;
+      const bidFill = fillEvent.makerClientOrderId.toString() === gammaBidID.toString()
+        || fillEvent.takerClientOrderId.toString() === gammaBidID.toString();
+      const askFill = fillEvent.makerClientOrderId.toString() === gammaAskID.toString()
+        || fillEvent.takerClientOrderId.toString() === gammaAskID.toString();
+
+      if (!bidFill && !askFill) {
+        return;
+      }
+      console.log(this.symbol, 'Gamma Filled', bidFill ? 'BID' : 'ASK', new Date().toUTCString());
+      fillFeed.removeEventListener('message', gammaFillListener);
+      // Do not need to remove the unfilled order since it will be cancelled in
+      // the recursive call.
+      this.gammaScalpMango(
+        dipProduct,
+        mangoGroup,
+        perpMarket,
+        fillFeed,
+        gammaScalpCount + 1,
+      );
     };
+
     if (fillFeed.readyState === WebSocket.OPEN) {
       fillFeed.addEventListener('message', gammaFillListener);
-      console.log(this.symbol, 'Listening For Gamma Scalps');
+      console.log(this.symbol, 'Listening For gamma scalps');
     } else {
       console.log(this.symbol, 'Websocket State', fillFeed.readyState);
     }
 
-    // Place Gamma scalp bid & offer
+    // Place gamma scalp bid & offer.
     try {
       await this.client.placePerpOrder2(
         mangoGroup,
@@ -466,13 +468,7 @@ Limit: ${hedgePrice} # ${deltaHedgeCount} ID ${deltaOrderId}`);
     } catch (err) {
       console.log(this.symbol, 'Gamma Error', err, err.stack);
     }
-    console.log(
-      this.symbol,
-      'Market Spread %',
-      ((gammaAsk - gammaBid) / fairValue) * 100,
-      'Liquidity $',
-      netGamma * 2 * fairValue,
-    );
+    console.log(`${this.symbol} Market Spread %' ${((gammaAsk - gammaBid) / fairValue) * 100} Liquidity $ ${netGamma * 2 * fairValue}`);
 
     // Sleep for the max time of the reruns then kill thread
     await sleepExact(scalperWindowSec);
@@ -486,22 +482,19 @@ Limit: ${hedgePrice} # ${deltaHedgeCount} ID ${deltaOrderId}`);
     perpMarket: PerpMarket,
   ): Promise<void> {
     const openOrders = mangoAccount.getPerpOpenOrders();
-    if (openOrders.length > 0) {
-      for (const order of openOrders) {
-        if (order.marketIndex === this.marketIndex) {
-          try {
-            console.log(this.symbol, 'Canceling Orders');
-            await this.client.cancelAllPerpOrders(
-              mangoGroup,
-              [perpMarket],
-              mangoAccount,
-              this.owner,
-            );
-          } catch (err) {
-            console.log(err, err.stack);
-          }
-          break;
-        }
+    if (openOrders.length === 0) {
+      return;
+    }
+    for (const order of openOrders) {
+      if (order.marketIndex === this.marketIndex) {
+        console.log(this.symbol, 'Canceling Orders');
+        await this.client.cancelAllPerpOrders(
+          mangoGroup,
+          [perpMarket],
+          mangoAccount,
+          this.owner,
+        );
+        break;
       }
     }
   }
@@ -538,6 +531,7 @@ Limit: ${hedgePrice} # ${deltaHedgeCount} ID ${deltaOrderId}`);
       console.log(this.symbol, 'Jupiter Failed', err);
       return;
     }
+
     if (this.mode === ScalperMode.Normal) {
       try {
         await this.deltaHedgeOpenBook(
@@ -546,22 +540,29 @@ Limit: ${hedgePrice} # ${deltaHedgeCount} ID ${deltaOrderId}`);
           spotMarket,
           jupiter,
         );
+        await this.gammaScalpOpenBook(
+          dipProduct,
+          1, /* gammaScalpCount */
+          NO_FAIR_VALUE, /* priorFillPrice */
+          spotMarket,
+          jupiter,
+        );
       } catch (err) {
-        console.log(this.symbol, 'Main Delta Error', err.stack);
+        console.log(this.symbol, 'Normal scalping error', err.stack);
       }
       this.serumVialClient.removeAnyListeners();
-    }
-
-    try {
-      await this.gammaScalpOpenBook(
-        dipProduct,
-        1, /* gammaScalpCount */
-        NO_FAIR_VALUE, /* priorFillPrice */
-        spotMarket,
-        jupiter,
-      );
-    } catch (err) {
-      console.log(this.symbol, 'Main Gamma Error', err.stack);
+    } else {
+      try {
+        await this.gammaScalpOpenBook(
+          dipProduct,
+          1, /* gammaScalpCount */
+          NO_FAIR_VALUE, /* priorFillPrice */
+          spotMarket,
+          jupiter,
+        );
+      } catch (err) {
+        console.log(this.symbol, 'Main Gamma Error', err.stack);
+      }
     }
     console.log(this.symbol, 'Scalper Cycle completed', new Date().toUTCString());
     console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
@@ -574,20 +575,13 @@ Limit: ${hedgePrice} # ${deltaHedgeCount} ID ${deltaOrderId}`);
     jupiter: Jupiter,
   ): Promise<void> {
     // Clean the state by cancelling all existing open orders.
-    const cancelDelta = (
-      await cancelTxOpenBookOrders(this.connection, this.owner, spotMarket, this.symbol));
-    if (cancelDelta !== undefined) {
-      try {
-        await sendAndConfirmTransaction(this.connection, setPriorityFee(cancelDelta), [this.owner]);
-      } catch (err) {
-        console.log(this.symbol, 'Cancel OpenBook Orders', err, err.stack);
-      }
-    }
+    await cancelOpenBookOrders(this.connection, this.owner, spotMarket, this.symbol);
 
     try {
       await settleOpenBook(this.connection, this.owner, spotMarket, this.symbol, 'USDC');
     } catch (err) {
-      console.log(this.symbol, 'Settling Funds', err, err.stack);
+      // Failing to settle should fail open.
+      console.log(err, 'Settle open book error');
     }
 
     // Prevent too much recursion.
@@ -615,14 +609,14 @@ Limit: ${hedgePrice} # ${deltaHedgeCount} ID ${deltaOrderId}`);
     );
 
     console.log(this.symbol, 'Loading Fair Value');
-    let fairValue = await getFairValue(this.connection, spotMarket, this.symbol, jupiter);
-    for (let i = 0; i < maxDeltaHedges; i++) {
-      if (fairValue === NO_FAIR_VALUE) {
-        console.log(this.symbol, 'Could not find fair value after', twapIntervalSec * (i + 1), 'seconds');
-        await sleepExact(twapIntervalSec);
-        fairValue = await getFairValue(this.connection, spotMarket, this.symbol, jupiter);
-      }
-    }
+    const fairValue = await findFairValue(
+      this.connection,
+      spotMarket,
+      this.symbol,
+      jupiter,
+      maxDeltaHedges,
+      twapIntervalSec,
+    );
     if (fairValue === NO_FAIR_VALUE) {
       console.log(this.symbol, 'No Robust Pricing. Exiting Delta Hedge', deltaHedgeCount);
       return;
@@ -739,12 +733,8 @@ Spot Δ: ${spotDelta} Offset Δ ${this.deltaOffset} Fair Value: ${fairValue}`,
     }
 
     try {
-      const amountDelta = Math.round(
-        Math.abs(hedgeDeltaClip) * (1 / this.minSpotSize),
-      ) / (1 / this.minSpotSize);
-      const priceDelta = Math.floor(
-        Math.abs(hedgePrice) * (1 / this.tickSize),
-      ) / (1 / this.tickSize);
+      const amountDelta = roundQtyToSpotSize(Math.abs(hedgeDeltaClip), this.minSpotSize);
+      const priceDelta = roundPriceToTickSize(Math.abs(hedgePrice), this.tickSize);
       const payerAccount = getPayerAccount(hedgeSide, this.symbol, 'USDC');
       console.log(this.symbol, hedgeSide, 'OpenBook-SPOT', amountDelta, 'Limit:', priceDelta, '#', deltaHedgeCount, 'ID', deltaID.toString());
       const deltaOrderTx = new Transaction();
@@ -866,25 +856,13 @@ Spot Δ: ${spotDelta} Offset Δ ${this.deltaOffset} Fair Value: ${fairValue}`,
     );
 
     // Clean the state by cancelling all existing open orders.
-    const cancelGammaStart = (
-      await cancelTxOpenBookOrders(this.connection, this.owner, spotMarket, this.symbol));
-    if (cancelGammaStart !== undefined) {
-      try {
-        await sendAndConfirmTransaction(
-          this.connection,
-          setPriorityFee(cancelGammaStart),
-          [this.owner],
-        );
-      } catch (err) {
-        console.log(this.symbol, 'Cancel OpenBook Orders', err, err.stack);
-      }
-    }
+    await cancelOpenBookOrders(this.connection, this.owner, spotMarket, this.symbol);
 
-    // Settle Funds
     try {
       await settleOpenBook(this.connection, this.owner, spotMarket, this.symbol, 'USDC');
     } catch (err) {
-      console.log(this.symbol, 'Settling Funds', err, err.stack);
+      // Failing to settle should fail open.
+      console.log(err, 'Settle open book error');
     }
 
     // Prevent too much recursion.
@@ -896,23 +874,22 @@ Spot Δ: ${spotDelta} Offset Δ ${this.deltaOffset} Fair Value: ${fairValue}`,
     // Find fair value.
     console.log(this.symbol, 'Loading Fair Value For Scalp', gammaScalpCount);
     let fairValue: number;
-    if (priorFillPrice > 0) {
+    if (priorFillPrice > NO_FAIR_VALUE) {
       fairValue = priorFillPrice;
       console.log(this.symbol, 'Fair Value Set to Prior Fill', fairValue);
     } else {
-      fairValue = await getFairValue(this.connection, spotMarket, this.symbol, jupiter);
-    }
-
-    for (let i = 0; i < gammaCycles; i++) {
+      fairValue = await findFairValue(
+        this.connection,
+        spotMarket,
+        this.symbol,
+        jupiter,
+        gammaCycles,
+        twapIntervalSec,
+      );
       if (fairValue === NO_FAIR_VALUE) {
-        console.log(this.symbol, 'No Prices. Refreshing Gamma Scalp', i + 1, 'After', twapIntervalSec, 'Seconds');
-        await sleepExact(twapIntervalSec);
-        fairValue = await getFairValue(this.connection, spotMarket, this.symbol, jupiter);
+        console.log(this.symbol, 'No Robust Pricing. Exiting Gamma Scalp', gammaScalpCount);
+        return;
       }
-    }
-    if (fairValue === NO_FAIR_VALUE) {
-      console.log(this.symbol, 'No Robust Pricing. Exiting Gamma Scalp', gammaScalpCount);
-      return;
     }
     const dipTotalGamma = getDIPGamma(dipProduct, fairValue, this.symbol);
 
@@ -1009,11 +986,9 @@ Spot Δ: ${spotDelta} Offset Δ ${this.deltaOffset} Fair Value: ${fairValue}`,
     console.log(`${this.symbol} Whale Bid: ${whaleBidPrice} Ask ${whaleAskPrice} \
 Spread % ${((whaleAskPrice - whaleBidPrice) / fairValue) * 100}`);
 
-    amountGamma = Math.round(
-      Math.abs(netGamma) * (1 / this.minSpotSize),
-    ) / (1 / this.minSpotSize);
-    const priceBid = Math.floor(Math.abs(gammaBid) * (1 / this.tickSize)) / (1 / this.tickSize);
-    const priceAsk = Math.floor(Math.abs(gammaAsk) * (1 / this.tickSize)) / (1 / this.tickSize);
+    amountGamma = roundQtyToSpotSize(Math.abs(netGamma), this.minSpotSize);
+    const priceBid = roundPriceToTickSize(Math.abs(gammaBid), this.tickSize);
+    const priceAsk = roundPriceToTickSize(Math.abs(gammaAsk), this.tickSize);
     const bidAccount = getPayerAccount('buy', this.symbol, 'USDC');
     const askAccount = getPayerAccount('sell', this.symbol, 'USDC');
     const gammaOrders = new Transaction();
@@ -1049,15 +1024,16 @@ Spread % ${((whaleAskPrice - whaleBidPrice) / fairValue) * 100}`);
     const whaleBidDiff = fairValue - whaleBidPrice;
     const whaleAskDiff = whaleAskPrice - fairValue;
     const backBidPrice = whaleBidDiff > fairValue - gammaBid
-      ? Math.max(Math.floor(
-        (whaleBidPrice + this.tickSize)
-        * (1 / this.tickSize),
-      ) / (1 / this.tickSize), gammaBid * (1 - whaleMaxSpread))
+      ? Math.max(
+        roundPriceToTickSize(whaleBidPrice + this.tickSize, this.tickSize),
+        gammaBid * (1 - whaleMaxSpread),
+      )
       : undefined;
     const backAskPrice = whaleAskDiff > gammaAsk - fairValue
-      ? Math.min(Math.floor((
-        whaleAskPrice - this.tickSize)
-        * (1 / this.tickSize)) / (1 / this.tickSize), gammaAsk * (1 + whaleMaxSpread))
+      ? Math.min(
+        roundPriceToTickSize(whaleAskPrice - this.tickSize, this.tickSize),
+        gammaAsk * (1 - whaleMaxSpread),
+      )
       : undefined;
     const whaleBidGammaQty = Math.min(
       netGamma * (maxBackGammaMultiple - 1),
@@ -1067,12 +1043,8 @@ Spread % ${((whaleAskPrice - whaleBidPrice) / fairValue) * 100}`);
       netGamma * (maxBackGammaMultiple - 1),
       dipTotalGamma * whaleAskDiff - netGamma,
     );
-    const backBidQty = Math.round(
-      Math.abs(whaleBidGammaQty) * (1 / this.minSpotSize),
-    ) / (1 / this.minSpotSize);
-    const backAskQty = Math.round(
-      Math.abs(whaleAskGammaQty) * (1 / this.minSpotSize),
-    ) / (1 / this.minSpotSize);
+    const backBidQty = roundQtyToSpotSize(Math.abs(whaleBidGammaQty), this.minSpotSize);
+    const backAskQty = roundQtyToSpotSize(Math.abs(whaleAskGammaQty), this.minSpotSize);
 
     // Enter bid & offer if outside of range from gamma orders
     if (backBidPrice !== undefined) {

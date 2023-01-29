@@ -300,11 +300,7 @@ export async function cancelOpenBookOrders(
     cancelTx.add(spotMarket.makeCancelOrderInstruction(connection, owner.publicKey, order));
   }
 
-  try {
-    await sendAndConfirmTransaction(connection, setPriorityFee(cancelTx), [owner]);
-  } catch (err) {
-    console.log(symbol, 'Cancel OpenBook Orders', err, err.stack);
-  }
+  await sendAndConfirmTransaction(connection, setPriorityFee(cancelTx), [owner]);
 }
 
 export async function getJupiterPrice(

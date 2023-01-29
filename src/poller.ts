@@ -7,7 +7,7 @@ import {
   Commitment,
   Cluster,
 } from '@solana/web3.js';
-import { AccountLayout, u64 } from '@solana/spl-token';
+import { AccountLayout } from '@solana/spl-token';
 import { CallOrPut, DIPDeposit, SYMBOL } from './common';
 import { API_URL } from './config';
 import { NUM_DIP_ATOMS_PER_TOKEN } from './constants';
@@ -47,9 +47,9 @@ class Poller {
       accountInfo: solanaAccountInfo<Buffer>,
       _context: Context,
     ) => {
-      const newAmountAtoms: number = u64.fromBuffer(
+      const newAmountAtoms: number = Number(
         AccountLayout.decode(accountInfo.data).amount,
-      ).toNumber();
+      );
 
       const dipDeposit: DIPDeposit = {
         splTokenName: this.splTokenName,

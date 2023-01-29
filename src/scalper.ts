@@ -540,22 +540,29 @@ Limit: ${hedgePrice} # ${deltaHedgeCount} ID ${deltaOrderId}`);
           spotMarket,
           jupiter,
         );
+        await this.gammaScalpOpenBook(
+          dipProduct,
+          1, /* gammaScalpCount */
+          NO_FAIR_VALUE, /* priorFillPrice */
+          spotMarket,
+          jupiter,
+        );
       } catch (err) {
-        console.log(this.symbol, 'Main Delta Error', err.stack);
+        console.log(this.symbol, 'Normal scalping error', err.stack);
       }
       this.serumVialClient.removeAnyListeners();
-    }
-
-    try {
-      await this.gammaScalpOpenBook(
-        dipProduct,
-        1, /* gammaScalpCount */
-        NO_FAIR_VALUE, /* priorFillPrice */
-        spotMarket,
-        jupiter,
-      );
-    } catch (err) {
-      console.log(this.symbol, 'Main Gamma Error', err.stack);
+    } else {
+      try {
+        await this.gammaScalpOpenBook(
+          dipProduct,
+          1, /* gammaScalpCount */
+          NO_FAIR_VALUE, /* priorFillPrice */
+          spotMarket,
+          jupiter,
+        );
+      } catch (err) {
+        console.log(this.symbol, 'Main Gamma Error', err.stack);
+      }
     }
     console.log(this.symbol, 'Scalper Cycle completed', new Date().toUTCString());
     console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');

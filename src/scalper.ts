@@ -487,17 +487,13 @@ Limit: ${hedgePrice} # ${deltaHedgeCount} ID ${deltaOrderId}`);
     }
     for (const order of openOrders) {
       if (order.marketIndex === this.marketIndex) {
-        try {
-          console.log(this.symbol, 'Canceling Orders');
-          await this.client.cancelAllPerpOrders(
-            mangoGroup,
-            [perpMarket],
-            mangoAccount,
-            this.owner,
-          );
-        } catch (err) {
-          console.log(err, err.stack);
-        }
+        console.log(this.symbol, 'Canceling Orders');
+        await this.client.cancelAllPerpOrders(
+          mangoGroup,
+          [perpMarket],
+          mangoAccount,
+          this.owner,
+        );
         break;
       }
     }

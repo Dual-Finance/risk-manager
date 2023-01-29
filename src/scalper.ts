@@ -577,7 +577,12 @@ Limit: ${hedgePrice} # ${deltaHedgeCount} ID ${deltaOrderId}`);
     // Clean the state by cancelling all existing open orders.
     await cancelOpenBookOrders(this.connection, this.owner, spotMarket, this.symbol);
 
-    await settleOpenBook(this.connection, this.owner, spotMarket, this.symbol, 'USDC');
+    try {
+      await settleOpenBook(this.connection, this.owner, spotMarket, this.symbol, 'USDC');
+    } catch (err) {
+      // Failing to settle should fail open.
+      console.log(err, 'Settle open book error');
+    }
 
     // Prevent too much recursion.
     if (deltaHedgeCount > maxDeltaHedges) {
@@ -853,8 +858,12 @@ Spot Δ: ${spotDelta} Offset Δ ${this.deltaOffset} Fair Value: ${fairValue}`,
     // Clean the state by cancelling all existing open orders.
     await cancelOpenBookOrders(this.connection, this.owner, spotMarket, this.symbol);
 
-    // Settle funds.
-    await settleOpenBook(this.connection, this.owner, spotMarket, this.symbol, 'USDC');
+    try {
+      await settleOpenBook(this.connection, this.owner, spotMarket, this.symbol, 'USDC');
+    } catch (err) {
+      // Failing to settle should fail open.
+      console.log(err, 'Settle open book error');
+    }
 
     // Prevent too much recursion.
     if (gammaScalpCount > gammaCycles) {

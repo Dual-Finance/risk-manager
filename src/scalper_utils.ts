@@ -556,9 +556,9 @@ export function findNearestStrikeType(dipProduct: DIPDeposit[], fairValue: numbe
 }
 
 export function roundPriceToTickSize(amount: number, tickSize: number) {
-  return Math.floor(amount * (1 / tickSize)) / (1 / tickSize);
+  return Math.round(amount * (1 / tickSize)) / (1 / tickSize);
 }
 
 export function roundQtyToSpotSize(amount: number, spotSize: number) {
-  return Math.floor(amount * (1 / spotSize)) / (1 / spotSize);
+  return Math.round(amount * (1 / spotSize)) / (1 / spotSize);
 }

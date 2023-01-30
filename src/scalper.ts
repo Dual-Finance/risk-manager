@@ -989,7 +989,7 @@ Spread % ${((whaleAskPrice - whaleBidPrice) / fairValue) * 100}`);
 
     amountGamma = roundQtyToSpotSize(Math.abs(netGamma), this.minSpotSize);
     // Reduce gamma ask if not enough inventory
-    const gammaAskQty = Math.abs(spotDelta) < amountGamma ? amountGamma
+    const gammaAskQty = Math.abs(spotDelta) > amountGamma ? amountGamma
       : roundQtyToSpotSize(Math.abs(spotDelta * orderSizeBufferPct), this.minSpotSize);
     const priceBid = roundPriceToTickSize(Math.abs(gammaBid), this.tickSize);
     const priceAsk = roundPriceToTickSize(Math.abs(gammaAsk), this.tickSize);
@@ -1030,13 +1030,13 @@ Spread % ${((whaleAskPrice - whaleBidPrice) / fairValue) * 100}`);
     const backBidPrice = whaleBidDiff > fairValue - gammaBid
       ? Math.max(
         roundPriceToTickSize(whaleBidPrice + this.tickSize, this.tickSize),
-        gammaBid * (1 - whaleMaxSpread),
+        roundPriceToTickSize(gammaBid * (1 - whaleMaxSpread), this.tickSize),
       )
       : undefined;
     const backAskPrice = whaleAskDiff > gammaAsk - fairValue
       ? Math.min(
         roundPriceToTickSize(whaleAskPrice - this.tickSize, this.tickSize),
-        gammaAsk * (1 + whaleMaxSpread),
+        roundPriceToTickSize(gammaAsk * (1 + whaleMaxSpread), this.tickSize),
       )
       : undefined;
     const whaleBidGammaQty = Math.min(

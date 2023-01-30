@@ -179,3 +179,5 @@ export const volSpread = 0.05;
 export const whaleMaxSpread = 0.4;
 // How frequently to poll for fills
 export const resolvePeriodMs = 100;
+// Order size buffer in percent to use to reduce order sizes
+export const orderSizeBufferPct = 0.99;

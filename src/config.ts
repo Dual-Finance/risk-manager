@@ -122,19 +122,11 @@ export const treasuryPositions: DIPDeposit[] = [({
 ({
   splTokenName: 'BONK',
   premiumAssetName: 'USDC',
-  expirationMs: 1675166400000,
-  strikeUsdcPerToken: 0.0000005,
+  expirationMs: 1677240000000,
+  strikeUsdcPerToken: 0.0000015,
   callOrPut: CallOrPut.Call,
-  qtyTokens: 10000150,
-}), // Actually GSO Position
-({
-  splTokenName: 'BONK',
-  premiumAssetName: 'USDC',
-  expirationMs: 1676462400000,
-  strikeUsdcPerToken: 0.000003,
-  callOrPut: CallOrPut.Call,
-  qtyTokens: 10000000,
-}), // Running this until EOM
+  qtyTokens: 36000300,
+}), // BONK GSO Position
 ];
 
 // Amount to vary the sleep on a random sleep.

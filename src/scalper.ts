@@ -17,7 +17,7 @@ import {
   perpFundingRateThreshold, gammaCycles, MinOpenBookSize, OPENBOOK_FORK_ID,
   treasuryPositions, slippageMax, gammaCompleteThresholdPct, cluster,
   maxOrderBookSearchDepth, maxBackGammaMultiple, API_URL, MODE_BY_SYMBOL,
-  whaleMaxSpread, ScalperMode,
+  whaleMaxSpread, ScalperMode, orderSizeBufferPct,
 } from './config';
 import { CallOrPut, DIPDeposit, SYMBOL } from './common';
 import { readKeypair, sleepExact, sleepRandom } from './utils';
@@ -904,11 +904,12 @@ Spot Δ: ${spotDelta} Offset Δ ${this.deltaOffset} Fair Value: ${fairValue}`,
     let gammaBid = fairValue * (1 - stdDevSpread - stdDevSpread * widenSpread);
     let gammaAsk = fairValue * (1 + stdDevSpread + stdDevSpread * widenSpread);
 
+    const spotDelta = await getSpotDelta(this.connection, this.symbol);
+
     // Adjust gamma prices based on strike
     // TODO: Determine if should always have this on or only on products we can't get delta neutral
     if (this.mode === ScalperMode.GammaBackStrikeAdjustment) {
       const dipTotalDelta = getDIPDelta(dipProduct, fairValue, this.symbol);
-      const spotDelta = await getSpotDelta(this.connection, this.symbol);
       const isShort = dipTotalDelta + spotDelta + this.deltaOffset < 0;
       // TODO: Create a gamma table to find relevant long & short strikes
       const nearStrikeType = findNearestStrikeType(dipProduct, fairValue);
@@ -987,6 +988,9 @@ Spot Δ: ${spotDelta} Offset Δ ${this.deltaOffset} Fair Value: ${fairValue}`,
 Spread % ${((whaleAskPrice - whaleBidPrice) / fairValue) * 100}`);
 
     amountGamma = roundQtyToSpotSize(Math.abs(netGamma), this.minSpotSize);
+    // Reduce gamma ask if not enough inventory
+    const gammaAskQty = Math.abs(spotDelta) < amountGamma ? amountGamma
+      : roundQtyToSpotSize(Math.abs(spotDelta * orderSizeBufferPct), this.minSpotSize);
     const priceBid = roundPriceToTickSize(Math.abs(gammaBid), this.tickSize);
     const priceAsk = roundPriceToTickSize(Math.abs(gammaAsk), this.tickSize);
     const bidAccount = getPayerAccount('buy', this.symbol, 'USDC');
@@ -1008,7 +1012,7 @@ Spread % ${((whaleAskPrice - whaleBidPrice) / fairValue) * 100}`);
         payer: askAccount,
         side: 'sell',
         price: priceAsk,
-        size: amountGamma,
+        size: gammaAskQty,
         orderType: 'limit',
         clientId: askID,
         selfTradeBehavior: 'abortTransaction',
@@ -1032,17 +1036,23 @@ Spread % ${((whaleAskPrice - whaleBidPrice) / fairValue) * 100}`);
     const backAskPrice = whaleAskDiff > gammaAsk - fairValue
       ? Math.min(
         roundPriceToTickSize(whaleAskPrice - this.tickSize, this.tickSize),
-        gammaAsk * (1 - whaleMaxSpread),
+        gammaAsk * (1 + whaleMaxSpread),
       )
       : undefined;
     const whaleBidGammaQty = Math.min(
       netGamma * (maxBackGammaMultiple - 1),
       dipTotalGamma * whaleBidDiff - netGamma,
     );
-    const whaleAskGammaQty = Math.min(
+    let whaleAskGammaQty = Math.min(
       netGamma * (maxBackGammaMultiple - 1),
       dipTotalGamma * whaleAskDiff - netGamma,
     );
+    // Reduce whale ask if not enough inventory
+    if (whaleAskGammaQty > Math.abs(spotDelta)) {
+      whaleAskGammaQty = 0;
+    } else if (whaleAskGammaQty + amountGamma > Math.abs(spotDelta)) {
+      whaleAskGammaQty = Math.abs(spotDelta * orderSizeBufferPct) - amountGamma;
+    }
     const backBidQty = roundQtyToSpotSize(Math.abs(whaleBidGammaQty), this.minSpotSize);
     const backAskQty = roundQtyToSpotSize(Math.abs(whaleAskGammaQty), this.minSpotSize);
 

@@ -1057,7 +1057,7 @@ Spread % ${((whaleAskPrice - whaleBidPrice) / fairValue) * 100}`);
     const backAskQty = roundQtyToSpotSize(Math.abs(whaleAskGammaQty), this.minSpotSize);
 
     // Enter bid & offer if outside of range from gamma orders
-    if (backBidPrice !== undefined) {
+    if (backBidPrice !== undefined && backBidQty > 0) {
       console.log(this.symbol, 'Back', backBidQty, 'Bid', backBidPrice, backBidID.toString());
       const whaleBidTx = await spotMarket.makePlaceOrderTransaction(this.connection, {
         owner: this.owner.publicKey,
@@ -1071,7 +1071,7 @@ Spread % ${((whaleAskPrice - whaleBidPrice) / fairValue) * 100}`);
       });
       gammaOrders.add(whaleBidTx.transaction);
     }
-    if (backAskPrice !== undefined) {
+    if (backAskPrice !== undefined && backAskQty > 0) {
       console.log(this.symbol, 'Back', backAskQty, 'Ask', backAskPrice, backAskID.toString());
       const whaleAskTx = await spotMarket.makePlaceOrderTransaction(this.connection, {
         owner: this.owner.publicKey,

@@ -598,11 +598,8 @@ Limit: ${hedgePrice} # ${deltaHedgeCount} ID ${deltaOrderId}`);
       [`${this.symbol}/USDC`],
       [deltaID.toString()],
       (message: SerumVialTradeMessage) => {
-        if (message.makerClientId === deltaID.toString()) {
-          console.log(this.symbol, 'Delta Fill Maker!', hedgeSide, tradeMessageToString(message));
-        } else if (message.takerClientId === deltaID.toString()) {
-          console.log(this.symbol, 'Delta Fill Taker!', hedgeSide, tradeMessageToString(message));
-        }
+        const side: string = message.makerClientId === deltaID.toString() ? 'Maker' : 'Taker';
+        console.log(`${this.symbol} Delta Fill ${side} ${hedgeSide} ${tradeMessageToString(message)}`);
         const fillQty = (hedgeSide === 'buy' ? 1 : -1) * message.size;
         hedgeDeltaTotal += fillQty;
       },
@@ -622,10 +619,9 @@ Limit: ${hedgePrice} # ${deltaHedgeCount} ID ${deltaOrderId}`);
       return;
     }
 
+    // Get total delta position to hedge. Use .1 for DEV to force that it does something.
     const dipTotalDelta = getDIPDelta(dipProduct, fairValue, this.symbol);
     const spotDelta = await getSpotDelta(this.connection, this.symbol);
-
-    // Get total delta position to hedge. Use .1 for DEV to force that it does something.
     hedgeDeltaTotal = IS_DEV ? 0.1 : dipTotalDelta + spotDelta + this.deltaOffset;
     hedgeSide = hedgeDeltaTotal < 0 ? 'buy' : 'sell';
 
@@ -642,12 +638,6 @@ Spot Δ: ${spotDelta} Offset Δ ${this.deltaOffset} Fair Value: ${fairValue}`,
       dipTotalGamma * stdDevSpread * fairValue * gammaThreshold,
       this.minSpotSize,
     );
-    if (Math.abs(hedgeDeltaTotal * fairValue) < (deltaThreshold * fairValue)) {
-      console.log(this.symbol, 'Delta Netural Within', deltaThreshold);
-      return;
-    }
-
-    // Adjust delta for slippage allowed.
     const slippageTolerance = Math.min(stdDevSpread / 2, slippageMax.get(this.symbol));
     let hedgePrice = hedgeDeltaTotal < 0
       ? fairValue * (1 + slippageTolerance)
@@ -656,8 +646,6 @@ Spot Δ: ${spotDelta} Offset Δ ${this.deltaOffset} Fair Value: ${fairValue}`,
     const dipDeltaDiff = slippageDIPDelta - dipTotalDelta;
     hedgeDeltaTotal += dipDeltaDiff;
     console.log(this.symbol, 'Adjust Slippage Delta by', dipDeltaDiff, 'to', -hedgeDeltaTotal);
-
-    // Check if we are within the delta threshold.
     const notionalThreshold = deltaThreshold * fairValue;
     const notionalAmount = -hedgeDeltaTotal * fairValue;
     if ((notionalAmount < notionalThreshold && hedgeSide === 'buy')
@@ -667,15 +655,9 @@ Spot Δ: ${spotDelta} Offset Δ ${this.deltaOffset} Fair Value: ${fairValue}`,
     }
     console.log(this.symbol, 'Outside delta threshold:', Math.abs(hedgeDeltaTotal), 'vs.', deltaThreshold);
 
-    // Load order book data
+    // Load order book data to determine splicing.
     const bids = await spotMarket.loadBids(this.connection);
     const asks = await spotMarket.loadAsks(this.connection);
-    const [bidTOB, _bidSize] = bids.getL2(1)[0];
-    const [askTOB, _askSize] = asks.getL2(1)[0];
-    const spreadDelta = hedgeDeltaTotal < 0
-      ? ((askTOB - hedgePrice) / hedgePrice) * 100
-      : ((bidTOB - hedgePrice) / hedgePrice) * 100;
-    // Check order book depth and splice order
     const spliceFactor = liquidityCheckAndNumSplices(
       hedgeDeltaTotal,
       hedgePrice,
@@ -703,16 +685,7 @@ Spot Δ: ${spotDelta} Offset Δ ${this.deltaOffset} Fair Value: ${fairValue}`,
             if (swapTransaction) {
               const spotDeltaUpdate = jupValues.qty;
               hedgeDeltaTotal += spotDeltaUpdate;
-              console.log(
-                this.symbol,
-                'Jupiter Hedge via',
-                jupValues.venue,
-                'Price',
-                jupValues.price,
-                'Qty',
-                jupValues.qty,
-                `https://solana.fm/tx/${txid}${cluster?.includes('devnet') ? '?cluster=devnet' : ''}`,
-              );
+              console.log(this.symbol, 'Jupiter Hedge via', jupValues.venue, 'Price', jupValues.price, 'Qty', jupValues.qty, `https://solana.fm/tx/${txid}${cluster?.includes('devnet') ? '?cluster=devnet' : ''}`);
             }
           }
           if (Math.abs(hedgeDeltaTotal * fairValue) < (deltaThreshold * fairValue)) {
@@ -732,69 +705,65 @@ Spot Δ: ${spotDelta} Offset Δ ${this.deltaOffset} Fair Value: ${fairValue}`,
       console.log(this.symbol, 'Jupiter Route', err, err.stack);
     }
 
-    try {
-      const amountDelta = roundQtyToSpotSize(Math.abs(hedgeDeltaClip), this.minSpotSize);
-      const priceDelta = roundPriceToTickSize(Math.abs(hedgePrice), this.tickSize);
-      const payerAccount = getPayerAccount(hedgeSide, this.symbol, 'USDC');
-      console.log(this.symbol, hedgeSide, 'OpenBook-SPOT', amountDelta, 'Limit:', priceDelta, '#', deltaHedgeCount, 'ID', deltaID.toString());
-      const deltaOrderTx = new Transaction();
-      const deltaTx = await spotMarket.makePlaceOrderTransaction(this.connection, {
-        owner: new Account(this.owner.secretKey),
-        payer: payerAccount,
-        side: hedgeSide,
-        price: priceDelta,
-        size: amountDelta,
-        orderType: 'limit',
-        clientId: deltaID,
-        selfTradeBehavior: 'abortTransaction',
-      });
-      deltaOrderTx.add(deltaTx.transaction);
-      await sendAndConfirmTransaction(this.connection, setPriorityFee(deltaOrderTx), [this.owner]);
-    } catch (err) {
-      console.log(this.symbol, 'Delta Hedge', err, err.stack);
-    }
+    // Send the delta hedge order to openbook.
+    const amountDelta = roundQtyToSpotSize(Math.abs(hedgeDeltaClip), this.minSpotSize);
+    const priceDelta = roundPriceToTickSize(Math.abs(hedgePrice), this.tickSize);
+    const payerAccount = getPayerAccount(hedgeSide, this.symbol, 'USDC');
+    console.log(this.symbol, hedgeSide, 'OpenBook-SPOT', amountDelta, 'Limit:', priceDelta, '#', deltaHedgeCount, 'ID', deltaID.toString());
+    const deltaOrderTx = new Transaction();
+    const deltaTx = await spotMarket.makePlaceOrderTransaction(this.connection, {
+      owner: new Account(this.owner.secretKey),
+      payer: payerAccount,
+      side: hedgeSide,
+      price: priceDelta,
+      size: amountDelta,
+      orderType: 'limit',
+      clientId: deltaID,
+      selfTradeBehavior: 'abortTransaction',
+    });
+    deltaOrderTx.add(deltaTx.transaction);
+    await sendAndConfirmTransaction(this.connection, setPriorityFee(deltaOrderTx), [this.owner]);
 
-    // Rest single order & do not refresh if the hedge should be completed in a single clip
+    // Rest single order if the hedge should be completed in a single clip
     if (spliceFactor === 1) {
       const netHedgePeriod = twapIntervalSec * maxDeltaHedges;
       console.log(this.symbol, 'Scan Delta Fills for ~', netHedgePeriod, 'seconds');
-      for (let i = 0; i < maxDeltaHedges; i++) {
-        // Should fix this, but the unsafe behavior is actually used.
-        // eslint-disable-next-line no-loop-func
-        await waitForFill(() => (
-          Math.abs(hedgeDeltaTotal * fairValue) < (this.minSpotSize * fairValue)), twapIntervalSec);
-        if (Math.abs(hedgeDeltaTotal * fairValue) < (this.minSpotSize * fairValue)) {
-          console.log(this.symbol, 'Delta Hedge Complete: SerumVial');
-          return;
-        }
-      }
-      console.log(
-        this.symbol,
-        'OpenBook Delta Hedge Timeout. Spread %',
-        spreadDelta,
-        '> Slippage %',
-        slippageTolerance * 100,
-      );
-    } else {
-      // Wait the twapInterval of time to see if the position gets to neutral.
-      console.log(this.symbol, 'Scan Delta Fills for ~', twapIntervalSec, 'seconds');
-      await waitForFill(
-        (_) => Math.abs(hedgeDeltaTotal * fairValue) < (this.minSpotSize * fairValue),
-        twapIntervalSec,
-      );
+
+      await waitForFill(() => (
+        Math.abs(hedgeDeltaTotal * fairValue) < (this.minSpotSize * fairValue)),
+        twapIntervalSec);
       if (Math.abs(hedgeDeltaTotal * fairValue) < (this.minSpotSize * fairValue)) {
         console.log(this.symbol, 'Delta Hedge Complete: SerumVial');
         return;
       }
-      console.log(this.symbol, 'OpenBook Delta Hedge Refresh', deltaHedgeCount);
-      this.serumVialClient.removeAnyListeners();
-      await this.deltaHedgeOpenBook(
-        dipProduct,
-        deltaHedgeCount + 1,
-        spotMarket,
-        jupiter,
-      );
+
+      const [bidTOB, _bidSize] = bids.getL2(1)[0];
+      const [askTOB, _askSize] = asks.getL2(1)[0];
+      const spreadDelta = hedgeDeltaTotal < 0
+        ? ((askTOB - hedgePrice) / hedgePrice) * 100
+        : ((bidTOB - hedgePrice) / hedgePrice) * 100;
+      console.log(`${this.symbol} OpenBook Delta Hedge Timeout. Spread % ${spreadDelta} \
+> Slippage % ${slippageTolerance * 100}`);
+      return;
     }
+
+    // Wait the twapInterval of time to see if the position gets to neutral.
+    // This is the case where we are unable to fill all of the delta at once and
+    // need to send multiple orders. Either it will get filled which will get
+    // caught in the next run, enough time has passed and we start a new run
+    // anyways.
+    console.log(this.symbol, 'Scan Delta Fills for ~', twapIntervalSec, 'seconds');
+    await waitForFill(
+      (_) => Math.abs(hedgeDeltaTotal * fairValue) < (this.minSpotSize * fairValue),
+      twapIntervalSec,
+    );
+    this.serumVialClient.removeAnyListeners();
+    await this.deltaHedgeOpenBook(
+      dipProduct,
+      deltaHedgeCount + 1,
+      spotMarket,
+      jupiter,
+    );
   }
 
   async gammaScalpOpenBook(

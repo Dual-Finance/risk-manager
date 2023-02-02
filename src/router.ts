@@ -161,6 +161,9 @@ class Router {
         },
         body: JSON.stringify(data),
       });
+      if (!response.ok) {
+        throw new Error('Failed to sell to API');
+      }
       console.log('API response', await response.json());
     });
   }
@@ -168,12 +171,19 @@ class Router {
   // Reads all DIP Deposits and decides whether to send it to the mm_callback
   async checkMMPrices(): Promise<void> {
     let openPositionCount = 0;
-    for (const dipDeposit of Object.values(this.dips)) {
-      if (dipDeposit.qtyTokens > 0) {
-        openPositionCount++;
-        await this.route(dipDeposit);
+    try {
+      for (const dipDeposit of Object.values(this.dips)) {
+        if (dipDeposit.qtyTokens > 0) {
+          openPositionCount++;
+          await this.route(dipDeposit);
+        }
       }
+    } catch (err) {
+      console.log('Failed to router with error: ', err, 'proceeding to run risk manager.');
+      this.run_risk_manager();
+      return;
     }
+
     // On startup run risk manager when there is no position
     if (openPositionCount === 0) {
       console.log('No Positions. Run Risk Manager', new Date().toUTCString());

@@ -161,7 +161,11 @@ class Router {
         },
         body: JSON.stringify(data),
       });
-      console.log('API response', await response.json());
+      const apiResponse: string = (await response.json()).message;
+      console.log('API response', apiResponse);
+      if (apiResponse.toLowerCase().includes('error')) {
+        this.run_risk_manager();
+      }
     });
   }
 

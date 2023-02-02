@@ -161,6 +161,9 @@ class Router {
         },
         body: JSON.stringify(data),
       });
+      if (!response.ok) {
+        throw new Error('Failed to sell to API');
+      }
       console.log('API response', await response.json());
     });
   }

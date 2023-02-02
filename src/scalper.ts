@@ -638,6 +638,10 @@ Spot Δ: ${spotDelta} Offset Δ ${this.deltaOffset} Fair Value: ${fairValue}`,
       dipTotalGamma * stdDevSpread * fairValue * gammaThreshold,
       this.minSpotSize,
     );
+    if (Math.abs(hedgeDeltaTotal * fairValue) < (deltaThreshold * fairValue)) {
+      console.log(this.symbol, 'Delta Netural Within', deltaThreshold);
+      return;
+    }
     const slippageTolerance = Math.min(stdDevSpread / 2, slippageMax.get(this.symbol));
     let hedgePrice = hedgeDeltaTotal < 0
       ? fairValue * (1 + slippageTolerance)

@@ -25,7 +25,7 @@ import { SerumVialClient, SerumVialTradeMessage, tradeMessageToString } from './
 import {
   jupiterHedge, getDIPDelta, getDIPGamma, getDIPTheta, getPayerAccount,
   getSpotDelta, loadPrices, orderSpliceMango, liquidityCheckAndNumSplices,
-  settleOpenBook, setPriorityFee, waitForFill, findMaxStrike, findMinStrike,
+  tryToSettleOpenBook, setPriorityFee, waitForFill, findMaxStrike, findMinStrike,
   findNearestStrikeType, getMangoHedgeProduct, cancelOpenBookOrders,
   findFairValue, roundPriceToTickSize, roundQtyToSpotSize,
 } from './scalper_utils';
@@ -577,12 +577,7 @@ Limit: ${hedgePrice} # ${deltaHedgeCount} ID ${deltaOrderId}`);
     // Clean the state by cancelling all existing open orders.
     await cancelOpenBookOrders(this.connection, this.owner, spotMarket, this.symbol);
 
-    try {
-      await settleOpenBook(this.connection, this.owner, spotMarket, this.symbol, 'USDC');
-    } catch (err) {
-      // Failing to settle should fail open.
-      console.log(err, 'Settle open book error');
-    }
+    await tryToSettleOpenBook(this.connection, this.owner, spotMarket, this.symbol, 'USDC');
 
     // Prevent too much recursion.
     if (deltaHedgeCount > maxDeltaHedges) {
@@ -833,13 +828,7 @@ Spot Δ: ${spotDelta} Offset Δ ${this.deltaOffset} Fair Value: ${fairValue}`,
     // Clean the state by cancelling all existing open orders.
     await cancelOpenBookOrders(this.connection, this.owner, spotMarket, this.symbol);
 
-    // TODO: Move the try catch into settleOpenBook since we always want it to fail open.
-    try {
-      await settleOpenBook(this.connection, this.owner, spotMarket, this.symbol, 'USDC');
-    } catch (err) {
-      // Failing to settle should fail open.
-      console.log(err, 'Settle open book error');
-    }
+    await tryToSettleOpenBook(this.connection, this.owner, spotMarket, this.symbol, 'USDC');
 
     // Prevent too much recursion.
     if (gammaScalpCount > gammaCycles) {

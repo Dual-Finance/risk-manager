@@ -235,7 +235,7 @@ export function setPriorityFee(
   return tx;
 }
 
-export async function settleOpenBook(
+export async function tryToSettleOpenBook(
   connection: Connection,
   owner: Keypair,
   market: Market,
@@ -265,11 +265,15 @@ export async function settleOpenBook(
 
   // If there are funds ready to be settled, settle them
   if (needSettle) {
-    await sendAndConfirmTransaction(
-      connection,
-      setPriorityFee(settleTx),
-      [owner],
-    );
+    try {
+      await sendAndConfirmTransaction(
+        connection,
+        setPriorityFee(settleTx),
+        [owner],
+      );
+    } catch (err) {
+      console.log(err, 'Settle open book error');
+    }
   }
   return settleTx;
 }

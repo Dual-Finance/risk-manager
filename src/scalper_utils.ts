@@ -24,7 +24,7 @@ import {
   sleepExact, splMintToToken, tokenToSplMint,
 } from './utils';
 import {
-  mangoTesterPk, MS_PER_YEAR, NO_FAIR_VALUE, optionVaultPk, riskManagerPk,
+  mangoTesterPk, MS_PER_YEAR, NO_FAIR_VALUE, optionVaultPk, riskManagerPk, SUFFICIENT_BOOK_DEPTH,
 } from './constants';
 
 export async function loadPrices(
@@ -164,7 +164,7 @@ export function liquidityCheckAndNumSplices(
     }
   }
   if (depth > Math.abs(qty)) {
-    return 0;
+    return SUFFICIENT_BOOK_DEPTH;
   }
   return Math.max((Math.abs(qty) * price) / notionalMax, 1);
 }

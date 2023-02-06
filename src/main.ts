@@ -2,7 +2,7 @@ import { DIPDeposit, SYMBOL } from './common';
 import Scalper from './scalper';
 import Router from './router';
 import {
-  scalperWindowSec, cluster, productStaggerSec, productStatus,
+  SCALPER_WINDOW_SEC, cluster, PRODUCT_STAGGER_SEC, productStatus,
 } from './config';
 import { sleepExact } from './utils';
 
@@ -30,7 +30,7 @@ async function main() {
       await router.refresh_dips();
       console.log(`Check ${symbol} Position vs MM Quotes ${new Date().toUTCString()}`);
       router.checkMMPrices();
-      await sleepExact(productStaggerSec);
+      await sleepExact(PRODUCT_STAGGER_SEC);
     }
   }
 
@@ -43,14 +43,14 @@ async function main() {
           await router.refresh_dips();
           console.log(`Re-Check ${symbol} Position vs MM Quotes ${new Date().toUTCString()}`);
           router.checkMMPrices();
-          await sleepExact(productStaggerSec);
+          await sleepExact(PRODUCT_STAGGER_SEC);
         }
       }
     } catch (err) {
       console.log(err);
       console.log(err.stack);
     }
-  }, 1_000 * scalperWindowSec);
+  }, 1_000 * SCALPER_WINDOW_SEC);
 }
 
 main();

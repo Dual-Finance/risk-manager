@@ -13,9 +13,9 @@ import {
   DUAL_API,
   usdcPk,
   BVE_VOL_MAP,
-  minExecutionPremium,
-  volSpread,
-  rfRate,
+  MIN_EXECUTION_PREMIUM,
+  VOL_SPREAD,
+  RF_RATE,
 } from './config';
 import Poller from './poller';
 import {
@@ -98,15 +98,15 @@ class Router {
       const fractionOfYear = (dipDeposit.expirationMs - Date.now()) / MS_PER_YEAR;
       const vol = BVE_VOL_MAP.get(
         dipDeposit.splTokenName,
-      ) * (1 + volSpread + Math.random() * volSpread);
-      const thresholdPrice = blackScholes(currentPrice, dipDeposit.strikeUsdcPerToken, fractionOfYear, vol, rfRate, 'call');
+      ) * (1 + VOL_SPREAD + Math.random() * VOL_SPREAD);
+      const thresholdPrice = blackScholes(currentPrice, dipDeposit.strikeUsdcPerToken, fractionOfYear, vol, RF_RATE, 'call');
       // @ts-ignore
       const { price } = order;
       console.log('MM price:', price, 'BVE Re-Route price:', thresholdPrice);
       const userPremium = price * dipDeposit.qtyTokens;
-      if (userPremium < minExecutionPremium) {
+      if (userPremium < MIN_EXECUTION_PREMIUM) {
         // If user premium is too small don't bother spamming MM
-        console.log('Not routing too small of a trade:', userPremium, minExecutionPremium);
+        console.log('Not routing too small of a trade:', userPremium, MIN_EXECUTION_PREMIUM);
         this.dips[
           dipToString(
             dipDeposit.expirationMs / 1_000,

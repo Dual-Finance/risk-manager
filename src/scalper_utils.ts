@@ -15,9 +15,9 @@ import {
   CallOrPut, DIPDeposit, RouteDetails, SYMBOL,
 } from './common';
 import {
-  ACCOUNT_MAP, JUPITER_LIQUIDITY, maxMktSpreadPctForPricing, jupiterSearchSteps,
-  rfRate, slippageMax, THEO_VOL_MAP, jupiterSlippageBps, PRIORITY_FEE,
-  gammaCycles, resolvePeriodMs,
+  ACCOUNT_MAP, JUPITER_LIQUIDITY, MAX_MKT_SPREAD_PCT_FOR_PRICING, JUPITER_SEARCH_STEPS,
+  RF_RATE, slippageMax, THEO_VOL_MAP, JUPITER_SLIPPAGE_BPS, PRIORITY_FEE,
+  GAMMA_CYCLES, RESOLVE_PERIOD_MS,
 } from './config';
 import {
   decimalsBaseSPL, getChainlinkPrice, getPythPrice, getSwitchboardPrice,
@@ -51,7 +51,7 @@ export function getDIPDelta(
       dip.strikeUsdcPerToken,
       yearsUntilMaturity,
       impliedVol,
-      rfRate,
+      RF_RATE,
       dip.callOrPut,
     )
         * dip.qtyTokens;
@@ -73,7 +73,7 @@ export function getDIPGamma(
       dip.strikeUsdcPerToken,
       yearsUntilMaturity,
       impliedVol,
-      rfRate,
+      RF_RATE,
       dip.callOrPut,
     )
         * dip.qtyTokens;
@@ -95,7 +95,7 @@ export function getDIPTheta(
       dip.strikeUsdcPerToken,
       yearsUntilMaturity,
       impliedVol,
-      rfRate,
+      RF_RATE,
       dip.callOrPut,
     )
         * dip.qtyTokens;
@@ -321,7 +321,7 @@ export async function getJupiterPrice(
     inputMint: inputBuyToken,
     outputMint: outputBuyToken,
     amount: JSBI.BigInt(buyQty),
-    slippageBps: jupiterSlippageBps,
+    slippageBps: JUPITER_SLIPPAGE_BPS,
     onlyDirectRoutes: false,
   });
   const buyPath = buyRoutes.routesInfos[0];
@@ -341,7 +341,7 @@ export async function getJupiterPrice(
     inputMint: inputSellToken,
     outputMint: outputSellToken,
     amount: JSBI.BigInt(sellQty),
-    slippageBps: jupiterSlippageBps,
+    slippageBps: JUPITER_SLIPPAGE_BPS,
     onlyDirectRoutes: false,
   });
   const sellPath = sellRoutes.routesInfos[0];
@@ -382,7 +382,7 @@ async function getOraclePrice(symbol: SYMBOL, connection: Connection, spotMarket
   const [askPrice, _askSize] = asks.getL2(1)[0];
   const midValue = (bidPrice + askPrice) / 2.0;
   const mktSpread = (askPrice - bidPrice) / midValue;
-  if (mktSpread < maxMktSpreadPctForPricing) {
+  if (mktSpread < MAX_MKT_SPREAD_PCT_FOR_PRICING) {
     console.log(`${symbol}: Openbook Mid Price: ${midValue}`);
     return midValue;
   }
@@ -459,7 +459,7 @@ export async function jupiterHedge(
   let routeDetails: RouteDetails;
   let sortFactor = 2;
   let lastSucess: boolean;
-  for (let i = 0; i < jupiterSearchSteps; i++) {
+  for (let i = 0; i < JUPITER_SEARCH_STEPS; i++) {
     sortFactor += lastSucess ? 1 / (2 ** i) : -1 / (2 ** i);
     lastSucess = false;
     const searchQty = Math.round(inputMaxQty * sortFactor);
@@ -517,12 +517,12 @@ export function waitForFill(conditionFunction, cycleDurationSec: number) {
   let pollCount = 0;
   const poll = (resolve) => {
     pollCount += 1;
-    if (pollCount > (cycleDurationSec * resolvePeriodMs) / gammaCycles) {
+    if (pollCount > (cycleDurationSec * RESOLVE_PERIOD_MS) / GAMMA_CYCLES) {
       resolve();
     } else if (conditionFunction()) {
       resolve();
     } else {
-      setTimeout((_) => poll(resolve), resolvePeriodMs);
+      setTimeout((_) => poll(resolve), RESOLVE_PERIOD_MS);
     }
   };
   return new Promise(poll);

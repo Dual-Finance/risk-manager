@@ -11,13 +11,13 @@ import { BN } from '@project-serum/anchor';
 import { Jupiter } from '@jup-ag/core';
 import configFile from './ids.json';
 import {
-  networkName, THEO_VOL_MAP, maxNotional, twapIntervalSec, scalperWindowSec,
-  ZSCORE, MinContractSize, TickSize, FILLS_URL, IS_DEV, gammaThreshold,
-  maxDeltaHedges, DELTA_OFFSET, MANGO_DOWNTIME_THRESHOLD_MIN,
-  perpFundingRateThreshold, gammaCycles, MinOpenBookSize, OPENBOOK_FORK_ID,
-  treasuryPositions, slippageMax, gammaCompleteThresholdPct, cluster,
-  maxOrderBookSearchDepth, maxBackGammaMultiple, API_URL, MODE_BY_SYMBOL,
-  whaleMaxSpread, ScalperMode, orderSizeBufferPct,
+  networkName, THEO_VOL_MAP, maxNotional, TWAP_INTERVAL_SEC, SCALPER_WINDOW_SEC,
+  ZSCORE, MinContractSize, TickSize, FILLS_URL, IS_DEV, GAMMA_THRESHOLD,
+  MAX_DELTA_HEDGES, DELTA_OFFSET, MANGO_DOWNTIME_THRESHOLD_MIN,
+  PERP_FUNDING_RATE_THRESHOLD, GAMMA_CYCLES, MinOpenBookSize, OPENBOOK_FORK_ID,
+  treasuryPositions, slippageMax, GAMMA_COMPLETE_THRESHOLD_PCT, cluster,
+  MAX_ORDER_BOOK_SEARCH_DEPTH, MAX_BACK_GAMMA_MULTIPLE, API_URL, MODE_BY_SYMBOL,
+  WHALE_MAX_SPREAD, ScalperMode, ORDER_SIZE_BUFFER_PCT,
 } from './config';
 import { CallOrPut, DIPDeposit, SYMBOL } from './common';
 import { readKeypair, sleepExact, sleepRandom } from './utils';
@@ -198,7 +198,7 @@ class Scalper {
     await this.cancelStaleMangoOrders(mangoAccount, mangoGroup, perpMarket);
 
     // Avoid unsafe recursion.
-    if (deltaHedgeCount > maxDeltaHedges) {
+    if (deltaHedgeCount > MAX_DELTA_HEDGES) {
       console.log(this.symbol, 'Max Hedges exceeded without getting to neutral');
       return;
     }
@@ -225,10 +225,10 @@ class Scalper {
     // Check whether we need to hedge.
     const dipTotalGamma = getDIPGamma(dipProduct, fairValue, this.symbol);
     const stdDevSpread = (this.impliedVol / Math.sqrt(SEC_PER_YEAR
-    / scalperWindowSec)) * this.zScore;
+    / SCALPER_WINDOW_SEC)) * this.zScore;
     const slippageTolerance = Math.min(stdDevSpread / 2, slippageMax.get(this.symbol));
     const deltaThreshold = Math.max(
-      dipTotalGamma * stdDevSpread * fairValue * gammaThreshold,
+      dipTotalGamma * stdDevSpread * fairValue * GAMMA_THRESHOLD,
       this.minSize,
     );
     if (Math.abs(hedgeDeltaTotal * fairValue) < (deltaThreshold * fairValue)) {
@@ -242,8 +242,8 @@ class Scalper {
     const askSide = await perpMarket.loadAsks(this.connection);
     const fundingRate = (24 * 365)
     * perpMarket.getCurrentFundingRate(mangoGroup, mangoCache, this.marketIndex, bidSide, askSide);
-    const buySpot = fundingRate > perpFundingRateThreshold;
-    const sellSpot = -fundingRate < perpFundingRateThreshold;
+    const buySpot = fundingRate > PERP_FUNDING_RATE_THRESHOLD;
+    const sellSpot = -fundingRate < PERP_FUNDING_RATE_THRESHOLD;
     const hedgeSide = hedgeDeltaTotal < 0 ? 'buy' : 'sell'; // TODO Make Enum everywhere
     const hedgeProduct = getMangoHedgeProduct(hedgeSide, buySpot, sellSpot);
 
@@ -341,8 +341,8 @@ Limit: ${hedgePrice} # ${deltaHedgeCount} ID ${deltaOrderId}`);
     }
 
     // Wait the twapInterval of time to see if the position gets to neutral.
-    console.log(this.symbol, 'Scan Delta Fills for ~', twapIntervalSec, 'seconds');
-    await sleepRandom(twapIntervalSec);
+    console.log(this.symbol, 'Scan Delta Fills for ~', TWAP_INTERVAL_SEC, 'seconds');
+    await sleepRandom(TWAP_INTERVAL_SEC);
 
     // Cleanup listener.
     fillFeed.removeEventListener('message', deltaFillListener);
@@ -377,7 +377,7 @@ Limit: ${hedgePrice} # ${deltaHedgeCount} ID ${deltaOrderId}`);
     await this.cancelStaleMangoOrders(mangoAccount, mangoGroup, perpMarket);
 
     // Avoid unsafe recursion.
-    if (gammaScalpCount > gammaCycles) {
+    if (gammaScalpCount > GAMMA_CYCLES) {
       console.log(this.symbol, 'Maximum scalps acheived!', gammaScalpCount - 1, 'Wait for Rerun');
       return;
     }
@@ -387,7 +387,7 @@ Limit: ${hedgePrice} # ${deltaHedgeCount} ID ${deltaOrderId}`);
 
     // Calc scalperWindow std deviation spread from zScore & IV for gamma levels
     const stdDevSpread = (this.impliedVol
-    / Math.sqrt(SEC_PER_YEAR / scalperWindowSec))
+    / Math.sqrt(SEC_PER_YEAR / SCALPER_WINDOW_SEC))
     * this.zScore;
     const netGamma = IS_DEV
       ? Math.max(0.01, dipTotalGamma * stdDevSpread * fairValue)
@@ -471,7 +471,7 @@ Limit: ${hedgePrice} # ${deltaHedgeCount} ID ${deltaOrderId}`);
     console.log(`${this.symbol} Market Spread %' ${((gammaAsk - gammaBid) / fairValue) * 100} Liquidity $ ${netGamma * 2 * fairValue}`);
 
     // Sleep for the max time of the reruns then kill thread
-    await sleepExact(scalperWindowSec);
+    await sleepExact(SCALPER_WINDOW_SEC);
     console.log(this.symbol, 'Remove stale gamma fill listener', gammaBidID, gammaAskID);
     fillFeed.removeEventListener('message', gammaFillListener);
   }
@@ -580,7 +580,7 @@ Limit: ${hedgePrice} # ${deltaHedgeCount} ID ${deltaOrderId}`);
     await tryToSettleOpenBook(this.connection, this.owner, spotMarket, this.symbol, 'USDC');
 
     // Prevent too much recursion.
-    if (deltaHedgeCount > maxDeltaHedges) {
+    if (deltaHedgeCount > MAX_DELTA_HEDGES) {
       console.log(this.symbol, 'Max OpenBook Hedges exceeded!');
       return;
     }
@@ -606,8 +606,8 @@ Limit: ${hedgePrice} # ${deltaHedgeCount} ID ${deltaOrderId}`);
       spotMarket,
       this.symbol,
       jupiter,
-      maxDeltaHedges,
-      twapIntervalSec,
+      MAX_DELTA_HEDGES,
+      TWAP_INTERVAL_SEC,
     );
     if (fairValue === NO_FAIR_VALUE) {
       console.log(this.symbol, 'No Robust Pricing. Exiting Delta Hedge', deltaHedgeCount);
@@ -627,10 +627,10 @@ Spot Δ: ${spotDelta} Offset Δ ${this.deltaOffset} Fair Value: ${fairValue}`,
 
     // Check whether we need to hedge.
     const dipTotalGamma = getDIPGamma(dipProduct, fairValue, this.symbol);
-    const stdDevSpread = (this.impliedVol / Math.sqrt(SEC_PER_YEAR / scalperWindowSec))
+    const stdDevSpread = (this.impliedVol / Math.sqrt(SEC_PER_YEAR / SCALPER_WINDOW_SEC))
     * this.zScore;
     const deltaThreshold = Math.max(
-      dipTotalGamma * stdDevSpread * fairValue * gammaThreshold,
+      dipTotalGamma * stdDevSpread * fairValue * GAMMA_THRESHOLD,
       this.minSpotSize,
     );
     if (Math.abs(hedgeDeltaTotal) < deltaThreshold) {
@@ -725,10 +725,10 @@ Spot Δ: ${spotDelta} Offset Δ ${this.deltaOffset} Fair Value: ${fairValue}`,
 
     // Rest single order if the hedge should be completed in a single clip
     if (spliceFactor === 1) {
-      const netHedgePeriod = twapIntervalSec * maxDeltaHedges;
+      const netHedgePeriod = TWAP_INTERVAL_SEC * MAX_DELTA_HEDGES;
       console.log(this.symbol, 'Scan Delta Fills for ~', netHedgePeriod, 'seconds');
 
-      await waitForFill(() => ( Math.abs(hedgeDeltaTotal) < this.minSpotSize), twapIntervalSec);
+      await waitForFill(() => ( Math.abs(hedgeDeltaTotal) < this.minSpotSize), TWAP_INTERVAL_SEC);
       if (Math.abs(hedgeDeltaTotal) < this.minSpotSize) {
         console.log(this.symbol, 'Delta Hedge Complete: SerumVial');
         return;
@@ -749,10 +749,10 @@ Spot Δ: ${spotDelta} Offset Δ ${this.deltaOffset} Fair Value: ${fairValue}`,
     // need to send multiple orders. Either it will get filled which will get
     // caught in the next run, enough time has passed and we start a new run
     // anyways.
-    console.log(this.symbol, 'Scan Delta Fills for ~', twapIntervalSec, 'seconds');
+    console.log(this.symbol, 'Scan Delta Fills for ~', TWAP_INTERVAL_SEC, 'seconds');
     await waitForFill(
       (_) => Math.abs(hedgeDeltaTotal * fairValue) < (this.minSpotSize * fairValue),
-      twapIntervalSec,
+      TWAP_INTERVAL_SEC,
     );
     this.serumVialClient.removeAnyListeners();
     await this.deltaHedgeOpenBook(
@@ -805,7 +805,7 @@ Spot Δ: ${spotDelta} Offset Δ ${this.deltaOffset} Fair Value: ${fairValue}`,
         }
 
         // Once the gamma fills have crossed the threshold, reset the orders.
-        if (gammaFillQty > amountGamma * gammaCompleteThresholdPct) {
+        if (gammaFillQty > amountGamma * GAMMA_COMPLETE_THRESHOLD_PCT) {
           gammaFillQty = 0;
           const fillPrice = Number(message.price);
           this.gammaScalpOpenBook(
@@ -827,7 +827,7 @@ Spot Δ: ${spotDelta} Offset Δ ${this.deltaOffset} Fair Value: ${fairValue}`,
     await tryToSettleOpenBook(this.connection, this.owner, spotMarket, this.symbol, 'USDC');
 
     // Prevent too much recursion.
-    if (gammaScalpCount > gammaCycles) {
+    if (gammaScalpCount > GAMMA_CYCLES) {
       console.log(this.symbol, 'Maximum scalps acheived!', gammaScalpCount - 1, 'Wait for Rerun');
       return;
     }
@@ -843,8 +843,8 @@ Spot Δ: ${spotDelta} Offset Δ ${this.deltaOffset} Fair Value: ${fairValue}`,
         spotMarket,
         this.symbol,
         jupiter,
-        gammaCycles,
-        twapIntervalSec,
+        GAMMA_CYCLES,
+        TWAP_INTERVAL_SEC,
       );
       if (fairValue === NO_FAIR_VALUE) {
         console.log(this.symbol, 'No Robust Pricing. Exiting Gamma Scalp', gammaScalpCount);
@@ -854,13 +854,13 @@ Spot Δ: ${spotDelta} Offset Δ ${this.deltaOffset} Fair Value: ${fairValue}`,
     const dipTotalGamma = getDIPGamma(dipProduct, fairValue, this.symbol);
 
     // Calc scalperWindow std deviation spread from zScore & IV for gamma levels.
-    const stdDevSpread = (this.impliedVol / Math.sqrt(SEC_PER_YEAR / scalperWindowSec))
+    const stdDevSpread = (this.impliedVol / Math.sqrt(SEC_PER_YEAR / SCALPER_WINDOW_SEC))
     * this.zScore;
     const netGamma = IS_DEV
       ? Math.max(0.01, dipTotalGamma * stdDevSpread * fairValue)
       : dipTotalGamma * stdDevSpread * fairValue;
 
-    const stdDevWidenedSpread = ((gammaScalpCount - 1) / gammaCycles) * stdDevSpread;
+    const stdDevWidenedSpread = ((gammaScalpCount - 1) / GAMMA_CYCLES) * stdDevSpread;
     let gammaBid = fairValue * (1 - stdDevSpread - stdDevWidenedSpread);
     let gammaAsk = fairValue * (1 + stdDevSpread + stdDevWidenedSpread);
 
@@ -904,8 +904,8 @@ Spot Δ: ${spotDelta} Offset Δ ${this.deltaOffset} Fair Value: ${fairValue}`,
 
     // Find the prices at which whale qty is bid & offered
     const bids = await spotMarket.loadBids(this.connection);
-    const numBids = bids.getL2(maxOrderBookSearchDepth).length;
-    const dimQty = maxBackGammaMultiple * netGamma;
+    const numBids = bids.getL2(MAX_ORDER_BOOK_SEARCH_DEPTH).length;
+    const dimQty = MAX_BACK_GAMMA_MULTIPLE * netGamma;
     let bidDepth = 0;
     let whaleBidPrice: number;
     // TODO: Fix this logic to avoid continuously reparsing L2.
@@ -917,7 +917,7 @@ Spot Δ: ${spotDelta} Offset Δ ${this.deltaOffset} Fair Value: ${fairValue}`,
       }
     }
     const asks = await spotMarket.loadAsks(this.connection);
-    const numAsks = asks.getL2(maxOrderBookSearchDepth).length;
+    const numAsks = asks.getL2(MAX_ORDER_BOOK_SEARCH_DEPTH).length;
     let askDepth = 0;
     let whaleAskPrice: number;
     for (let i = 0; i < numAsks; i++) {
@@ -933,7 +933,7 @@ Spread % ${((whaleAskPrice - whaleBidPrice) / fairValue) * 100}`);
     amountGamma = roundQtyToSpotSize(Math.abs(netGamma), this.minSpotSize);
     // Reduce gamma ask if not enough inventory.
     const gammaAskQty = Math.abs(spotDelta) > amountGamma ? amountGamma
-      : roundQtyToSpotSize(Math.abs(spotDelta * orderSizeBufferPct), this.minSpotSize);
+      : roundQtyToSpotSize(Math.abs(spotDelta * ORDER_SIZE_BUFFER_PCT), this.minSpotSize);
     const priceBid = roundPriceToTickSize(Math.abs(gammaBid), this.tickSize);
     const priceAsk = roundPriceToTickSize(Math.abs(gammaAsk), this.tickSize);
     const bidAccount = getPayerAccount('buy', this.symbol, 'USDC');
@@ -973,26 +973,26 @@ Spread % ${((whaleAskPrice - whaleBidPrice) / fairValue) * 100}`);
     const whaleAskDiff = whaleAskPrice - fairValue;
     const backBidPrice = whaleBidDiff > fairValue - gammaBid
       ? roundPriceToTickSize(
-        Math.max(whaleBidPrice + this.tickSize, gammaBid * (1 - whaleMaxSpread)),
+        Math.max(whaleBidPrice + this.tickSize, gammaBid * (1 - WHALE_MAX_SPREAD)),
         this.tickSize,
       )
       : undefined;
     const backAskPrice = whaleAskDiff > gammaAsk - fairValue
       ? roundPriceToTickSize(
-        Math.min(whaleAskPrice - this.tickSize, gammaAsk * (1 + whaleMaxSpread)),
+        Math.min(whaleAskPrice - this.tickSize, gammaAsk * (1 + WHALE_MAX_SPREAD)),
         this.tickSize,
       )
       : undefined;
 
     // TODO: Do the same logic for whale bid. Less likely but still applicable.
-    const maxBackGamma = netGamma * (maxBackGammaMultiple - 1);
+    const maxBackGamma = netGamma * (MAX_BACK_GAMMA_MULTIPLE - 1);
     const whaleBidGammaQty = Math.min(maxBackGamma, dipTotalGamma * whaleBidDiff - netGamma);
     let whaleAskGammaQty = Math.min(maxBackGamma, dipTotalGamma * whaleAskDiff - netGamma);
     // Reduce whale ask if not enough inventory
     if (whaleAskGammaQty > Math.abs(spotDelta)) {
       whaleAskGammaQty = 0;
     } else if (whaleAskGammaQty + amountGamma > Math.abs(spotDelta)) {
-      whaleAskGammaQty = Math.abs(spotDelta * orderSizeBufferPct) - amountGamma;
+      whaleAskGammaQty = Math.abs(spotDelta * ORDER_SIZE_BUFFER_PCT) - amountGamma;
     }
     const backBidQty = roundQtyToSpotSize(Math.abs(whaleBidGammaQty), this.minSpotSize);
     const backAskQty = roundQtyToSpotSize(Math.abs(whaleAskGammaQty), this.minSpotSize);
@@ -1037,16 +1037,16 @@ Liquidity $ ${(amountGamma * 2 + backBidQty + backAskQty) * fairValue}`);
 
     // At the base level only, wait for the scalp to fill.
     if (gammaScalpCount === 1) {
-      await waitForFill((_) => gammaScalpCount === gammaCycles, scalperWindowSec);
+      await waitForFill((_) => gammaScalpCount === GAMMA_CYCLES, SCALPER_WINDOW_SEC);
 
       // TODO: Remove this logging unless necessary. It is not showing new actionable info.
       const scalpPnL = (
-        (1 + 1 / (2 * gammaCycles)) * (gammaScalpCount - 1) * stdDevSpread * fairValue)
+        (1 + 1 / (2 * GAMMA_CYCLES)) * (gammaScalpCount - 1) * stdDevSpread * fairValue)
         * netGamma * gammaScalpCount
-        + ((1 + 1 / (2 * gammaCycles)) * (gammaScalpCount - 1) * stdDevSpread * fairValue)
+        + ((1 + 1 / (2 * GAMMA_CYCLES)) * (gammaScalpCount - 1) * stdDevSpread * fairValue)
         * gammaFillQty;
       const thetaPnL = getDIPTheta(dipProduct, fairValue, this.symbol)
-        / ((24 * 60 * 60) / scalperWindowSec);
+        / ((24 * 60 * 60) / SCALPER_WINDOW_SEC);
       const estTotalPnL = scalpPnL + thetaPnL;
       console.log(
         `${this.symbol} Estimated Total PnL ${estTotalPnL} Scalp PnL ${scalpPnL} \

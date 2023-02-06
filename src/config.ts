@@ -132,44 +132,44 @@ export const treasuryPositions: DIPDeposit[] = [({
 // Amount to vary the sleep on a random sleep.
 export const RANDOM_SLEEP_MULTIPLIER = 0.05;
 // Risk Free Rate of Return ~ T-Bill Rate
-export const rfRate = 0.03;
+export const RF_RATE = 0.03;
 // Number of seconds to space spliced delta orders across
-export const twapIntervalSec = 15;
+export const TWAP_INTERVAL_SEC = 15;
 // Number of seconds for each gamma scalping window
-export const scalperWindowSec = 600;
+export const SCALPER_WINDOW_SEC = 600;
 // Percentage of gamma to calc delta hedge threshold
-export const gammaThreshold = 0.05;
+export const GAMMA_THRESHOLD = 0.05;
 // Maximum amount of orders to delta hedge across
-export const maxDeltaHedges = 4;
+export const MAX_DELTA_HEDGES = 4;
 // Number cycles to scalp gamma
-export const gammaCycles: number = 10;
+export const GAMMA_CYCLES: number = 10;
 // Seconds to wait between reruns of each product
-export const productStaggerSec = 30;
+export const PRODUCT_STAGGER_SEC = 30;
 // Time in minutes of downtime to stop routing transactions to mango
 export const MANGO_DOWNTIME_THRESHOLD_MIN = 15;
 // % Funding to switch to openbook orders instead of mango
-export const perpFundingRateThreshold = 0.25;
+export const PERP_FUNDING_RATE_THRESHOLD = 0.25;
 // Max % allowable spread to use midvalue as accurate price
-export const maxMktSpreadPctForPricing = 0.01;
+export const MAX_MKT_SPREAD_PCT_FOR_PRICING = 0.01;
 // Move on to new gamma cycle when 90% filled
-export const gammaCompleteThresholdPct = 0.90;
+export const GAMMA_COMPLETE_THRESHOLD_PCT = 0.90;
 // Number of times to reduce the jupiter qty to check for routes
-export const jupiterSearchSteps = 5;
+export const JUPITER_SEARCH_STEPS = 5;
 // Min USDC amount to fill MM on
-export const minExecutionPremium = 0.001;
+export const MIN_EXECUTION_PREMIUM = 0.001;
 // USDC amount to check jupiter mid point price
 export const JUPITER_LIQUIDITY = 100;
 // Bps to allow calculating mid price to succeed
-export const jupiterSlippageBps = 50;
+export const JUPITER_SLIPPAGE_BPS = 50;
 // Max num of levels to search for order book depth
-export const maxOrderBookSearchDepth = 100;
+export const MAX_ORDER_BOOK_SEARCH_DEPTH = 100;
 // Max multiple of gamma to allow on the back bids
-export const maxBackGammaMultiple = 5;
+export const MAX_BACK_GAMMA_MULTIPLE = 5;
 // IV spread market maker at minimum must beat backstop to take fills
-export const volSpread = 0.05;
+export const VOL_SPREAD = 0.05;
 // Max % spread to allow whale bid/ask
-export const whaleMaxSpread = 0.4;
+export const WHALE_MAX_SPREAD = 0.4;
 // How frequently to poll for fills
-export const resolvePeriodMs = 100;
+export const RESOLVE_PERIOD_MS = 100;
 // Order size buffer in percent to use to reduce order sizes
-export const orderSizeBufferPct = 0.99;
+export const ORDER_SIZE_BUFFER_PCT = 0.99;

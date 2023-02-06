@@ -35,3 +35,4 @@ export const SIX_MONTHS_IN_MS = 1_000 * 60 * 60 * 24 * 30 * 6;
 export const DIP_STATE_LENGTH = 260;
 
 export const NO_FAIR_VALUE = 0;
+export const SUFFICIENT_BOOK_DEPTH = 0;

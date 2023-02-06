@@ -29,7 +29,7 @@ import {
   findNearestStrikeType, getMangoHedgeProduct, cancelOpenBookOrders,
   findFairValue, roundPriceToTickSize, roundQtyToSpotSize,
 } from './scalper_utils';
-import { NO_FAIR_VALUE, OPENBOOK_MKT_MAP, SEC_PER_YEAR } from './constants';
+import { NO_FAIR_VALUE, OPENBOOK_MKT_MAP, SEC_PER_YEAR, SUFFICIENT_BOOK_DEPTH } from './constants';
 
 class Scalper {
   client: MangoClient;
@@ -633,7 +633,7 @@ Spot Δ: ${spotDelta} Offset Δ ${this.deltaOffset} Fair Value: ${fairValue}`,
       dipTotalGamma * stdDevSpread * fairValue * gammaThreshold,
       this.minSpotSize,
     );
-    if (Math.abs(hedgeDeltaTotal * fairValue) < (deltaThreshold * fairValue)) {
+    if (Math.abs(hedgeDeltaTotal) < deltaThreshold) {
       console.log(this.symbol, 'Delta Netural Within', deltaThreshold);
       return;
     }
@@ -645,6 +645,7 @@ Spot Δ: ${spotDelta} Offset Δ ${this.deltaOffset} Fair Value: ${fairValue}`,
     const dipDeltaDiff = slippageDIPDelta - dipTotalDelta;
     hedgeDeltaTotal += dipDeltaDiff;
     console.log(this.symbol, 'Adjust Slippage Delta by', dipDeltaDiff, 'to', -hedgeDeltaTotal);
+
     const notionalThreshold = deltaThreshold * fairValue;
     const notionalAmount = -hedgeDeltaTotal * fairValue;
     if ((notionalAmount < notionalThreshold && hedgeSide === 'buy')
@@ -668,7 +669,7 @@ Spot Δ: ${spotDelta} Offset Δ ${this.deltaOffset} Fair Value: ${fairValue}`,
 
     let hedgeDeltaClip = hedgeDeltaTotal;
     try {
-      if (spliceFactor > 0) {
+      if (spliceFactor != SUFFICIENT_BOOK_DEPTH) {
         console.log(this.symbol, 'Not enough liquidity! Try Jupiter. Adjust Price', hedgePrice, 'Splice', spliceFactor);
         // Check on jupiter and sweep price
         const jupValues = await jupiterHedge(hedgeSide, this.symbol, 'USDC', hedgeDeltaTotal, hedgePrice, jupiter);
@@ -677,19 +678,12 @@ Spot Δ: ${spotDelta} Offset Δ ${this.deltaOffset} Fair Value: ${fairValue}`,
           for (const jupTx of [setupTransaction, swapTransaction, cleanupTransaction].filter(
             Boolean,
           )) {
-            if (!jupTx) {
-              continue;
-            }
             const txid = await sendAndConfirmTransaction(this.connection, jupTx, [this.owner]);
-            if (swapTransaction) {
+            if (jupTx === swapTransaction) {
               const spotDeltaUpdate = jupValues.qty;
               hedgeDeltaTotal += spotDeltaUpdate;
               console.log(this.symbol, 'Jupiter Hedge via', jupValues.venue, 'Price', jupValues.price, 'Qty', jupValues.qty, `https://solana.fm/tx/${txid}${cluster?.includes('devnet') ? '?cluster=devnet' : ''}`);
             }
-          }
-          if (Math.abs(hedgeDeltaTotal * fairValue) < (deltaThreshold * fairValue)) {
-            console.log(this.symbol, 'Delta Netural: Jupiter Hedge');
-            return;
           }
           console.log(this.symbol, 'Adjust', hedgeSide, 'Price', hedgePrice, 'to', jupValues.price, 'Remaining Qty', hedgeDeltaTotal);
           hedgePrice = jupValues.price;
@@ -698,7 +692,13 @@ Spot Δ: ${spotDelta} Offset Δ ${this.deltaOffset} Fair Value: ${fairValue}`,
         }
         hedgeDeltaClip = hedgeDeltaTotal / spliceFactor;
       } else {
-        console.log(this.symbol, 'Sufficient liquidity. Sweep OpenBook', spliceFactor);
+        console.log(this.symbol, 'Sufficient liquidity. Sweep OpenBook');
+      }
+
+      // Return early if jupiter sweeping got within the threshold.
+      if (Math.abs(hedgeDeltaTotal) < deltaThreshold) {
+        console.log(this.symbol, 'Delta Netural: Jupiter Hedge');
+        return;
       }
     } catch (err) {
       console.log(this.symbol, 'Jupiter Route', err, err.stack);
@@ -728,12 +728,8 @@ Spot Δ: ${spotDelta} Offset Δ ${this.deltaOffset} Fair Value: ${fairValue}`,
       const netHedgePeriod = twapIntervalSec * maxDeltaHedges;
       console.log(this.symbol, 'Scan Delta Fills for ~', netHedgePeriod, 'seconds');
 
-      await waitForFill(
-        () => (
-          Math.abs(hedgeDeltaTotal * fairValue) < (this.minSpotSize * fairValue)),
-        twapIntervalSec,
-      );
-      if (Math.abs(hedgeDeltaTotal * fairValue) < (this.minSpotSize * fairValue)) {
+      await waitForFill(() => ( Math.abs(hedgeDeltaTotal) < this.minSpotSize), twapIntervalSec);
+      if (Math.abs(hedgeDeltaTotal) < this.minSpotSize) {
         console.log(this.symbol, 'Delta Hedge Complete: SerumVial');
         return;
       }
@@ -780,7 +776,7 @@ Spot Δ: ${spotDelta} Offset Δ ${this.deltaOffset} Fair Value: ${fairValue}`,
     const backBidID = new BN(orderIDBase * 2);
     const backAskID = new BN(orderIDBase * 2 + 1);
     const gammaIds = [
-      bidID.toString(), askID.toString(), backBidID.toString(), backAskID.toString(),
+      bidID.toString(), askID.toString(), backBidID.toString(), backAskID.toString()
     ];
 
     if (this.serumVialClient.checkSerumVial() !== WebSocket.OPEN) {
@@ -901,7 +897,7 @@ Spot Δ: ${spotDelta} Offset Δ ${this.deltaOffset} Fair Value: ${fairValue}`,
     }
 
     console.log(this.symbol, 'Position Gamma Γ:', netGamma, 'Fair Value', fairValue);
-    if ((netGamma * fairValue) < (this.minSpotSize * fairValue)) {
+    if (netGamma  < this.minSpotSize) {
       console.log(this.symbol, 'Gamma Hedge Too Small');
       return;
     }
@@ -935,7 +931,7 @@ Spot Δ: ${spotDelta} Offset Δ ${this.deltaOffset} Fair Value: ${fairValue}`,
 Spread % ${((whaleAskPrice - whaleBidPrice) / fairValue) * 100}`);
 
     amountGamma = roundQtyToSpotSize(Math.abs(netGamma), this.minSpotSize);
-    // Reduce gamma ask if not enough inventory
+    // Reduce gamma ask if not enough inventory.
     const gammaAskQty = Math.abs(spotDelta) > amountGamma ? amountGamma
       : roundQtyToSpotSize(Math.abs(spotDelta * orderSizeBufferPct), this.minSpotSize);
     const priceBid = roundPriceToTickSize(Math.abs(gammaBid), this.tickSize);

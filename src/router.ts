@@ -28,7 +28,7 @@ import {
 import * as apiSecret from '../apiSecret.json';
 import {
   DIP_STATE_LENGTH,
-  dualMarketProgramID, MS_PER_YEAR, NUM_DIP_ATOMS_PER_TOKEN, optionVaultPk,
+  DIP_PROGRAM_ID, MS_PER_YEAR, NUM_DIP_ATOMS_PER_TOKEN, OPTION_VAULT_PK,
   OPTION_MINT_ADDRESS_SEED, PROTCOL_API_KEY, SIX_MONTHS_IN_MS,
 } from './constants';
 import { dipToString, fetchMMOrder } from './router_utils';
@@ -209,10 +209,10 @@ class Router {
       expirationSec,
       splMint,
       usdcPk,
-      dualMarketProgramID,
+      DIP_PROGRAM_ID,
     );
     const mmOptionAccount = await getAssociatedTokenAddress(
-      optionVaultPk,
+      OPTION_VAULT_PK,
       optionMint,
     );
     const balance = await connection.getTokenAccountBalance(mmOptionAccount);
@@ -230,7 +230,7 @@ class Router {
   async refresh_dips() {
     console.log('Refreshing dips', API_URL);
     const connection = new Connection(API_URL, 'processed' as Commitment);
-    const programAccountsPromise = connection.getProgramAccounts(dualMarketProgramID);
+    const programAccountsPromise = connection.getProgramAccounts(DIP_PROGRAM_ID);
 
     await programAccountsPromise.then(async (data) => {
       for (const programAccount of data) {
@@ -271,10 +271,10 @@ class Router {
             expiration,
             splMint,
             usdcPk,
-            dualMarketProgramID,
+            DIP_PROGRAM_ID,
           );
           const mmOptionAccount = await getAssociatedTokenAddress(
-            optionVaultPk,
+            OPTION_VAULT_PK,
             optionMint,
           );
 

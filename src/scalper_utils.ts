@@ -24,7 +24,7 @@ import {
   sleepExact, splMintToToken, tokenToSplMint,
 } from './utils';
 import {
-  mangoTesterPk, MS_PER_YEAR, NO_FAIR_VALUE, optionVaultPk, riskManagerPk, SUFFICIENT_BOOK_DEPTH,
+  MANGO_TESTER_PK, MS_PER_YEAR, NO_FAIR_VALUE, OPTION_VAULT_PK, RISK_MANAGER_PK, SUFFICIENT_BOOK_DEPTH,
 } from './constants';
 
 export async function loadPrices(
@@ -198,7 +198,7 @@ export async function getSpotDelta(connection: Connection, symbol: SYMBOL) {
   let tokenDelta = 0;
   let spotDelta = 0;
   let tokenDecimals = 1;
-  const accountList = [mangoTesterPk, optionVaultPk, riskManagerPk];
+  const accountList = [MANGO_TESTER_PK, OPTION_VAULT_PK, RISK_MANAGER_PK];
   for (const account of accountList) {
     if (symbol === 'SOL') {
       mainDelta = (await connection.getBalance(account)) / LAMPORTS_PER_SOL;

@@ -13,7 +13,7 @@ import {
   API_URL, IS_DEV, RANDOM_SLEEP_MULTIPLIER, usdcPk,
 } from './config';
 import {
-  bonkPk, CHAINLINK_PROGRAM_ID, mngoPk, soBtcPk, soEthPk, wsolPk,
+  BONK_PK, CHAINLINK_PROGRAM_ID, MNGO_PK, SO_BTC_PK, SO_ETH_PK, WSOL_PK,
 } from './constants';
 import { SYMBOL } from './common';
 
@@ -98,19 +98,19 @@ export async function findProgramAddressWithMintAndStrikeAndExpiration(
 }
 
 export function splMintToToken(splMint: PublicKey): SYMBOL {
-  if (splMint.toBase58() === wsolPk.toBase58()) {
+  if (splMint.toBase58() === WSOL_PK.toBase58()) {
     return 'SOL';
   }
-  if (splMint.toBase58() === soBtcPk.toBase58()) {
+  if (splMint.toBase58() === SO_BTC_PK.toBase58()) {
     return 'BTC';
   }
-  if (splMint.toBase58() === soEthPk.toBase58()) {
+  if (splMint.toBase58() === SO_ETH_PK.toBase58()) {
     return 'ETH';
   }
-  if (splMint.toBase58() === mngoPk.toBase58()) {
+  if (splMint.toBase58() === MNGO_PK.toBase58()) {
     return 'MNGO';
   }
-  if (splMint.toBase58() === bonkPk.toBase58()) {
+  if (splMint.toBase58() === BONK_PK.toBase58()) {
     return 'BONK';
   }
   if (splMint.toBase58() === usdcPk.toBase58()) {
@@ -122,19 +122,19 @@ export function splMintToToken(splMint: PublicKey): SYMBOL {
 
 export function tokenToSplMint(token: SYMBOL) {
   if (token === 'SOL') {
-    return wsolPk;
+    return WSOL_PK;
   }
   if (token === 'BTC') {
-    return soBtcPk;
+    return SO_BTC_PK;
   }
   if (token === 'ETH') {
-    return soEthPk;
+    return SO_ETH_PK;
   }
   if (token === 'MNGO') {
-    return mngoPk;
+    return MNGO_PK;
   }
   if (token === 'BONK') {
-    return bonkPk;
+    return BONK_PK;
   }
   if (token === 'USDC') {
     return usdcPk;

@@ -25,8 +25,8 @@ export const OPB_MAINNET_PROGRAM_ID = new PublicKey('srmqPvymJeFKQ4zGQed1GFppgkR
 export const CHAINLINK_PROGRAM_ID = new PublicKey('cjg3oHmg9uuPsP8D6g29NWvhySJkdYdAo9D25PRbKXJ');
 
 export const OPTION_VAULT_PK = new PublicKey('9SgZKdeTMaNuEZnhccK2crHxi1grXRmZKQCvNSKgVrCQ');
-export const RISK_MANAGER_PK = new PublicKey('FCsXUii28gmnKQCZV1vGMZPqF2LCRCr3pqErQcskgr8W');
-export const OPENBOOK_PROD_PK = new PublicKey('CkcJx7Uwgxck5zm3DqUp2N1ikkkoPn2wA8zf7oS4tFSZ');
+export const RM_BACKUP_PK = new PublicKey('FCsXUii28gmnKQCZV1vGMZPqF2LCRCr3pqErQcskgr8W');
+export const RM_PROD_PK = new PublicKey('CkcJx7Uwgxck5zm3DqUp2N1ikkkoPn2wA8zf7oS4tFSZ');
 
 export const MS_PER_YEAR = 365 * 60 * 60 * 24 * 1_000;
 export const SEC_PER_YEAR = 365 * 60 * 60 * 24;

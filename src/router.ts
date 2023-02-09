@@ -71,7 +71,6 @@ class Router {
         dipToString(dipDeposit.expirationMs / 1_000, dipDeposit.strikeUsdcPerToken)
       ] = dipDeposit;
       console.log('DIP Deposit quantity zero. Rerun');
-      this.run_risk_manager();
       return;
     }
 
@@ -88,7 +87,6 @@ class Router {
           )
         ] = dipDeposit;
         console.log('No available MM bid', order);
-        this.run_risk_manager();
         return;
       }
 
@@ -113,7 +111,6 @@ class Router {
             dipDeposit.strikeUsdcPerToken,
           )
         ] = dipDeposit;
-        this.run_risk_manager();
         return;
       }
 
@@ -127,7 +124,6 @@ class Router {
             dipDeposit.strikeUsdcPerToken,
           )
         ] = dipDeposit;
-        this.run_risk_manager();
         return;
       }
 
@@ -180,17 +176,10 @@ class Router {
       }
     } catch (err) {
       console.log('Failed to router with error: ', err, 'proceeding to run risk manager.');
-      this.run_risk_manager();
-      return;
     }
 
-    // On startup run risk manager when there is no position
-    if (openPositionCount === 0) {
-      console.log('No Positions. Run Risk Manager', new Date().toUTCString());
-      this.run_risk_manager();
-    } else {
-      console.log('Open DIP Positions', openPositionCount);
-    }
+    console.log('Open DIP Positions', openPositionCount);
+    this.run_risk_manager();
   }
 
   run_risk_manager(): void {
@@ -286,8 +275,8 @@ class Router {
             expirationSec,
             strikeTokensPerToken,
             CallOrPut.Call,
-            (deposit: DIPDeposit) => {
-              this.route(deposit);
+            () => {
+              this.checkMMPrices();
             },
           );
 

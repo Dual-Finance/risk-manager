@@ -99,7 +99,7 @@ class Router {
       ) * (1 + VOL_SPREAD + Math.random() * VOL_SPREAD);
       const thresholdPrice = blackScholes(currentPrice, dipDeposit.strikeUsdcPerToken, fractionOfYear, vol, RF_RATE, 'call');
       // @ts-ignore
-      const { price } = order;
+      const { price, remainingQuantity } = order;
       console.log('MM price:', price, 'BVE Re-Route price:', thresholdPrice);
       const userPremium = price * dipDeposit.qtyTokens;
       if (userPremium < MIN_EXECUTION_PREMIUM) {
@@ -129,11 +129,12 @@ class Router {
 
       const clientOrderId = `clientOrderId${Date.now()}`;
       const side = 'SELL';
-      const quantity = dipDeposit.qtyTokens;
+      const quantityDIP = dipDeposit.qtyTokens;
+      const quantityTrade = Math.min(quantityDIP, remainingQuantity);
       // @ts-ignore
       const secret = apiSecret.default;
 
-      const request = `clientOrderId=${clientOrderId}&symbol=${symbol}&price=${price}&quantity=${quantity}&side=${side}`;
+      const request = `clientOrderId=${clientOrderId}&symbol=${symbol}&price=${price}&quantity=${quantityTrade}&side=${side}`;
       const calculatedHash = crypto
         .createHmac('SHA256', secret)
         .update(Buffer.from(request))
@@ -142,7 +143,7 @@ class Router {
       const data = {
         symbol,
         price,
-        quantity,
+        quantityTrade,
         side,
         clientOrderId,
         signature: calculatedHash,

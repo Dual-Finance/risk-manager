@@ -178,7 +178,6 @@ class Router {
       console.log('Failed to router with error: ', err, 'proceeding to run risk manager.');
     }
 
-    // On startup run risk manager when there is no position
     console.log('Open DIP Positions', openPositionCount);
     this.run_risk_manager();
   }

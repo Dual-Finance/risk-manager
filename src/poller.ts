@@ -2,6 +2,8 @@ import {
   Connection,
   AccountChangeCallback,
   PublicKey,
+  AccountInfo as solanaAccountInfo,
+  Context,
   Commitment,
   Cluster,
 } from '@solana/web3.js';
@@ -39,7 +41,10 @@ class Poller {
     console.log('Listening at:', address);
     const connection = new Connection(API_URL, 'processed' as Commitment);
 
-    const callback: AccountChangeCallback = () => {
+    const callback: AccountChangeCallback = (
+      _accountInfo: solanaAccountInfo<Buffer>,
+      _context: Context,
+    ) => {
       this.callback();
     };
 

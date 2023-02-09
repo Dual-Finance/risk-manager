@@ -79,7 +79,7 @@ class Router {
       // @ts-ignore
       if (!order || order.price === undefined
         // @ts-ignore
-        || Number(order.remainingQuantity) < dipDeposit.qtyTokens) {
+        || Number(order.remainingQuantity) === 0) {
         this.dips[
           dipToString(
             dipDeposit.expirationMs / 1_000,

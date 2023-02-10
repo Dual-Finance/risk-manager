@@ -7,12 +7,14 @@ import {
   Commitment,
   Cluster,
 } from '@solana/web3.js';
-import { CallOrPut, SYMBOL } from './common';
+import { AccountLayout } from '@solana/spl-token';
+import { CallOrPut, DIPDeposit, SYMBOL } from './common';
 import { API_URL } from './config';
+import { NUM_DIP_ATOMS_PER_TOKEN } from './constants';
 
 class Poller {
   cluster: Cluster;
-  callback: () => void;
+  callback: (deposit: DIPDeposit) => void;
   splTokenName: SYMBOL;
   premiumAssetName: SYMBOL;
   expirationSec: number;
@@ -26,7 +28,7 @@ class Poller {
     expirationSec: number,
     strikeTokens: number,
     callOrPut: CallOrPut,
-    callback: () => void,
+    callback: (deposit: DIPDeposit) => void,
   ) {
     this.cluster = cluster;
     this.callback = callback;
@@ -45,7 +47,19 @@ class Poller {
       _accountInfo: solanaAccountInfo<Buffer>,
       _context: Context,
     ) => {
-      this.callback();
+      const newAmountAtoms: number = Number(
+        AccountLayout.decode(_accountInfo.data).amount,
+      );
+
+      const dipDeposit: DIPDeposit = {
+        splTokenName: this.splTokenName,
+        premiumAssetName: this.premiumAssetName,
+        expirationMs: this.expirationSec * 1_000,
+        strikeUsdcPerToken: this.strikeTokens,
+        callOrPut: this.callOrPut,
+        qtyTokens: newAmountAtoms / NUM_DIP_ATOMS_PER_TOKEN,
+      };
+      this.callback(dipDeposit);
     };
 
     try {

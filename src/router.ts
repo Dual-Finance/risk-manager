@@ -166,9 +166,17 @@ class Router {
   }
 
   // Reads all DIP Deposits and decides whether to send it to the mm_callback
-  async checkMMPrices(): Promise<void> {
+  async checkMMPrices(dipDeposit?: DIPDeposit): Promise<void> {
     let openPositionCount = 0;
     try {
+      if (dipDeposit !== undefined) {
+        this.dips[
+          dipToString(
+            dipDeposit.expirationMs / 1_000,
+            dipDeposit.strikeUsdcPerToken,
+          )
+        ] = dipDeposit;
+      }
       for (const dipDeposit of Object.values(this.dips)) {
         if (dipDeposit.qtyTokens > 0) {
           openPositionCount++;
@@ -276,8 +284,8 @@ class Router {
             expirationSec,
             strikeTokensPerToken,
             CallOrPut.Call,
-            () => {
-              this.checkMMPrices();
+            (deposit: DIPDeposit) => {
+              this.checkMMPrices(deposit);
             },
           );
 

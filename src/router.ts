@@ -165,7 +165,7 @@ class Router {
     });
   }
 
-  // Reads all DIP Deposits and decides whether to send it to the mm_callback
+  // Reads existing DIP Deposits & new deposit and decides whether to send it to the mm_callback
   async checkMMPrices(dipDeposit?: DIPDeposit): Promise<void> {
     let openPositionCount = 0;
     try {

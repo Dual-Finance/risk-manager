@@ -44,11 +44,11 @@ class Poller {
     const connection = new Connection(API_URL, 'processed' as Commitment);
 
     const callback: AccountChangeCallback = (
-      _accountInfo: solanaAccountInfo<Buffer>,
+      accountInfo: solanaAccountInfo<Buffer>,
       _context: Context,
     ) => {
       const newAmountAtoms: number = Number(
-        AccountLayout.decode(_accountInfo.data).amount,
+        AccountLayout.decode(accountInfo.data).amount,
       );
 
       const dipDeposit: DIPDeposit = {

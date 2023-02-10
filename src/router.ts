@@ -143,7 +143,7 @@ class Router {
       const data = {
         symbol,
         price,
-        quantityTrade,
+        quantity: quantityTrade,
         side,
         clientOrderId,
         signature: calculatedHash,

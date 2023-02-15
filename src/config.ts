@@ -7,12 +7,12 @@ import {
 export const IS_DEV = process.env.DEV !== 'false';
 export const API_URL = process.env.RPC;
 // Priority Fee to use for all txs in micro lamports
-export const PRIORITY_FEE = parseInt(process.env.FEE, 10);
-const solVars = process.env.SOL.split(',');
-const btcVars = process.env.BTC.split(',');
-const ethVars = process.env.ETH.split(',');
-const mngoVars = process.env.MNGO.split(',');
-const bonkVars = process.env.BONK.split(',');
+export const PRIORITY_FEE = process.env.FEE ? parseInt(process.env.FEE, 10) : 1;
+const solVars = process.env.SOL ? process.env.SOL.split(',') : [null, null, null, null];
+const btcVars = process.env.BTC ? process.env.BTC.split(',') : [null, null, null, null];
+const ethVars = process.env.ETH ? process.env.ETH.split(',') : [null, null, null, null];
+const mngoVars = process.env.MNGO ? process.env.MNGO.split(',') : [null, null, null, null];
+const bonkVars = process.env.BONK ? process.env.BONK.split(',') : [null, null, null, null];
 
 export const productStatus = new Map<SYMBOL, boolean>([
   ['BTC', btcVars[0] === 'ON'],

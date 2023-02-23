@@ -10,7 +10,7 @@ import SwitchboardProgram from '@switchboard-xyz/sbv2-lite';
 import * as anchor from '@project-serum/anchor';
 import { OCR2Feed } from '@chainlink/solana-sdk';
 import {
-  API_URL, IS_DEV, RANDOM_SLEEP_MULTIPLIER, usdcPk,
+  API_URL, IS_DEMO, IS_DEV, RANDOM_SLEEP_MULTIPLIER, usdcPk,
 } from './config';
 import {
   BONK_PK, CHAINLINK_PROGRAM_ID, MNGO_PK, SO_BTC_PK, SO_ETH_PK, WSOL_PK,
@@ -20,7 +20,8 @@ import { SYMBOL } from './common';
 export function readKeypair() {
   return JSON.parse(
     process.env.KEYPAIR
-      || fs.readFileSync(`${os.homedir()}/mango-explorer/id.json`, 'utf-8'),
+      || (IS_DEMO ? fs.readFileSync(`${os.homedir()}/Documents/DualFinance/demo.json`, 'utf-8')
+        : fs.readFileSync(`${os.homedir()}/mango-explorer/id.json`, 'utf-8')),
   );
 }
 

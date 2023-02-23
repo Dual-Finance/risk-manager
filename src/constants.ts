@@ -8,8 +8,11 @@ export const OPTION_MINT_ADDRESS_SEED = 'option-mint';
 
 export const OPENBOOK_MKT_MAP = new Map<string, string>([
   ['SOL', '8BnEgHoWFysVcuFFX7QztDmzuH8r5ZFvyP3sYwn1XTh6'], ['MNGO', '3NnxQvDcZXputNMxaxsGvqiKpqgPfSYXpNigZNFcknmD'],
-  ['BONK', '8PhnCfgqpgFM7ZJvttGdBVMXHuU4Q23ACxCvWkbs1M71'],
+  ['BONK', '8PhnCfgqpgFM7ZJvttGdBVMXHuU4Q23ACxCvWkbs1M71'], ['ETH', 'BbJgE7HZMaDp5NTYvRh5jZSkQPVDTU8ubPFtpogUkEj4'],
 ]);
+
+export const MANGO_ACCOUNT_PK = new PublicKey('EUQQaFnLBaTmjj9tuj4jP5a9byPYcrQ8M6PvkULtMBLD');
+export const MANGO_DEMO_PK = new PublicKey('5fEtAwzsXM4bHAT7gf3unPJFKJmQgYnce9L7GCxWTpEd');
 
 export const WSOL_PK = new PublicKey('So11111111111111111111111111111111111111112');
 export const SO_BTC_PK = new PublicKey('9n4nbM75f5Ui33ZbPYXn59EwSgE8CGsHtAeTH5YFeJ9E');

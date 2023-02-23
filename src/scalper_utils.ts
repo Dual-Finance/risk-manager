@@ -1,7 +1,7 @@
 import * as greeks from 'greeks';
 import {
-  BookSide, MangoCache, MangoGroup, PerpMarket,
-} from '@blockworks-foundation/mango-client';
+  BookSide, PerpMarket, PerpOrderSide,
+} from '@blockworks-foundation/mango-v4';
 import {
   ComputeBudgetProgram, Connection, Keypair, LAMPORTS_PER_SOL, PublicKey,
   sendAndConfirmTransaction, Transaction,
@@ -17,25 +17,16 @@ import {
 import {
   ACCOUNT_MAP, JUPITER_LIQUIDITY, MAX_MKT_SPREAD_PCT_FOR_PRICING, JUPITER_SEARCH_STEPS,
   RF_RATE, slippageMax, THEO_VOL_MAP, JUPITER_SLIPPAGE_BPS, PRIORITY_FEE,
-  GAMMA_CYCLES, RESOLVE_PERIOD_MS,
+  GAMMA_CYCLES, RESOLVE_PERIOD_MS, HedgeProduct,
 } from './config';
 import {
   decimalsBaseSPL, getChainlinkPrice, getPythPrice, getSwitchboardPrice,
   sleepExact, splMintToToken, tokenToSplMint,
 } from './utils';
 import {
-  RM_PROD_PK, MS_PER_YEAR, NO_FAIR_VALUE, OPTION_VAULT_PK, RM_BACKUP_PK, SUFFICIENT_BOOK_DEPTH,
+  RM_PROD_PK, MS_PER_YEAR, NO_FAIR_VALUE, OPTION_VAULT_PK, RM_BACKUP_PK,
+  SUFFICIENT_BOOK_DEPTH,
 } from './constants';
-
-export async function loadPrices(
-  mangoGroup: MangoGroup,
-  connection: Connection,
-) {
-  const [mangoCache]: [MangoCache] = await Promise.all([
-    mangoGroup.loadCache(connection),
-  ]);
-  return [mangoCache];
-}
 
 export function getDIPDelta(
   dipProduct: DIPDeposit[],
@@ -103,13 +94,14 @@ export function getDIPTheta(
   return thetaSum;
 }
 
-export function getMangoHedgeProduct(hedgeSide: string, buySpot: boolean, sellSpot: boolean): '-SPOT' | '-PERP' {
-  if (hedgeSide === 'buy' && buySpot) {
-    return '-SPOT';
-  } if (hedgeSide === 'sell' && sellSpot) {
-    return '-SPOT';
+export function getMangoHedgeProduct(hedgeSide: PerpOrderSide, buySpot: boolean, sellSpot: boolean):
+  HedgeProduct.Spot | HedgeProduct.Perp {
+  if (hedgeSide === PerpOrderSide.bid && buySpot) {
+    return HedgeProduct.Spot;
+  } if (hedgeSide === PerpOrderSide.ask && sellSpot) {
+    return HedgeProduct.Spot;
   }
-  return '-PERP';
+  return HedgeProduct.Perp;
 }
 
 // Splice delta hedge orders if available mango liquidity not supportive
@@ -122,7 +114,7 @@ export function orderSpliceMango(
   market: PerpMarket,
 ) {
   let spliceFactor: number;
-  const [_, nativeQty] = market.uiToNativePriceQuantity(0, qty);
+  const nativeQty = market.uiBaseToLots(qty);
   if (qty > 0 && side.getImpactPriceUi(nativeQty) < price * (1 - slippage)) {
     spliceFactor = Math.max((qty * price) / notionalMax, 1);
     console.log(`Sell Price Impact: ${side.getImpactPriceUi(nativeQty)} High Slippage!`);
@@ -172,19 +164,21 @@ export function liquidityCheckAndNumSplices(
 // Fill Size from any perp orders
 export async function fillSize(
   perpMarket: PerpMarket,
-  connection: Connection,
   orderID: number,
 ) {
   let filledQty = 0;
-  for (const fill of await perpMarket.loadFills(connection)) {
-    if (
-      fill.makerClientOrderId.toString() === orderID.toString()
-      || fill.takerClientOrderId.toString() === orderID.toString()
-    ) {
-      if (fill.takerSide === 'buy') {
-        filledQty += fill.quantity;
-      } else if (fill.takerSide === 'sell') {
-        filledQty -= fill.quantity;
+  const recentFills = await perpMarket.loadFills(this.mangoClient);
+  for (const fill of recentFills) {
+    if (fill.eventType) {
+      if (
+        fill.eventType[1].makerClientOrderId.toString() === orderID.toString()
+      || fill.eventType[1].takerClientOrderId.toString() === orderID.toString()
+      ) {
+        if (fill.eventType[1].takerSide === 'buy') {
+          filledQty += fill.eventType[1].quantity;
+        } else if (fill.eventType[1].takerSide === 'sell') {
+          filledQty -= fill.eventType[1].quantity;
+        }
       }
     }
   }

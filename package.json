@@ -1,6 +1,6 @@
 {
   "dependencies": {
-    "@blockworks-foundation/mango-client": "^3.6.11",
+    "@blockworks-foundation/mango-v4": "^0.5.21",
     "@chainlink/solana-sdk": "^0.2.2",
     "@coral-xyz/anchor": "^0.26.0",
     "@jup-ag/core": "^3.0.0-beta.9",

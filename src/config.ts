@@ -5,6 +5,7 @@ import {
 } from './constants';
 
 export const IS_DEV = process.env.DEV !== 'false';
+export const IS_DEMO = process.env.DEMO !== 'false';
 export const API_URL = process.env.RPC;
 // Priority Fee to use for all txs in micro lamports
 export const PRIORITY_FEE = parseInt(process.env.FEE, 10);
@@ -52,14 +53,20 @@ export enum ScalperMode {
   GammaBack,
   GammaBackStrikeAdjustment,
   BackOnly,
+  Perp,
+}
+
+export enum HedgeProduct {
+  Spot = '-SPOT',
+  Perp = '-PERP',
 }
 
 export const MODE_BY_SYMBOL = new Map<SYMBOL, ScalperMode>([
-  ['BTC', parseFloat(btcVars[4]) > 0 && parseFloat(btcVars[4]) < 4 ? parseFloat(btcVars[4]) : ScalperMode.Normal],
-  ['ETH', parseFloat(ethVars[4]) > 0 && parseFloat(ethVars[4]) < 4 ? parseFloat(ethVars[4]) : ScalperMode.Normal],
-  ['SOL', parseFloat(solVars[4]) > 0 && parseFloat(solVars[4]) < 4 ? parseFloat(solVars[4]) : ScalperMode.Normal],
-  ['MNGO', parseFloat(mngoVars[4]) > 0 && parseFloat(mngoVars[4]) < 4 ? parseFloat(mngoVars[4]) : ScalperMode.Normal],
-  ['BONK', parseFloat(bonkVars[4]) > 0 && parseFloat(bonkVars[4]) < 4 ? parseFloat(bonkVars[4]) : ScalperMode.Normal],
+  ['BTC', parseFloat(btcVars[4]) > 0 && parseFloat(btcVars[4]) < 5 ? parseFloat(btcVars[4]) : ScalperMode.Normal],
+  ['ETH', parseFloat(ethVars[4]) > 0 && parseFloat(ethVars[4]) < 5 ? parseFloat(ethVars[4]) : ScalperMode.Normal],
+  ['SOL', parseFloat(solVars[4]) > 0 && parseFloat(solVars[4]) < 5 ? parseFloat(solVars[4]) : ScalperMode.Normal],
+  ['MNGO', parseFloat(mngoVars[4]) > 0 && parseFloat(mngoVars[4]) < 5 ? parseFloat(mngoVars[4]) : ScalperMode.Normal],
+  ['BONK', parseFloat(bonkVars[4]) > 0 && parseFloat(bonkVars[4]) < 5 ? parseFloat(bonkVars[4]) : ScalperMode.Normal],
 ]);
 
 export const ENVIRONMENT: string = IS_DEV ? 'DEVNET' : 'MAINNET';
@@ -67,7 +74,7 @@ export const ENVIRONMENT: string = IS_DEV ? 'DEVNET' : 'MAINNET';
 export const networkName = IS_DEV ? 'devnet.2' : 'mainnet.1';
 export const cluster: Cluster = IS_DEV ? 'devnet' : 'mainnet-beta';
 export const DUAL_API = IS_DEV ? 'https://dev.api.dual.finance' : 'https://api.dual.finance';
-export const FILLS_URL = IS_DEV ? 'ws://api.mngo.cloud:2082' : 'ws://v3.mngo.cloud:8080';
+export const FILLS_URL = IS_DEV ? 'ws://api.mngo.cloud:2082' : 'ws://v4.mngo.cloud:8080';
 export const VIAL_WS_URL = 'wss://vial.mngo.cloud/v1/ws';
 export const usdcPk = IS_DEV ? USDC_DEVNET_PK : USDC_MAINNET_PK;
 export const OPENBOOK_FORK_ID = IS_DEV ? OPB_DEVNET_PROGRAM_ID : OPB_MAINNET_PROGRAM_ID;

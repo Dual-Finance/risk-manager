@@ -29,7 +29,9 @@ import {
   findNearestStrikeType, getMangoHedgeProduct, cancelOpenBookOrders,
   findFairValue, roundPriceToTickSize, roundQtyToSpotSize,
 } from './scalper_utils';
-import { NO_FAIR_VALUE, OPENBOOK_MKT_MAP, SEC_PER_YEAR, SUFFICIENT_BOOK_DEPTH } from './constants';
+import {
+  NO_FAIR_VALUE, OPENBOOK_MKT_MAP, SEC_PER_YEAR, SUFFICIENT_BOOK_DEPTH,
+} from './constants';
 
 class Scalper {
   client: MangoClient;
@@ -215,7 +217,7 @@ class Scalper {
         .toNumber() / 10 ** this.perpMarketConfig.baseDecimals);
 
     // Get all spot positions Option Vault, Risk Manager, Mango Tester
-    const spotDelta = await getSpotDelta(this.connection, this.symbol);
+    const spotDelta = await getSpotDelta(this.connection, this.symbol, this.owner, spotMarket);
 
     // Get Total Delta Position to hedge
     let hedgeDeltaTotal = IS_DEV
@@ -616,7 +618,7 @@ Limit: ${hedgePrice} # ${deltaHedgeCount} ID ${deltaOrderId}`);
 
     // Get total delta position to hedge. Use .1 for DEV to force that it does something.
     const dipTotalDelta = getDIPDelta(dipProduct, fairValue, this.symbol);
-    const spotDelta = await getSpotDelta(this.connection, this.symbol);
+    const spotDelta = await getSpotDelta(this.connection, this.symbol, this.owner, spotMarket);
     hedgeDeltaTotal = IS_DEV ? 0.1 : dipTotalDelta + spotDelta + this.deltaOffset;
     hedgeSide = hedgeDeltaTotal < 0 ? 'buy' : 'sell';
 
@@ -669,7 +671,7 @@ Spot Δ: ${spotDelta} Offset Δ ${this.deltaOffset} Fair Value: ${fairValue}`,
 
     let hedgeDeltaClip = hedgeDeltaTotal;
     try {
-      if (spliceFactor != SUFFICIENT_BOOK_DEPTH) {
+      if (spliceFactor !== SUFFICIENT_BOOK_DEPTH) {
         console.log(this.symbol, 'Not enough liquidity! Try Jupiter. Adjust Price', hedgePrice, 'Splice', spliceFactor);
         // Check on jupiter and sweep price
         const jupValues = await jupiterHedge(hedgeSide, this.symbol, 'USDC', hedgeDeltaTotal, hedgePrice, jupiter);
@@ -728,7 +730,7 @@ Spot Δ: ${spotDelta} Offset Δ ${this.deltaOffset} Fair Value: ${fairValue}`,
       const netHedgePeriod = TWAP_INTERVAL_SEC * MAX_DELTA_HEDGES;
       console.log(this.symbol, 'Scan Delta Fills for ~', netHedgePeriod, 'seconds');
 
-      await waitForFill(() => ( Math.abs(hedgeDeltaTotal) < this.minSpotSize), TWAP_INTERVAL_SEC);
+      await waitForFill(() => (Math.abs(hedgeDeltaTotal) < this.minSpotSize), TWAP_INTERVAL_SEC);
       if (Math.abs(hedgeDeltaTotal) < this.minSpotSize) {
         console.log(this.symbol, 'Delta Hedge Complete: SerumVial');
         return;
@@ -776,7 +778,7 @@ Spot Δ: ${spotDelta} Offset Δ ${this.deltaOffset} Fair Value: ${fairValue}`,
     const backBidID = new BN(orderIDBase * 2);
     const backAskID = new BN(orderIDBase * 2 + 1);
     const gammaIds = [
-      bidID.toString(), askID.toString(), backBidID.toString(), backAskID.toString()
+      bidID.toString(), askID.toString(), backBidID.toString(), backAskID.toString(),
     ];
 
     if (this.serumVialClient.checkSerumVial() !== WebSocket.OPEN) {
@@ -864,7 +866,7 @@ Spot Δ: ${spotDelta} Offset Δ ${this.deltaOffset} Fair Value: ${fairValue}`,
     let gammaBid = fairValue * (1 - stdDevSpread - stdDevWidenedSpread);
     let gammaAsk = fairValue * (1 + stdDevSpread + stdDevWidenedSpread);
 
-    const spotDelta = await getSpotDelta(this.connection, this.symbol);
+    const spotDelta = await getSpotDelta(this.connection, this.symbol, this.owner, spotMarket);
 
     // TODO: Determine if should always have this on or only on products we can't get delta neutral
     if (this.mode === ScalperMode.GammaBackStrikeAdjustment) {
@@ -897,7 +899,7 @@ Spot Δ: ${spotDelta} Offset Δ ${this.deltaOffset} Fair Value: ${fairValue}`,
     }
 
     console.log(this.symbol, 'Position Gamma Γ:', netGamma, 'Fair Value', fairValue);
-    if (netGamma  < this.minSpotSize) {
+    if (netGamma < this.minSpotSize) {
       console.log(this.symbol, 'Gamma Hedge Too Small');
       return;
     }

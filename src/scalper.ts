@@ -648,10 +648,7 @@ Spot Δ: ${spotDelta} Offset Δ ${this.deltaOffset} Fair Value: ${fairValue}`,
     hedgeDeltaTotal += dipDeltaDiff;
     console.log(this.symbol, 'Adjust Slippage Delta by', dipDeltaDiff, 'to', -hedgeDeltaTotal);
 
-    const notionalThreshold = deltaThreshold * fairValue;
-    const notionalAmount = -hedgeDeltaTotal * fairValue;
-    if ((notionalAmount < notionalThreshold && hedgeSide === 'buy')
-       || (notionalAmount > notionalThreshold && hedgeSide === 'sell')) {
+    if (Math.abs(hedgeDeltaTotal) < deltaThreshold) {
       console.log(this.symbol, 'Delta Netural: Slippage', deltaThreshold);
       return;
     }
@@ -693,8 +690,6 @@ Spot Δ: ${spotDelta} Offset Δ ${this.deltaOffset} Fair Value: ${fairValue}`,
           console.log(this.symbol, 'No Jupiter Route Found Better than', hedgePrice);
         }
         hedgeDeltaClip = hedgeDeltaTotal / spliceFactor;
-      } else {
-        console.log(this.symbol, 'Sufficient liquidity. Sweep OpenBook');
       }
 
       // Return early if jupiter sweeping got within the threshold.
@@ -707,6 +702,7 @@ Spot Δ: ${spotDelta} Offset Δ ${this.deltaOffset} Fair Value: ${fairValue}`,
     }
 
     // Send the delta hedge order to openbook.
+    console.log(this.symbol, 'Sufficient liquidity. Sweep OpenBook');
     const amountDelta = roundQtyToSpotSize(Math.abs(hedgeDeltaClip), this.minSpotSize);
     const priceDelta = roundPriceToTickSize(Math.abs(hedgePrice), this.tickSize);
     const payerAccount = getPayerAccount(hedgeSide, this.symbol, 'USDC');

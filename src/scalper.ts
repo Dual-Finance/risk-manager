@@ -1,7 +1,7 @@
 import WebSocket from 'ws';
 import {
   MangoAccount, MangoClient,
-  PerpMarket, FillEvent, MANGO_V4_ID, Group, PerpOrderType, PerpOrderSide,
+  PerpMarket, MANGO_V4_ID, Group, PerpOrderType, PerpOrderSide,
   Serum3Side, Serum3SelfTradeBehavior, Serum3OrderType,
 } from '@blockworks-foundation/mango-v4';
 import {
@@ -9,8 +9,8 @@ import {
   sendAndConfirmTransaction, TransactionInstruction,
 } from '@solana/web3.js';
 import { Market } from '@project-serum/serum';
-import { AnchorProvider, BN, Wallet } from '@project-serum/anchor';
 import { Jupiter } from '@jup-ag/core';
+import { AnchorProvider, BN, Wallet } from '@coral-xyz/anchor';
 import {
   THEO_VOL_MAP, maxNotional, TWAP_INTERVAL_SEC, SCALPER_WINDOW_SEC,
   ZSCORE, MinContractSize, TickSize, FILLS_URL, IS_DEV, GAMMA_THRESHOLD,
@@ -22,7 +22,7 @@ import {
 } from './config';
 import { CallOrPut, DIPDeposit, SYMBOL } from './common';
 import {
-  readKeypair, sleepExact, sleepRandom, tokenToSplMint,
+  readKeypair, sleepExact, tokenToSplMint,
 } from './utils';
 import { SerumVialClient, SerumVialTradeMessage, tradeMessageToString } from './serumVial';
 import {
@@ -33,7 +33,7 @@ import {
   findFairValue, roundPriceToTickSize, roundQtyToSpotSize,
 } from './scalper_utils';
 import {
-  MANGO_ACCOUNT_PK, MANGO_DEMO_PK, NO_FAIR_VALUE, OPENBOOK_MKT_MAP,
+  MANGO_ACCOUNT_PK, MANGO_DEMO_PK, MANGO_MKT_MAP, NO_FAIR_VALUE, OPENBOOK_MKT_MAP,
   SEC_PER_YEAR, SUFFICIENT_BOOK_DEPTH,
 } from './constants';
 
@@ -102,6 +102,7 @@ class Scalper {
 
     if (this.mode === ScalperMode.Perp) {
       // Load Mango
+      // TODO: Add Priority Fee
       this.mangoClient = MangoClient.connect(
         this.provider,
         cluster,
@@ -148,10 +149,14 @@ class Scalper {
     console.log(this.symbol, 'Hedging on Mango');
 
     // Open Mango Websocket
-    // TODO: Get Fills Feed Running
-    const fillFeed = new WebSocket(FILLS_URL!);
+    const fillFeed = new WebSocket(FILLS_URL);
+    const subscriptionData = {
+      command: 'subscribe',
+      marketId: MANGO_MKT_MAP.get(this.symbol),
+    };
     fillFeed.onopen = (_) => {
-      console.log('Connected to Mango Websocket', new Date().toUTCString());
+      fillFeed.send(JSON.stringify(subscriptionData));
+      console.log('Connected to Mango Websocket', subscriptionData.marketId, new Date().toUTCString());
     };
     fillFeed.onerror = (error) => {
       console.log(`Websocket Error ${error.message}`);
@@ -224,18 +229,35 @@ class Scalper {
     const dipTotalGamma = getDIPGamma(dipProduct, fairValue, this.symbol);
     const stdDevSpread = (this.impliedVol / Math.sqrt(SEC_PER_YEAR
     / SCALPER_WINDOW_SEC)) * this.zScore;
-    const slippageTolerance = Math.min(stdDevSpread / 2, slippageMax.get(this.symbol));
     const deltaThreshold = Math.max(
       dipTotalGamma * stdDevSpread * fairValue * GAMMA_THRESHOLD,
       this.minSize,
     );
-    if (Math.abs(hedgeDeltaTotal * fairValue) < (deltaThreshold * fairValue)) {
+    if (Math.abs(hedgeDeltaTotal) < (deltaThreshold)) {
       console.log(this.symbol, 'Delta Netural <', deltaThreshold);
       return;
     }
-    console.log(this.symbol, 'Above delta threshold:', deltaThreshold);
 
     // TODO: Add slippage delta adjustment
+    const slippageTolerance = Math.min(stdDevSpread / 2, slippageMax.get(this.symbol));
+    let hedgePrice = hedgeDeltaTotal < 0
+      ? fairValue * (1 + slippageTolerance)
+      : fairValue * (1 - slippageTolerance);
+    const slippageDIPDelta = getDIPDelta(dipProduct, hedgePrice, this.symbol);
+    const dipDeltaDiff = slippageDIPDelta - dipTotalDelta;
+    hedgeDeltaTotal += dipDeltaDiff;
+    console.log(this.symbol, 'Adjust Slippage Delta by', dipDeltaDiff, 'to', -hedgeDeltaTotal);
+    const hedgeSide = hedgeDeltaTotal < 0 ? PerpOrderSide.bid : PerpOrderSide.ask;
+    const hedgeSideText = hedgeSide === PerpOrderSide.bid ? 'Buy' : 'Sell';
+
+    const notionalThreshold = deltaThreshold * fairValue;
+    const notionalAmount = -hedgeDeltaTotal * fairValue;
+    if ((notionalAmount < notionalThreshold && hedgeSideText === 'Buy')
+       || (notionalAmount > notionalThreshold && hedgeSideText === 'Sell')) {
+      console.log(this.symbol, 'Delta Netural: Slippage', deltaThreshold);
+      return;
+    }
+    console.log(this.symbol, 'Outside delta threshold:', Math.abs(hedgeDeltaTotal), 'vs.', deltaThreshold);
 
     // Determine spot or perp order based on funding rate.
     const bidSide = await perpMarket.loadBids(this.mangoClient);
@@ -244,7 +266,6 @@ class Scalper {
     * perpMarket.getCurrentFundingRate(bidSide, askSide);
     const buySpot = fundingRate > PERP_FUNDING_RATE_THRESHOLD;
     const sellSpot = -fundingRate < PERP_FUNDING_RATE_THRESHOLD;
-    const hedgeSide = hedgeDeltaTotal < 0 ? PerpOrderSide.bid : PerpOrderSide.ask;
     let hedgeProduct = getMangoHedgeProduct(hedgeSide, buySpot, sellSpot);
     // No OpenBook BTC market exists still
     if (this.symbol === 'BTC') {
@@ -252,13 +273,13 @@ class Scalper {
     }
 
     console.log(
-      `${this.symbol} Target Delta Hedge: ${hedgeSide} ${hedgeProduct} ${-hedgeDeltaTotal} \
+      `${this.symbol} Target Delta Hedge: ${hedgeSideText} ${hedgeProduct} ${-hedgeDeltaTotal} \
       DIP Δ: ${dipTotalDelta} Mango Perp Δ: ${mangoPerpDelta} Mango Spot Δ: ${mangoSpotDelta} \
       Spot Δ: ${spotDelta} Offset Δ ${this.deltaOffset} Fair Value: ${fairValue}`,
     );
 
     // Determine what price to use for hedging depending on allowable slippage.
-    const hedgePrice = roundPriceToTickSize(hedgeDeltaTotal < 0
+    hedgePrice = roundPriceToTickSize(hedgeDeltaTotal < 0
       ? fairValue * (1 + slippageTolerance) : fairValue * (1 - slippageTolerance), this.tickSize);
 
     // Break up order depending on whether the book can support it
@@ -278,26 +299,18 @@ class Scalper {
     // Start listening for Delta Hedge Fills
     const deltaFillListener = async (event: WebSocket.MessageEvent) => {
       const parsedEvent = JSON.parse(event.data as string);
-      if (parsedEvent.status === 'New' && parsedEvent.market === this.symbol.concat(hedgeProduct)) {
-        const fillBytes: Buffer = Buffer.from(parsedEvent.event, 'base64');
-        // TODO: Confirm this parses fills
-        const fillEvent: FillEvent = parsedEvent.decode(fillBytes).fill;
-        if (
-          (fillEvent.makerOrderId.toString() === deltaOrderId.toString())
-          || (fillEvent.takerOrderId.toString() === deltaOrderId.toString())
-        ) {
-          const fillQty = (hedgeSide === PerpOrderSide.bid ? 1 : -1)
-            * fillEvent.quantity.toNumber() * this.minSize;
-          const fillPrice = fillEvent.price.toNumber() * this.tickSize;
-          hedgeDeltaTotal += fillQty;
+      const {
+        owner, clientOrderId, quantity, price,
+      } = parsedEvent.event;
+      if (owner === mangoAccount.publicKey.toBase58() && clientOrderId === deltaOrderId) {
+        const fillQty = (hedgeSide === PerpOrderSide.bid ? 1 : -1) * quantity;
+        hedgeDeltaTotal += fillQty;
+        console.log(`${this.symbol} Delta Filled ${hedgeSideText} ${hedgeProduct} Qty ${fillQty} \
+          Price ${price} Remaining ${hedgeDeltaTotal} ID ${deltaOrderId} ${new Date().toUTCString()}`);
 
-          console.log(`${this.symbol} Delta Filled ${hedgeSide} ${hedgeProduct} Qty ${fillQty} \
-          Price ${fillPrice} Remaining ${hedgeDeltaTotal} ID ${deltaOrderId} ${new Date().toUTCString()}`);
-
-          if (Math.abs(hedgeDeltaTotal * fairValue) < (this.minSize * fairValue)) {
-            fillFeed.removeEventListener('message', deltaFillListener);
-            console.log(this.symbol, 'Delta Hedge Complete: Websocket Fill');
-          }
+        if (Math.abs(hedgeDeltaTotal) < (deltaThreshold)) {
+          fillFeed.removeEventListener('message', deltaFillListener);
+          console.log(this.symbol, 'Delta Hedge Complete: Websocket Fill');
         }
       }
     };
@@ -310,7 +323,7 @@ class Scalper {
       console.log(this.symbol, 'Websocket State', fillFeed.readyState);
     }
 
-    console.log(`${this.symbol} ${hedgeSide} ${hedgeProduct} ${Math.abs(hedgeDeltaClip)} \
+    console.log(`${this.symbol} ${hedgeSideText} ${hedgeProduct} ${Math.abs(hedgeDeltaClip)} \
     Limit: ${hedgePrice} # ${deltaHedgeCount} ID ${deltaOrderId}`);
 
     try {
@@ -348,7 +361,10 @@ class Scalper {
 
     // Wait the twapInterval of time to see if the position gets to neutral.
     console.log(this.symbol, 'Scan Delta Fills for ~', TWAP_INTERVAL_SEC, 'seconds');
-    await sleepRandom(TWAP_INTERVAL_SEC);
+    await waitForFill(
+      (_) => Math.abs(hedgeDeltaTotal) < (deltaThreshold),
+      TWAP_INTERVAL_SEC,
+    );
 
     // Cleanup listener.
     fillFeed.removeEventListener('message', deltaFillListener);
@@ -407,35 +423,44 @@ class Scalper {
     const gammaAsk = fairValue * (1 + stdDevSpread);
     const gammaAskID = orderIdGamma + 2;
 
+    let gammaFillQty = 0;
     // TODO: Check fills feed works here
     fillFeed.removeAllListeners('message');
     const gammaFillListener = (event) => {
       const parsedEvent = JSON.parse(event.data);
-      if (parsedEvent.status !== 'New' || parsedEvent.market !== this.symbol.concat('-PERP')) {
+      const {
+        owner, clientOrderId, quantity, price,
+      } = parsedEvent.event;
+      if (owner !== mangoAccount.publicKey.toBase58()) {
         return;
       }
-      const fillBytes = Buffer.from(parsedEvent.event, 'base64');
-      const fillEvent: FillEvent = parsedEvent.decode(fillBytes).fill;
-      const bidFill = fillEvent.makerOrderId.toString() === gammaBidID.toString()
-        || fillEvent.takerOrderId.toString() === gammaBidID.toString();
-      const askFill = fillEvent.makerOrderId.toString() === gammaAskID.toString()
-        || fillEvent.takerOrderId.toString() === gammaAskID.toString();
-
-      if (!bidFill && !askFill) {
-        return;
+      if (clientOrderId === gammaBidID || clientOrderId === gammaAskID) {
+        gammaFillQty += Math.abs(quantity);
+        // Once the gamma fills have crossed the threshold, reset the orders.
+        if (gammaFillQty > netGamma * GAMMA_COMPLETE_THRESHOLD_PCT) {
+          console.log(
+            this.symbol,
+            'Gamma Filled',
+            gammaFillQty,
+            clientOrderId === gammaBidID ? 'BOUGHT FOR' : 'SOLD AT',
+            price,
+            new Date().toUTCString(),
+          );
+          fillFeed.removeEventListener('message', gammaFillListener);
+          // Do not need to remove the unfilled order since it will be cancelled in
+          // the recursive call.
+          this.gammaScalpMango(
+            dipProduct,
+            mangoAccount,
+            mangoGroup,
+            perpMarket,
+            fillFeed,
+            gammaScalpCount + 1,
+          );
+        } else {
+          console.log('Gamma Partially Filled', gammaFillQty, 'of', netGamma);
+        }
       }
-      console.log(this.symbol, 'Gamma Filled', bidFill ? 'BID' : 'ASK', new Date().toUTCString());
-      fillFeed.removeEventListener('message', gammaFillListener);
-      // Do not need to remove the unfilled order since it will be cancelled in
-      // the recursive call.
-      this.gammaScalpMango(
-        dipProduct,
-        mangoAccount,
-        mangoGroup,
-        perpMarket,
-        fillFeed,
-        gammaScalpCount + 1,
-      );
     };
 
     if (fillFeed.readyState === WebSocket.OPEN) {
@@ -476,7 +501,7 @@ class Scalper {
     } catch (err) {
       console.log(this.symbol, 'Gamma Error', err, err.stack);
     }
-    console.log(`${this.symbol} Market Spread %' ${((gammaAsk - gammaBid) / fairValue) * 100} Liquidity $ ${netGamma * 2 * fairValue}`);
+    console.log(`${this.symbol} Gamma Spread % ${((gammaAsk - gammaBid) / fairValue) * 100} Liquidity $ ${netGamma * 2 * fairValue}`);
 
     // Sleep for the max time of the reruns then kill thread
     await sleepExact(SCALPER_WINDOW_SEC);
@@ -741,8 +766,8 @@ class Scalper {
       const netHedgePeriod = TWAP_INTERVAL_SEC * MAX_DELTA_HEDGES;
       console.log(this.symbol, 'Scan Delta Fills for ~', netHedgePeriod, 'seconds');
 
-      await waitForFill(() => (Math.abs(hedgeDeltaTotal) < this.minSpotSize), TWAP_INTERVAL_SEC);
-      if (Math.abs(hedgeDeltaTotal) < this.minSpotSize) {
+      await waitForFill(() => (Math.abs(hedgeDeltaTotal) < deltaThreshold), TWAP_INTERVAL_SEC);
+      if (Math.abs(hedgeDeltaTotal) < deltaThreshold) {
         console.log(this.symbol, 'Delta Hedge Complete: SerumVial');
         return;
       }
@@ -764,7 +789,7 @@ class Scalper {
     // anyways.
     console.log(this.symbol, 'Scan Delta Fills for ~', TWAP_INTERVAL_SEC, 'seconds');
     await waitForFill(
-      (_) => Math.abs(hedgeDeltaTotal * fairValue) < (this.minSpotSize * fairValue),
+      (_) => Math.abs(hedgeDeltaTotal) < (deltaThreshold),
       TWAP_INTERVAL_SEC,
     );
     this.serumVialClient.removeAnyListeners();
@@ -879,7 +904,6 @@ class Scalper {
 
     const spotDelta = await getSpotDelta(this.connection, this.symbol);
 
-    // TODO: Determine if should always have this on or only on products we can't get delta neutral
     if (this.mode === ScalperMode.GammaBackStrikeAdjustment) {
       const dipTotalDelta = getDIPDelta(dipProduct, fairValue, this.symbol);
       const isShort = dipTotalDelta + spotDelta + this.deltaOffset < 0;

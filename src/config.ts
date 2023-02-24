@@ -74,7 +74,7 @@ export const ENVIRONMENT: string = IS_DEV ? 'DEVNET' : 'MAINNET';
 export const networkName = IS_DEV ? 'devnet.2' : 'mainnet.1';
 export const cluster: Cluster = IS_DEV ? 'devnet' : 'mainnet-beta';
 export const DUAL_API = IS_DEV ? 'https://dev.api.dual.finance' : 'https://api.dual.finance';
-export const FILLS_URL = IS_DEV ? 'ws://api.mngo.cloud:2082' : 'ws://v4.mngo.cloud:8080';
+export const FILLS_URL = IS_DEV ? 'ws://api.mngo.cloud:2082' : 'wss://api.mngo.cloud/fills/v1/';
 export const VIAL_WS_URL = 'wss://vial.mngo.cloud/v1/ws';
 export const usdcPk = IS_DEV ? USDC_DEVNET_PK : USDC_MAINNET_PK;
 export const OPENBOOK_FORK_ID = IS_DEV ? OPB_DEVNET_PROGRAM_ID : OPB_MAINNET_PROGRAM_ID;
@@ -134,6 +134,22 @@ export const treasuryPositions: DIPDeposit[] = [({
   callOrPut: CallOrPut.Call,
   qtyTokens: 576000300,
 }), // BONK GSO Position
+({
+  splTokenName: 'BTC',
+  premiumAssetName: 'USDC',
+  expirationMs: 1680350400000,
+  strikeUsdcPerToken: 24000,
+  callOrPut: CallOrPut.Call,
+  qtyTokens: 0.005,
+}),
+({
+  splTokenName: 'BTC',
+  premiumAssetName: 'USDC',
+  expirationMs: 1680350400000,
+  strikeUsdcPerToken: 24000,
+  callOrPut: CallOrPut.Put,
+  qtyTokens: 0.005,
+}), // Test for Mango Perps
 ];
 
 // Amount to vary the sleep on a random sleep.

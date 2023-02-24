@@ -11,6 +11,10 @@ export const OPENBOOK_MKT_MAP = new Map<string, string>([
   ['BONK', '8PhnCfgqpgFM7ZJvttGdBVMXHuU4Q23ACxCvWkbs1M71'], ['ETH', 'BbJgE7HZMaDp5NTYvRh5jZSkQPVDTU8ubPFtpogUkEj4'],
 ]);
 
+export const MANGO_MKT_MAP = new Map<string, string>([
+  ['BTC', 'HwhVGkfsSQ9JSQeQYu2CbkRCLvsh3qRZxG6m4oMVwZpN'],
+]);
+
 export const MANGO_ACCOUNT_PK = new PublicKey('EUQQaFnLBaTmjj9tuj4jP5a9byPYcrQ8M6PvkULtMBLD');
 export const MANGO_DEMO_PK = new PublicKey('5fEtAwzsXM4bHAT7gf3unPJFKJmQgYnce9L7GCxWTpEd');
 

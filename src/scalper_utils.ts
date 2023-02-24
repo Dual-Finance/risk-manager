@@ -193,11 +193,17 @@ export async function fillSize(
 
 // TODO: Update this to also take into account the openbook position
 // Get Spot Balance
-export async function getSpotDelta(connection: Connection, symbol: SYMBOL) {
+export async function getSpotDelta(
+  connection: Connection,
+  symbol: SYMBOL,
+  owner: Keypair,
+  market: Market,
+) {
   let mainDelta = 0;
   let tokenDelta = 0;
   let spotDelta = 0;
   let tokenDecimals = 1;
+  let openOrderQty = 0;
   const accountList = [RM_PROD_PK, OPTION_VAULT_PK, RM_BACKUP_PK];
   for (const account of accountList) {
     if (symbol === 'SOL') {
@@ -217,7 +223,14 @@ export async function getSpotDelta(connection: Connection, symbol: SYMBOL) {
     }
     spotDelta = mainDelta + tokenDelta + spotDelta;
   }
-  return spotDelta;
+  const openBookOO = await market.findOpenOrdersAccountsForOwner(
+    connection,
+    owner.publicKey,
+  );
+  for (const openOrders of openBookOO) {
+    openOrderQty += openOrders.baseTokenTotal.toNumber() / 10 ** tokenDecimals;
+  }
+  return spotDelta + openOrderQty;
 }
 
 // TODO: Refine logic & make dynamic.

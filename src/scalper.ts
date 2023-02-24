@@ -648,10 +648,7 @@ Spot Δ: ${spotDelta} Offset Δ ${this.deltaOffset} Fair Value: ${fairValue}`,
     hedgeDeltaTotal += dipDeltaDiff;
     console.log(this.symbol, 'Adjust Slippage Delta by', dipDeltaDiff, 'to', -hedgeDeltaTotal);
 
-    const notionalThreshold = deltaThreshold * fairValue;
-    const notionalAmount = -hedgeDeltaTotal * fairValue;
-    if ((notionalAmount < notionalThreshold && hedgeSide === 'buy')
-       || (notionalAmount > notionalThreshold && hedgeSide === 'sell')) {
+    if (Math.abs(hedgeDeltaTotal) < deltaThreshold) {
       console.log(this.symbol, 'Delta Netural: Slippage', deltaThreshold);
       return;
     }

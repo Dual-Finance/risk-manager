@@ -690,8 +690,6 @@ Spot Δ: ${spotDelta} Offset Δ ${this.deltaOffset} Fair Value: ${fairValue}`,
           console.log(this.symbol, 'No Jupiter Route Found Better than', hedgePrice);
         }
         hedgeDeltaClip = hedgeDeltaTotal / spliceFactor;
-      } else {
-        console.log(this.symbol, 'Sufficient liquidity. Sweep OpenBook');
       }
 
       // Return early if jupiter sweeping got within the threshold.
@@ -704,6 +702,7 @@ Spot Δ: ${spotDelta} Offset Δ ${this.deltaOffset} Fair Value: ${fairValue}`,
     }
 
     // Send the delta hedge order to openbook.
+    console.log(this.symbol, 'Sufficient liquidity. Sweep OpenBook');
     const amountDelta = roundQtyToSpotSize(Math.abs(hedgeDeltaClip), this.minSpotSize);
     const priceDelta = roundPriceToTickSize(Math.abs(hedgePrice), this.tickSize);
     const payerAccount = getPayerAccount(hedgeSide, this.symbol, 'USDC');

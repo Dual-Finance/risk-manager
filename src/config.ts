@@ -122,10 +122,10 @@ export const treasuryPositions: DIPDeposit[] = [({
 ({
   splTokenName: 'BONK',
   premiumAssetName: 'USDC',
-  expirationMs: 1677240000000,
-  strikeUsdcPerToken: 0.0000015,
+  expirationMs: 1679572800000,
+  strikeUsdcPerToken: 0.0000009,
   callOrPut: CallOrPut.Call,
-  qtyTokens: 576000300,
+  qtyTokens: 335284600,
 }), // BONK GSO Position
 ];
 

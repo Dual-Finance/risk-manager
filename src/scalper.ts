@@ -246,7 +246,7 @@ class Scalper {
       this.minSize,
     );
     if (Math.abs(hedgeDeltaTotal) < (deltaThreshold)) {
-      console.log(this.symbol, 'Delta Netural <', deltaThreshold);
+      console.log(this.symbol, 'Delta Netural', hedgeDeltaTotal, '<', deltaThreshold);
       return;
     }
 
@@ -319,11 +319,6 @@ class Scalper {
         hedgeDeltaTotal += fillQty;
         console.log(`${this.symbol} Delta Filled ${hedgeSideText} ${hedgeProduct} Qty ${fillQty} \
           Price ${price} Remaining ${hedgeDeltaTotal} ID ${deltaOrderId} ${new Date().toUTCString()}`);
-
-        if (Math.abs(hedgeDeltaTotal) < (deltaThreshold)) {
-          fillFeed.removeEventListener('message', deltaFillListener);
-          console.log(this.symbol, 'Delta Hedge Complete: Websocket Fill');
-        }
       }
     };
 
@@ -380,6 +375,12 @@ class Scalper {
 
     // Cleanup listener.
     fillFeed.removeEventListener('message', deltaFillListener);
+
+    if (Math.abs(hedgeDeltaTotal) < (deltaThreshold)) {
+      fillFeed.removeEventListener('message', deltaFillListener);
+      console.log(this.symbol, 'Delta Hedge Complete', hedgeDeltaTotal, '<', deltaThreshold);
+      return;
+    }
 
     // Recursive call. This happens when we are not getting fills to get to neutral.
     await this.deltaHedgeMango(

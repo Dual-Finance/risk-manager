@@ -8,12 +8,12 @@ export const IS_DEV = process.env.DEV !== 'false';
 export const IS_DEMO = process.env.DEMO !== 'false';
 export const API_URL = process.env.RPC;
 // Priority Fee to use for all txs in micro lamports
-export const PRIORITY_FEE = parseInt(process.env.FEE, 10);
-const solVars = process.env.SOL.split(',');
-const btcVars = process.env.BTC.split(',');
-const ethVars = process.env.ETH.split(',');
-const mngoVars = process.env.MNGO.split(',');
-const bonkVars = process.env.BONK.split(',');
+export const PRIORITY_FEE = process.env.FEE ? parseInt(process.env.FEE, 10) : 1;
+const solVars = process.env.SOL ? process.env.SOL.split(',') : [null, null, null, null];
+const btcVars = process.env.BTC ? process.env.BTC.split(',') : [null, null, null, null];
+const ethVars = process.env.ETH ? process.env.ETH.split(',') : [null, null, null, null];
+const mngoVars = process.env.MNGO ? process.env.MNGO.split(',') : [null, null, null, null];
+const bonkVars = process.env.BONK ? process.env.BONK.split(',') : [null, null, null, null];
 
 export const productStatus = new Map<SYMBOL, boolean>([
   ['BTC', btcVars[0] === 'ON'],
@@ -106,7 +106,7 @@ export const slippageMax = new Map<SYMBOL, number>([
 ]); // Max Allowed xbps above/below FMV on limit orders
 
 export const BVE_VOL_MAP = new Map<SYMBOL, number>([
-  ['BTC', 0.3], ['ETH', 0.4], ['SOL', 0.5], ['MNGO', 0.6], ['BONK', 1.0],
+  ['BTC', 0.2], ['ETH', 0.25], ['SOL', 0.3], ['MNGO', 0.35], ['BONK', 0.35],
 ]); // BVE vol keep alligned with app & contract vol
 
 // Enter any Staking Options owned and to be hedged from the treasury
@@ -129,10 +129,10 @@ export const treasuryPositions: DIPDeposit[] = [({
 ({
   splTokenName: 'BONK',
   premiumAssetName: 'USDC',
-  expirationMs: 1677240000000,
-  strikeUsdcPerToken: 0.0000015,
+  expirationMs: 1679572800000,
+  strikeUsdcPerToken: 0.0000009,
   callOrPut: CallOrPut.Call,
-  qtyTokens: 576000300,
+  qtyTokens: 335284600,
 }), // BONK GSO Position
 ({
   splTokenName: 'BTC',

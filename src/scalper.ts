@@ -218,7 +218,7 @@ class Scalper {
     }
 
     // Get all spot positions Option Vault, Risk Manager, Mango Tester
-    const spotDelta = await getSpotDelta(this.connection, this.symbol);
+    const spotDelta = await getSpotDelta(this.connection, this.symbol, this.owner, spotMarket);
 
     // Get Total Delta Position to hedge
     let hedgeDeltaTotal = IS_DEV
@@ -654,7 +654,7 @@ class Scalper {
 
     // Get total delta position to hedge. Use .1 for DEV to force that it does something.
     const dipTotalDelta = getDIPDelta(dipProduct, fairValue, this.symbol);
-    const spotDelta = await getSpotDelta(this.connection, this.symbol);
+    const spotDelta = await getSpotDelta(this.connection, this.symbol, this.owner, spotMarket);
     hedgeDeltaTotal = IS_DEV ? 0.1 : dipTotalDelta + spotDelta + this.deltaOffset;
     hedgeSide = hedgeDeltaTotal < 0 ? 'buy' : 'sell';
 
@@ -684,10 +684,7 @@ class Scalper {
     hedgeDeltaTotal += dipDeltaDiff;
     console.log(this.symbol, 'Adjust Slippage Delta by', dipDeltaDiff, 'to', -hedgeDeltaTotal);
 
-    const notionalThreshold = deltaThreshold * fairValue;
-    const notionalAmount = -hedgeDeltaTotal * fairValue;
-    if ((notionalAmount < notionalThreshold && hedgeSide === 'buy')
-       || (notionalAmount > notionalThreshold && hedgeSide === 'sell')) {
+    if (Math.abs(hedgeDeltaTotal) < deltaThreshold) {
       console.log(this.symbol, 'Delta Netural: Slippage', deltaThreshold);
       return;
     }
@@ -729,8 +726,6 @@ class Scalper {
           console.log(this.symbol, 'No Jupiter Route Found Better than', hedgePrice);
         }
         hedgeDeltaClip = hedgeDeltaTotal / spliceFactor;
-      } else {
-        console.log(this.symbol, 'Sufficient liquidity. Sweep OpenBook');
       }
 
       // Return early if jupiter sweeping got within the threshold.
@@ -743,6 +738,7 @@ class Scalper {
     }
 
     // Send the delta hedge order to openbook.
+    console.log(this.symbol, 'Sufficient liquidity. Sweep OpenBook');
     const amountDelta = roundQtyToSpotSize(Math.abs(hedgeDeltaClip), this.minSpotSize);
     const priceDelta = roundPriceToTickSize(Math.abs(hedgePrice), this.tickSize);
     const payerAccount = getPayerAccount(hedgeSide, this.symbol, 'USDC');
@@ -902,7 +898,7 @@ class Scalper {
     let gammaBid = fairValue * (1 - stdDevSpread - stdDevWidenedSpread);
     let gammaAsk = fairValue * (1 + stdDevSpread + stdDevWidenedSpread);
 
-    const spotDelta = await getSpotDelta(this.connection, this.symbol);
+    const spotDelta = await getSpotDelta(this.connection, this.symbol, this.owner, spotMarket);
 
     if (this.mode === ScalperMode.GammaBackStrikeAdjustment) {
       const dipTotalDelta = getDIPDelta(dipProduct, fairValue, this.symbol);

@@ -148,6 +148,16 @@ class Scalper {
   ): Promise<void> {
     console.log(this.symbol, 'Hedging on Mango');
 
+    let spotMarket: Market;
+    if (OPENBOOK_MKT_MAP.get(this.symbol) !== undefined) {
+      spotMarket = await Market.load(
+        this.connection,
+        new PublicKey(OPENBOOK_MKT_MAP.get(this.symbol)),
+        undefined,
+        OPENBOOK_FORK_ID,
+      );
+    }
+
     // Open Mango Websocket
     const fillFeed = new WebSocket(FILLS_URL);
     const subscriptionData = {
@@ -168,6 +178,7 @@ class Scalper {
         mangoAccount,
         mangoGroup,
         perpMarket,
+        spotMarket,
         fillFeed,
         1,
       );
@@ -189,6 +200,7 @@ class Scalper {
     mangoAccount: MangoAccount,
     mangoGroup: Group,
     perpMarket: PerpMarket,
+    spotMarket: Market,
     fillFeed: WebSocket,
     deltaHedgeCount: number,
   ): Promise<void> {
@@ -375,6 +387,7 @@ class Scalper {
       mangoAccount,
       mangoGroup,
       perpMarket,
+      spotMarket,
       fillFeed,
       deltaHedgeCount + 1,
     );

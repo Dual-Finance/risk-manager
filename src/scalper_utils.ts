@@ -217,12 +217,14 @@ export async function getSpotDelta(
     }
     spotDelta = mainDelta + tokenDelta + spotDelta;
   }
-  const openBookOO = await market.findOpenOrdersAccountsForOwner(
-    connection,
-    owner.publicKey,
-  );
-  for (const openOrders of openBookOO) {
-    openOrderQty += openOrders.baseTokenTotal.toNumber() / 10 ** tokenDecimals;
+  if (market !== undefined) {
+    const openBookOO = await market.findOpenOrdersAccountsForOwner(
+      connection,
+      owner.publicKey,
+    );
+    for (const openOrders of openBookOO) {
+      openOrderQty += openOrders.baseTokenTotal.toNumber() / 10 ** tokenDecimals;
+    }
   }
   return spotDelta + openOrderQty;
 }

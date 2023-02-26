@@ -99,7 +99,7 @@ export const slippageMax = new Map<SYMBOL, number>([
 ]); // Max Allowed xbps above/below FMV on limit orders
 
 export const BVE_VOL_MAP = new Map<SYMBOL, number>([
-  ['BTC', 0.3], ['ETH', 0.4], ['SOL', 0.5], ['MNGO', 0.6], ['BONK', 1.0],
+  ['BTC', 0.2], ['ETH', 0.25], ['SOL', 0.3], ['MNGO', 0.35], ['BONK', 0.35],
 ]); // BVE vol keep alligned with app & contract vol
 
 // Enter any Staking Options owned and to be hedged from the treasury

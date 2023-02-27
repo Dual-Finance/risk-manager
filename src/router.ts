@@ -180,6 +180,7 @@ class Router {
       for (const dipDeposit of Object.values(this.dips)) {
         if (dipDeposit.qtyTokens > 0) {
           openPositionCount++;
+          // TODO await for a response back from the API
           await this.route(dipDeposit);
         }
       }
@@ -225,8 +226,10 @@ class Router {
     };
   }
 
-  async refresh_dips() {
+  async refresh_dips() : Promise<[Poller[], string[]]> {
     console.log('Refreshing dips', API_URL);
+    const pollers: Poller[] = [];
+    const mmAccounts: string[] = [];
     const connection = new Connection(API_URL, 'processed' as Commitment);
     const programAccountsPromise = connection.getProgramAccounts(DIP_PROGRAM_ID);
 
@@ -289,11 +292,12 @@ class Router {
             },
           );
 
-          // Start polling for a specific DIP option token account
-          poller.subscribe(mmOptionAccount.toBase58());
+          mmAccounts.push(mmOptionAccount.toBase58());
+          pollers.push(poller);
         }
       }
     });
+    return [pollers, mmAccounts];
   }
 }
 

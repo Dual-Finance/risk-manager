@@ -177,19 +177,24 @@ class Router {
           )
         ] = dipDeposit;
       }
-      for (const dipDeposit of Object.values(this.dips)) {
-        if (dipDeposit.qtyTokens > 0) {
+      for (const dip of Object.values(this.dips)) {
+        if (dip.qtyTokens > 0) {
           openPositionCount++;
           // TODO await for a response back from the API
-          await this.route(dipDeposit);
+          await this.route(dip);
         }
       }
     } catch (err) {
       console.log('Failed to router with error: ', err, 'proceeding to run risk manager.');
     }
-
-    console.log('Open DIP Positions', openPositionCount);
-    this.run_risk_manager();
+    console.log('Checked', openPositionCount, 'DIP Positions');
+    await this.refresh_dips();
+    if (dipDeposit !== undefined) {
+      // TODO: Only run RM here if position changed from prior run
+      if (dipDeposit.qtyTokens !== 0) {
+        this.run_risk_manager();
+      }
+    }
   }
 
   run_risk_manager(): void {

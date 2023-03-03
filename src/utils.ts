@@ -13,7 +13,7 @@ import {
   API_URL, IS_DEV, RANDOM_SLEEP_MULTIPLIER, usdcPk,
 } from './config';
 import {
-  BONK_PK, CHAINLINK_PROGRAM_ID, MNGO_PK, SO_BTC_PK, SO_ETH_PK, WSOL_PK,
+  BONK_PK, CHAINLINK_PROGRAM_ID, DUAL_PK, MNGO_PK, SO_BTC_PK, SO_ETH_PK, WSOL_PK,
 } from './constants';
 import { SYMBOL } from './common';
 
@@ -113,6 +113,9 @@ export function splMintToToken(splMint: PublicKey): SYMBOL {
   if (splMint.toBase58() === BONK_PK.toBase58()) {
     return 'BONK';
   }
+  if (splMint.toBase58() === DUAL_PK.toBase58()) {
+    return 'DUAL';
+  }
   if (splMint.toBase58() === usdcPk.toBase58()) {
     return 'USDC';
   }
@@ -136,6 +139,9 @@ export function tokenToSplMint(token: SYMBOL) {
   if (token === 'BONK') {
     return BONK_PK;
   }
+  if (token === 'DUAL') {
+    return DUAL_PK;
+  }
   if (token === 'USDC') {
     return usdcPk;
   }
@@ -158,6 +164,7 @@ export function tokenToPythSymbol(token: SYMBOL) {
   if (token === 'BONK') {
     return 'Crypto.BONK/USD';
   }
+  // TODO: Add DUAL Pyth
   return undefined;
 }
 
@@ -196,6 +203,7 @@ function tokenToSBSymbol(token: SYMBOL) {
   if (token === 'BONK') {
     return '6qBqGAYmoZw2r4fda7671NSUbcDWE4XicJdJoWqK8aTe';
   }
+  // TODO: Add DUAL Switchboard
   return undefined;
 }
 
@@ -245,6 +253,9 @@ function tokenToChainlinkSymbol(token: SYMBOL) {
   if (token === 'BONK') {
     return '';
   }
+  if (token === 'DUAL') {
+    return '';
+  }
   return undefined;
 }
 
@@ -264,6 +275,9 @@ export function decimalsBaseSPL(token: SYMBOL) {
     }
     case 'BONK': {
       return 5;
+    }
+    case 'DUAL': {
+      return 6;
     }
     case 'USDC': {
       return 6;

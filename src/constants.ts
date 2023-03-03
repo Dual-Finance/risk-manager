@@ -8,7 +8,7 @@ export const OPTION_MINT_ADDRESS_SEED = 'option-mint';
 
 export const OPENBOOK_MKT_MAP = new Map<string, string>([
   ['SOL', '8BnEgHoWFysVcuFFX7QztDmzuH8r5ZFvyP3sYwn1XTh6'], ['MNGO', '3NnxQvDcZXputNMxaxsGvqiKpqgPfSYXpNigZNFcknmD'],
-  ['BONK', '8PhnCfgqpgFM7ZJvttGdBVMXHuU4Q23ACxCvWkbs1M71'],
+  ['BONK', '8PhnCfgqpgFM7ZJvttGdBVMXHuU4Q23ACxCvWkbs1M71'], ['DUAL', 'H6rrYK3SUHF2eguZCyJxnSBMJqjXhUtuaki6PHiutvum'],
 ]);
 
 export const WSOL_PK = new PublicKey('So11111111111111111111111111111111111111112');
@@ -16,6 +16,7 @@ export const SO_BTC_PK = new PublicKey('9n4nbM75f5Ui33ZbPYXn59EwSgE8CGsHtAeTH5YF
 export const SO_ETH_PK = new PublicKey('2FPyTwcZLUg1MDrwsyoP4D6s1tM7hAkHYRjkNb5w6Pxk');
 export const MNGO_PK = new PublicKey('MangoCzJ36AjZyKwVj3VnYU4GTonjfVEnJmvvWaxLac');
 export const BONK_PK = new PublicKey('DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263');
+export const DUAL_PK = new PublicKey('DUALa4FC2yREwZ59PHeu1un4wis36vHRv5hWVBmzykCJ');
 export const USDC_DEVNET_PK = new PublicKey('HJiQv33nKujRmZQ3sJBSosXgCEmiHs3mG1yd9VcLawPM');
 export const USDC_MAINNET_PK = new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
 

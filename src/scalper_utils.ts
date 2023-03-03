@@ -17,7 +17,7 @@ import {
 import {
   ACCOUNT_MAP, JUPITER_LIQUIDITY, MAX_MKT_SPREAD_PCT_FOR_PRICING, JUPITER_SEARCH_STEPS,
   RF_RATE, slippageMax, THEO_VOL_MAP, JUPITER_SLIPPAGE_BPS, PRIORITY_FEE,
-  GAMMA_CYCLES, RESOLVE_PERIOD_MS, HedgeProduct,
+  GAMMA_CYCLES, RESOLVE_PERIOD_MS, HedgeProduct, DUAL_START_PRICE,
 } from './config';
 import {
   decimalsBaseSPL, getChainlinkPrice, getPythPrice, getSwitchboardPrice,
@@ -427,6 +427,10 @@ export async function findFairValue(
   tries: number,
   waitSecPerTry: number,
 ) {
+  // TODO: Remove this once there is a DUAL Oracle price
+  if (symbol === 'DUAL') {
+    return DUAL_START_PRICE;
+  }
   let fairValue = await getFairValue(connection, spotMarket, symbol, jupiter);
   for (let i = 0; i < tries; i++) {
     if (fairValue === NO_FAIR_VALUE) {

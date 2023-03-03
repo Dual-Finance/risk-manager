@@ -9,7 +9,7 @@ import { sleepExact } from './utils';
 async function main() {
   console.log('Risk Manager Running on', cluster, new Date().toUTCString());
 
-  const symbols: SYMBOL[] = ['SOL', 'BTC', 'ETH', 'MNGO', 'BONK'];
+  const symbols: SYMBOL[] = ['SOL', 'BTC', 'ETH', 'MNGO', 'BONK', 'DUAL'];
 
   const scalpers: Map<SYMBOL, Scalper> = new Map(
     symbols.map((symbol) => [symbol, new Scalper(symbol)]),

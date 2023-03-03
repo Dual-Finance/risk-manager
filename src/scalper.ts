@@ -4,7 +4,7 @@ import {
   PerpMarket, MangoGroup, PerpEventLayout, FillEvent, MarketConfig,
 } from '@blockworks-foundation/mango-client';
 import {
-  Keypair, Commitment, Connection, PublicKey, Account, Transaction, sendAndConfirmTransaction,
+  Keypair, Commitment, Connection, PublicKey, Transaction, sendAndConfirmTransaction,
 } from '@solana/web3.js';
 import { Market } from '@project-serum/serum';
 import { BN } from '@project-serum/anchor';
@@ -702,14 +702,14 @@ Spot Δ: ${spotDelta} Offset Δ ${this.deltaOffset} Fair Value: ${fairValue}`,
     }
 
     // Send the delta hedge order to openbook.
-    console.log(this.symbol, 'Sufficient liquidity. Sweep OpenBook');
+    console.log(this.symbol, 'Sweep OpenBook');
     const amountDelta = roundQtyToSpotSize(Math.abs(hedgeDeltaClip), this.minSpotSize);
     const priceDelta = roundPriceToTickSize(Math.abs(hedgePrice), this.tickSize);
     const payerAccount = getPayerAccount(hedgeSide, this.symbol, 'USDC');
     console.log(this.symbol, hedgeSide, 'OpenBook-SPOT', amountDelta, 'Limit:', priceDelta, '#', deltaHedgeCount, 'ID', deltaID.toString());
     const deltaOrderTx = new Transaction();
     const deltaTx = await spotMarket.makePlaceOrderTransaction(this.connection, {
-      owner: new Account(this.owner.secretKey),
+      owner: this.owner.publicKey,
       payer: payerAccount,
       side: hedgeSide,
       price: priceDelta,

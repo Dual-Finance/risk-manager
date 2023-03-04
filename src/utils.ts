@@ -13,7 +13,7 @@ import {
   API_URL, IS_DEMO, IS_DEV, RANDOM_SLEEP_MULTIPLIER, usdcPk,
 } from './config';
 import {
-  BONK_PK, CHAINLINK_PROGRAM_ID, DUAL_PK, MNGO_PK, SO_BTC_PK, SO_ETH_PK, WSOL_PK,
+  BONK_PK, CHAINLINK_PROGRAM_ID, DUAL_PK, MNGO_PK, BTC_PK, ETH_PK, WSOL_PK,
 } from './constants';
 import { SYMBOL } from './common';
 
@@ -102,10 +102,10 @@ export function splMintToToken(splMint: PublicKey): SYMBOL {
   if (splMint.toBase58() === WSOL_PK.toBase58()) {
     return 'SOL';
   }
-  if (splMint.toBase58() === SO_BTC_PK.toBase58()) {
+  if (splMint.toBase58() === BTC_PK.toBase58()) {
     return 'BTC';
   }
-  if (splMint.toBase58() === SO_ETH_PK.toBase58()) {
+  if (splMint.toBase58() === ETH_PK.toBase58()) {
     return 'ETH';
   }
   if (splMint.toBase58() === MNGO_PK.toBase58()) {
@@ -129,10 +129,10 @@ export function tokenToSplMint(token: SYMBOL) {
     return WSOL_PK;
   }
   if (token === 'BTC') {
-    return SO_BTC_PK;
+    return BTC_PK;
   }
   if (token === 'ETH') {
-    return SO_ETH_PK;
+    return ETH_PK;
   }
   if (token === 'MNGO') {
     return MNGO_PK;

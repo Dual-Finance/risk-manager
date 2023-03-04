@@ -17,7 +17,7 @@ import {
 import {
   ACCOUNT_MAP, JUPITER_LIQUIDITY, MAX_MKT_SPREAD_PCT_FOR_PRICING, JUPITER_SEARCH_STEPS,
   RF_RATE, slippageMax, THEO_VOL_MAP, JUPITER_SLIPPAGE_BPS, PRIORITY_FEE,
-  GAMMA_CYCLES, RESOLVE_PERIOD_MS, HedgeProduct, DUAL_START_PRICE,
+  GAMMA_CYCLES, RESOLVE_PERIOD_MS, HedgeProduct, PRICE_OVERRIDE,
 } from './config';
 import {
   decimalsBaseSPL, getChainlinkPrice, getPythPrice, getSwitchboardPrice,
@@ -169,15 +169,19 @@ export async function fillSize(
   let filledQty = 0;
   const recentFills = await perpMarket.loadFills(this.mangoClient);
   for (const fill of recentFills) {
-    if (fill.eventType) {
+    const { eventType } = fill;
+    const {
+      makerClientOrderId, takerClientOrderId, takerSide, quantity,
+    } = eventType[1];
+    if (eventType) {
       if (
-        fill.eventType[1].makerClientOrderId.toString() === orderID.toString()
-      || fill.eventType[1].takerClientOrderId.toString() === orderID.toString()
+        makerClientOrderId.toString() === orderID.toString()
+      || takerClientOrderId.toString() === orderID.toString()
       ) {
-        if (fill.eventType[1].takerSide === 'buy') {
-          filledQty += fill.eventType[1].quantity;
-        } else if (fill.eventType[1].takerSide === 'sell') {
-          filledQty -= fill.eventType[1].quantity;
+        if (takerSide === 'buy') {
+          filledQty += quantity;
+        } else if (takerSide === 'sell') {
+          filledQty -= quantity;
         }
       }
     }
@@ -427,9 +431,8 @@ export async function findFairValue(
   tries: number,
   waitSecPerTry: number,
 ) {
-  // TODO: Remove this once there is a DUAL Oracle price
-  if (symbol === 'DUAL') {
-    return DUAL_START_PRICE;
+  if (PRICE_OVERRIDE > 0) {
+    return PRICE_OVERRIDE;
   }
   let fairValue = await getFairValue(connection, spotMarket, symbol, jupiter);
   for (let i = 0; i < tries; i++) {

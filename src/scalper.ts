@@ -46,7 +46,6 @@ class Scalper {
   minSize: number;
   minSpotSize: number;
   tickSize: number;
-  marketIndex: number;
   deltaOffset: number;
   zScore: number;
   mode: ScalperMode;
@@ -118,7 +117,6 @@ class Scalper {
       const mangoGroup = await this.mangoClient.getGroup(mangoAccount.group);
       await mangoGroup.reloadAll(this.mangoClient);
       const perpMarket = mangoGroup.getPerpMarketByName('BTC-PERP');
-      this.marketIndex = perpMarket.perpMarketIndex;
       if (!perpMarket) {
         console.log('No Mango Market Exists. Run OpenBook');
         await this.scalperOpenBook(dipProduct);
@@ -538,7 +536,7 @@ class Scalper {
       return;
     }
     for (const order of openOrders) {
-      if (order.perpMarketIndex === this.marketIndex) {
+      if (order.perpMarketIndex === perpMarket.perpMarketIndex) {
         console.log(this.symbol, 'Canceling All Orders');
         await this.mangoClient.perpCancelAllOrders(
           mangoGroup,

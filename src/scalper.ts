@@ -1,44 +1,40 @@
 import WebSocket from 'ws';
 import {
-  MangoAccount, MangoClient,
-  PerpMarket, MANGO_V4_ID, Group, PerpOrderType, PerpOrderSide,
-  Serum3Side, Serum3SelfTradeBehavior, Serum3OrderType,
-} from '@blockworks-foundation/mango-v4';
-import {
   Keypair, Commitment, Connection, PublicKey, Transaction,
-  sendAndConfirmTransaction, TransactionInstruction,
+  sendAndConfirmTransaction,
 } from '@solana/web3.js';
 import { Market } from '@project-serum/serum';
 import { Jupiter } from '@jup-ag/core';
 import { AnchorProvider, BN, Wallet } from '@coral-xyz/anchor';
 import {
   THEO_VOL_MAP, maxNotional, TWAP_INTERVAL_SEC, SCALPER_WINDOW_SEC,
-  ZSCORE, MinContractSize, TickSize, FILLS_URL, IS_DEV, GAMMA_THRESHOLD,
-  MAX_DELTA_HEDGES, DELTA_OFFSET, MANGO_DOWNTIME_THRESHOLD_MIN,
-  PERP_FUNDING_RATE_THRESHOLD, GAMMA_CYCLES, MinOpenBookSize, OPENBOOK_FORK_ID,
+  ZSCORE, MinContractSize, TickSize, IS_DEV, GAMMA_THRESHOLD,
+  MAX_DELTA_HEDGES, DELTA_OFFSET,
+  GAMMA_CYCLES, MinOpenBookSize, OPENBOOK_FORK_ID,
   treasuryPositions, slippageMax, GAMMA_COMPLETE_THRESHOLD_PCT, cluster,
   MAX_ORDER_BOOK_SEARCH_DEPTH, MAX_BACK_GAMMA_MULTIPLE, API_URL, MODE_BY_SYMBOL,
-  WHALE_MAX_SPREAD, ScalperMode, ORDER_SIZE_BUFFER_PCT, IS_DEMO, HedgeProduct,
+  WHALE_MAX_SPREAD, ScalperMode, ORDER_SIZE_BUFFER_PCT,
 } from './config';
 import { CallOrPut, DIPDeposit, SYMBOL } from './common';
 import {
-  readKeypair, sleepExact, tokenToSplMint,
+  readKeypair,
 } from './utils';
 import { SerumVialClient, SerumVialTradeMessage, tradeMessageToString } from './serumVial';
 import {
   jupiterHedge, getDIPDelta, getDIPGamma, getDIPTheta, getPayerAccount,
-  getSpotDelta, orderSpliceMango, liquidityCheckAndNumSplices,
+  getSpotDelta, liquidityCheckAndNumSplices,
   tryToSettleOpenBook, setPriorityFee, waitForFill, findMaxStrike, findMinStrike,
-  findNearestStrikeType, getMangoHedgeProduct, cancelOpenBookOrders,
+  findNearestStrikeType, cancelOpenBookOrders,
   findFairValue, roundPriceToTickSize, roundQtyToSpotSize,
 } from './scalper_utils';
 import {
-  MANGO_ACCOUNT_PK, MANGO_DEMO_PK, MANGO_MKT_MAP, NO_FAIR_VALUE, OPENBOOK_MKT_MAP,
+  NO_FAIR_VALUE, OPENBOOK_MKT_MAP,
   SEC_PER_YEAR, SUFFICIENT_BOOK_DEPTH,
 } from './constants';
+// eslint-disable-next-line import/no-cycle
+import { runMangoScalper } from './mango';
 
 class Scalper {
-  mangoClient: MangoClient;
   connection: Connection;
   owner: Keypair;
   symbol: SYMBOL;
@@ -100,453 +96,10 @@ class Scalper {
     console.log(this.symbol, 'Choosing market to trade');
 
     if (this.mode === ScalperMode.Perp) {
-      // Load Mango
-      // TODO: Add Priority Fee
-      this.mangoClient = MangoClient.connect(
-        this.provider,
-        cluster,
-        MANGO_V4_ID[cluster],
-        {
-          idsSource: 'get-program-accounts',
-        },
-      );
-      const mangoAccount = await this.mangoClient.getMangoAccount(
-        IS_DEMO ? new PublicKey(MANGO_DEMO_PK) : new PublicKey(MANGO_ACCOUNT_PK),
-      );
-      await mangoAccount.reload(this.mangoClient);
-      const mangoGroup = await this.mangoClient.getGroup(mangoAccount.group);
-      await mangoGroup.reloadAll(this.mangoClient);
-      const perpMarket = mangoGroup.getPerpMarketByName('BTC-PERP');
-      if (!perpMarket) {
-        console.log('No Mango Market Exists. Run OpenBook');
-        await this.scalperOpenBook(dipProduct);
-        return;
-      }
-
-      // Check if Mango Perp is live
-      const lastUpdateMango = perpMarket.fundingLastUpdated.toNumber() * 1000;
-      if ((Date.now() - lastUpdateMango)
-        / (1_000 * 60) > MANGO_DOWNTIME_THRESHOLD_MIN) {
-        console.log(this.symbol, 'Mango Down! Last Updated:', new Date(lastUpdateMango));
-        await this.scalperOpenBook(dipProduct);
-      } else {
-        await this.scalperMango(dipProduct, mangoAccount, mangoGroup, perpMarket);
-      }
-    } else {
-      await this.scalperOpenBook(dipProduct);
-    }
-  }
-
-  // Delta hedge and gamma scalp on mango.
-  async scalperMango(
-    dipProduct: DIPDeposit[],
-    mangoAccount: MangoAccount,
-    mangoGroup: Group,
-    perpMarket: PerpMarket,
-  ): Promise<void> {
-    console.log(this.symbol, 'Hedging on Mango');
-
-    let spotMarket: Market;
-    if (OPENBOOK_MKT_MAP.get(this.symbol) !== undefined) {
-      spotMarket = await Market.load(
-        this.connection,
-        new PublicKey(OPENBOOK_MKT_MAP.get(this.symbol)),
-        undefined,
-        OPENBOOK_FORK_ID,
-      );
-    }
-
-    // Open Mango Websocket
-    const fillFeed = new WebSocket(FILLS_URL);
-    const subscriptionData = {
-      command: 'subscribe',
-      marketId: MANGO_MKT_MAP.get(this.symbol),
-    };
-    fillFeed.onopen = (_) => {
-      fillFeed.send(JSON.stringify(subscriptionData));
-      console.log('Connected to Mango Websocket', subscriptionData.marketId, new Date().toUTCString());
-    };
-    fillFeed.onerror = (error) => {
-      console.log(`Websocket Error ${error.message}`);
-    };
-
-    try {
-      await this.deltaHedgeMango(
-        dipProduct,
-        mangoAccount,
-        mangoGroup,
-        perpMarket,
-        spotMarket,
-        fillFeed,
-        1,
-      );
-      await this.gammaScalpMango(
-        dipProduct,
-        mangoAccount,
-        mangoGroup,
-        perpMarket,
-        fillFeed,
-        1,
-      );
-    } catch (err) {
-      console.log(this.symbol, 'Main Error', err, err.stack);
-    }
-  }
-
-  async deltaHedgeMango(
-    dipProduct: DIPDeposit[],
-    mangoAccount: MangoAccount,
-    mangoGroup: Group,
-    perpMarket: PerpMarket,
-    spotMarket: Market,
-    fillFeed: WebSocket,
-    deltaHedgeCount: number,
-  ): Promise<void> {
-    await mangoGroup.reloadAll(this.mangoClient);
-    // Cleanup from previous runs.
-    await this.cancelStaleMangoOrders(mangoAccount, mangoGroup, perpMarket);
-
-    // Avoid unsafe recursion.
-    if (deltaHedgeCount > MAX_DELTA_HEDGES) {
-      console.log(this.symbol, 'Max Hedges exceeded without getting to neutral');
+      await runMangoScalper(dipProduct, this);
       return;
     }
-
-    // Calc DIP delta for new position
-    const fairValue = perpMarket.uiPrice;
-    const dipTotalDelta = getDIPDelta(dipProduct, fairValue, this.symbol);
-
-    // Get Mango delta position
-    const mangoPerpDelta = mangoAccount.getPerpPositionUi(mangoGroup, perpMarket.perpMarketIndex);
-    let mangoSpotDelta = 0;
-    try {
-      mangoSpotDelta = mangoAccount.getTokenBalanceUi(
-        mangoGroup.getFirstBankByMint(tokenToSplMint(this.symbol)),
-      );
-    } catch (err) {
-      console.log(this.symbol, 'No Mango Token Balance Possible');
-    }
-
-    // Get all spot positions Option Vault, Risk Manager, Mango Tester
-    const spotDelta = await getSpotDelta(this.connection, this.symbol, this.owner, spotMarket);
-
-    // Get Total Delta Position to hedge
-    let hedgeDeltaTotal = IS_DEV
-      ? 0.1
-      : mangoPerpDelta + dipTotalDelta + spotDelta + mangoSpotDelta + this.deltaOffset;
-
-    // Check whether we need to hedge.
-    const dipTotalGamma = getDIPGamma(dipProduct, fairValue, this.symbol);
-    const stdDevSpread = (this.impliedVol / Math.sqrt(SEC_PER_YEAR
-    / SCALPER_WINDOW_SEC)) * this.zScore;
-    const deltaThreshold = Math.max(
-      dipTotalGamma * stdDevSpread * fairValue * GAMMA_THRESHOLD,
-      this.minSize,
-    );
-    if (Math.abs(hedgeDeltaTotal) < (deltaThreshold)) {
-      console.log(this.symbol, 'Delta Netural', hedgeDeltaTotal, '<', deltaThreshold);
-      return;
-    }
-
-    // TODO: Add slippage delta adjustment
-    const slippageTolerance = Math.min(stdDevSpread / 2, slippageMax.get(this.symbol));
-    let hedgePrice = hedgeDeltaTotal < 0
-      ? fairValue * (1 + slippageTolerance)
-      : fairValue * (1 - slippageTolerance);
-    const slippageDIPDelta = getDIPDelta(dipProduct, hedgePrice, this.symbol);
-    const dipDeltaDiff = slippageDIPDelta - dipTotalDelta;
-    hedgeDeltaTotal += dipDeltaDiff;
-    console.log(this.symbol, 'Adjust Slippage Delta by', dipDeltaDiff, 'to', -hedgeDeltaTotal);
-    const hedgeSide = hedgeDeltaTotal < 0 ? PerpOrderSide.bid : PerpOrderSide.ask;
-    const hedgeSideText = hedgeSide === PerpOrderSide.bid ? 'Buy' : 'Sell';
-
-    const notionalThreshold = deltaThreshold * fairValue;
-    const notionalAmount = -hedgeDeltaTotal * fairValue;
-    if ((notionalAmount < notionalThreshold && hedgeSideText === 'Buy')
-       || (notionalAmount > notionalThreshold && hedgeSideText === 'Sell')) {
-      console.log(this.symbol, 'Delta Netural: Slippage', deltaThreshold);
-      return;
-    }
-    console.log(this.symbol, 'Outside delta threshold:', Math.abs(hedgeDeltaTotal), 'vs.', deltaThreshold);
-
-    // Determine spot or perp order based on funding rate.
-    const bidSide = await perpMarket.loadBids(this.mangoClient);
-    const askSide = await perpMarket.loadAsks(this.mangoClient);
-    const fundingRate = (24 * 365)
-    * perpMarket.getCurrentFundingRate(bidSide, askSide);
-    const buySpot = fundingRate > PERP_FUNDING_RATE_THRESHOLD;
-    const sellSpot = -fundingRate < PERP_FUNDING_RATE_THRESHOLD;
-    let hedgeProduct = getMangoHedgeProduct(hedgeSide, buySpot, sellSpot);
-    // No OpenBook BTC market exists still
-    if (this.symbol === 'BTC') {
-      hedgeProduct = HedgeProduct.Perp;
-    }
-
-    console.log(
-      `${this.symbol} Target Delta Hedge: ${hedgeSideText} ${hedgeProduct} ${-hedgeDeltaTotal} \
-      DIP Δ: ${dipTotalDelta} Mango Perp Δ: ${mangoPerpDelta} Mango Spot Δ: ${mangoSpotDelta} \
-      Spot Δ: ${spotDelta} Offset Δ ${this.deltaOffset} Fair Value: ${fairValue}`,
-    );
-
-    // Determine what price to use for hedging depending on allowable slippage.
-    hedgePrice = roundPriceToTickSize(hedgeDeltaTotal < 0
-      ? fairValue * (1 + slippageTolerance) : fairValue * (1 - slippageTolerance), this.tickSize);
-
-    // Break up order depending on whether the book can support it
-    const bookSide = hedgeDeltaTotal < 0 ? askSide : bidSide;
-    const hedgeDeltaClip = roundQtyToSpotSize(hedgeDeltaTotal
-      / orderSpliceMango(
-        hedgeDeltaTotal,
-        fairValue,
-        maxNotional.get(this.symbol),
-        slippageTolerance,
-        bookSide,
-        perpMarket,
-      ), this.minSize);
-
-    const deltaOrderId = new Date().getTime() * 2;
-
-    // Start listening for Delta Hedge Fills
-    const deltaFillListener = async (event: WebSocket.MessageEvent) => {
-      const parsedEvent = JSON.parse(event.data as string);
-      const {
-        owner, clientOrderId, quantity, price,
-      } = parsedEvent.event;
-      if (owner === mangoAccount.publicKey.toBase58() && clientOrderId === deltaOrderId) {
-        const fillQty = (hedgeSide === PerpOrderSide.bid ? 1 : -1) * quantity;
-        hedgeDeltaTotal += fillQty;
-        console.log(`${this.symbol} Delta Filled ${hedgeSideText} ${hedgeProduct} Qty ${fillQty} \
-          Price ${price} Remaining ${hedgeDeltaTotal} ID ${deltaOrderId} ${new Date().toUTCString()}`);
-      }
-    };
-
-    // Setup a listener for the order.
-    if (fillFeed.readyState === WebSocket.OPEN) {
-      fillFeed.addEventListener('message', deltaFillListener);
-      console.log(this.symbol, 'Listening For Delta Hedges');
-    } else {
-      console.log(this.symbol, 'Websocket State', fillFeed.readyState);
-    }
-
-    console.log(`${this.symbol} ${hedgeSideText} ${hedgeProduct} ${Math.abs(hedgeDeltaClip)} \
-    Limit: ${hedgePrice} # ${deltaHedgeCount} ID ${deltaOrderId}`);
-
-    try {
-      // TODO: Test Spot
-      if (hedgeProduct === HedgeProduct.Spot) {
-        const spotHedgeSide = hedgeSide === PerpOrderSide.bid ? Serum3Side.bid : Serum3Side.ask;
-        await this.mangoClient.serum3PlaceOrder(
-          mangoGroup,
-          mangoAccount,
-          new PublicKey(OPENBOOK_MKT_MAP.get(this.symbol)),
-          spotHedgeSide,
-          hedgePrice,
-          Math.abs(hedgeDeltaClip),
-          Serum3SelfTradeBehavior.decrementTake,
-          Serum3OrderType.limit,
-          deltaOrderId,
-          10,
-        );
-      } else {
-        await this.mangoClient.perpPlaceOrder(
-          mangoGroup,
-          mangoAccount,
-          perpMarket.perpMarketIndex,
-          hedgeSide,
-          hedgePrice,
-          Math.abs(hedgeDeltaClip),
-          undefined,
-          deltaOrderId,
-          PerpOrderType.limit,
-        );
-      }
-    } catch (err) {
-      console.log(this.symbol, 'Failed to place order', err, err.stack);
-    }
-
-    // Wait the twapInterval of time to see if the position gets to neutral.
-    console.log(this.symbol, 'Scan Delta Fills for ~', TWAP_INTERVAL_SEC, 'seconds');
-    await waitForFill(
-      (_) => Math.abs(hedgeDeltaTotal) < (deltaThreshold),
-      TWAP_INTERVAL_SEC,
-    );
-
-    // Cleanup listener.
-    fillFeed.removeEventListener('message', deltaFillListener);
-
-    if (Math.abs(hedgeDeltaTotal) < (deltaThreshold)) {
-      fillFeed.removeEventListener('message', deltaFillListener);
-      console.log(this.symbol, 'Delta Hedge Complete', hedgeDeltaTotal, '<', deltaThreshold);
-      return;
-    }
-
-    // Recursive call. This happens when we are not getting fills to get to neutral.
-    await this.deltaHedgeMango(
-      dipProduct,
-      mangoAccount,
-      mangoGroup,
-      perpMarket,
-      spotMarket,
-      fillFeed,
-      deltaHedgeCount + 1,
-    );
-  }
-
-  async gammaScalpMango(
-    dipProduct: DIPDeposit[],
-    mangoAccount,
-    mangoGroup: Group,
-    perpMarket: PerpMarket,
-    fillFeed: WebSocket,
-    gammaScalpCount: number,
-  ): Promise<void> {
-    await mangoGroup.reloadAll(this.mangoClient);
-    // Makes the recursive gamma scalps safer. Rerun will clear any stale
-    // orders. Allows only 2 gamma orders at any time
-    await this.cancelStaleMangoOrders(mangoAccount, mangoGroup, perpMarket);
-
-    // Avoid unsafe recursion.
-    if (gammaScalpCount > GAMMA_CYCLES) {
-      console.log(this.symbol, 'Maximum scalps acheived!', gammaScalpCount - 1, 'Wait for Rerun');
-      return;
-    }
-
-    const fairValue = perpMarket.uiPrice;
-    const dipTotalGamma = getDIPGamma(dipProduct, fairValue, this.symbol);
-
-    // TODO: Allow scalper modes for back bids & strike adjustments
-    // Calc scalperWindow std deviation spread from zScore & IV for gamma levels
-    const stdDevSpread = (this.impliedVol
-    / Math.sqrt(SEC_PER_YEAR / SCALPER_WINDOW_SEC))
-    * this.zScore;
-    const netGamma = IS_DEV
-      ? Math.max(0.01, dipTotalGamma * stdDevSpread * fairValue)
-      : dipTotalGamma * stdDevSpread * fairValue;
-
-    console.log(this.symbol, 'Position Gamma Γ:', netGamma, 'Fair Value', fairValue);
-    if ((netGamma * fairValue) < (this.minSize * fairValue)) {
-      console.log(this.symbol, 'Gamma Hedge Too Small');
-      return;
-    }
-
-    const orderIdGamma = new Date().getTime() * 2;
-    const gammaBid = fairValue * (1 - stdDevSpread);
-    const gammaBidID = orderIdGamma + 1;
-    const gammaAsk = fairValue * (1 + stdDevSpread);
-    const gammaAskID = orderIdGamma + 2;
-
-    let gammaFillQty = 0;
-    // TODO: Check fills feed works here
-    fillFeed.removeAllListeners('message');
-    const gammaFillListener = (event) => {
-      const parsedEvent = JSON.parse(event.data);
-      const {
-        owner, clientOrderId, quantity, price,
-      } = parsedEvent.event;
-      if (owner !== mangoAccount.publicKey.toBase58()) {
-        return;
-      }
-      if (clientOrderId === gammaBidID || clientOrderId === gammaAskID) {
-        gammaFillQty += Math.abs(quantity);
-        // Once the gamma fills have crossed the threshold, reset the orders.
-        if (gammaFillQty > netGamma * GAMMA_COMPLETE_THRESHOLD_PCT) {
-          console.log(
-            this.symbol,
-            'Gamma Filled',
-            gammaFillQty,
-            clientOrderId === gammaBidID ? 'BOUGHT FOR' : 'SOLD AT',
-            price,
-            new Date().toUTCString(),
-          );
-          fillFeed.removeEventListener('message', gammaFillListener);
-          // Do not need to remove the unfilled order since it will be cancelled in
-          // the recursive call.
-          this.gammaScalpMango(
-            dipProduct,
-            mangoAccount,
-            mangoGroup,
-            perpMarket,
-            fillFeed,
-            gammaScalpCount + 1,
-          );
-        } else {
-          console.log('Gamma Partially Filled', gammaFillQty, 'of', netGamma);
-        }
-      }
-    };
-
-    if (fillFeed.readyState === WebSocket.OPEN) {
-      fillFeed.addEventListener('message', gammaFillListener);
-      console.log(this.symbol, 'Listening For gamma scalps');
-    } else {
-      console.log(this.symbol, 'Websocket State', fillFeed.readyState);
-    }
-
-    // Place gamma scalp bid & offer.
-    try {
-      const gammaBidTx = await this.mangoClient.perpPlaceOrderIx(
-        mangoGroup,
-        mangoAccount,
-        perpMarket.perpMarketIndex,
-        PerpOrderSide.bid,
-        gammaBid,
-        netGamma,
-        undefined,
-        gammaBidID,
-        PerpOrderType.postOnlySlide,
-      );
-      const gammaAskTx = await this.mangoClient.perpPlaceOrderIx(
-        mangoGroup,
-        mangoAccount,
-        perpMarket.perpMarketIndex,
-        PerpOrderSide.ask,
-        gammaAsk,
-        netGamma,
-        undefined,
-        gammaBidID,
-        PerpOrderType.postOnlySlide,
-      );
-      const gammaOrdersTx: TransactionInstruction[] = [gammaBidTx, gammaAskTx];
-      console.log(this.symbol, 'Gamma Bid', gammaBid, 'ID', gammaBidID);
-      console.log(this.symbol, 'Gamma Ask', gammaAsk, 'ID', gammaAskID);
-      await this.mangoClient.sendAndConfirmTransaction(gammaOrdersTx);
-    } catch (err) {
-      console.log(this.symbol, 'Gamma Error', err, err.stack);
-    }
-    console.log(`${this.symbol} Gamma Spread % ${((gammaAsk - gammaBid) / fairValue) * 100} Liquidity $ ${netGamma * 2 * fairValue}`);
-
-    // Sleep for the max time of the reruns then kill thread
-    await sleepExact(SCALPER_WINDOW_SEC);
-    console.log(this.symbol, 'Remove stale gamma fill listener', gammaBidID, gammaAskID);
-    fillFeed.removeEventListener('message', gammaFillListener);
-  }
-
-  async cancelStaleMangoOrders(
-    mangoAccount: MangoAccount,
-    mangoGroup: Group,
-    perpMarket: PerpMarket,
-  ): Promise<void> {
-    await mangoAccount.reload(this.mangoClient);
-    const openOrders = await mangoAccount.loadPerpOpenOrdersForMarket(
-      this.mangoClient,
-      mangoGroup,
-      perpMarket.perpMarketIndex,
-    );
-    if (openOrders.length === 0) {
-      return;
-    }
-    for (const order of openOrders) {
-      if (order.perpMarketIndex === perpMarket.perpMarketIndex) {
-        console.log(this.symbol, 'Canceling All Orders');
-        await this.mangoClient.perpCancelAllOrders(
-          mangoGroup,
-          mangoAccount,
-          perpMarket.perpMarketIndex,
-          10,
-        );
-        break;
-      }
-    }
+    await this.scalperOpenBook(dipProduct);
   }
 
   async scalperOpenBook(dipProduct: DIPDeposit[]): Promise<void> {

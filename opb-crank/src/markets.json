@@ -1,0 +1,16 @@
+{
+  "mainnet": [
+    {
+      "address": "H6rrYK3SUHF2eguZCyJxnSBMJqjXhUtuaki6PHiutvum",
+      "deprecated": false,
+      "name": "DUAL/USDC",
+      "programId": "srmqPvymJeFKQ4zGQed1GFppgkRHL9kaELCbyksJtPX"
+    }
+  ],
+  "devnet": [
+    {
+      "name": "SOL/USDC",
+      "address": "82iPEvGiTceyxYpeLK3DhSwga3R5m4Yfyoydd13CukQ9"
+    }
+  ]
+}

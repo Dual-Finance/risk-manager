@@ -7,6 +7,7 @@ export const NUM_DIP_ATOMS_PER_TOKEN = 10 ** 6;
 export const OPTION_MINT_ADDRESS_SEED = 'option-mint';
 
 export const OPENBOOK_MKT_MAP = new Map<string, string>([
+  ['BTC', '3BAKsQd3RuhZKES2DGysMhjBdwjZYKYmxRqnSMtZ4KSN'], ['ETH', 'BbJgE7HZMaDp5NTYvRh5jZSkQPVDTU8ubPFtpogUkEj4'],
   ['SOL', '8BnEgHoWFysVcuFFX7QztDmzuH8r5ZFvyP3sYwn1XTh6'], ['MNGO', '3NnxQvDcZXputNMxaxsGvqiKpqgPfSYXpNigZNFcknmD'],
   ['BONK', '8PhnCfgqpgFM7ZJvttGdBVMXHuU4Q23ACxCvWkbs1M71'], ['ETH', 'BbJgE7HZMaDp5NTYvRh5jZSkQPVDTU8ubPFtpogUkEj4'],
   ['DUAL', 'H6rrYK3SUHF2eguZCyJxnSBMJqjXhUtuaki6PHiutvum'], ['BTC', '3BAKsQd3RuhZKES2DGysMhjBdwjZYKYmxRqnSMtZ4KSN'],

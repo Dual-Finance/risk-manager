@@ -306,7 +306,7 @@ class Scalper {
     console.log(this.symbol, 'Sweep OpenBook');
     const amountDelta = roundQtyToSpotSize(Math.abs(hedgeDeltaClip), this.minSpotSize);
     const priceDelta = roundPriceToTickSize(Math.abs(hedgePrice), this.tickSize);
-    const payerAccount = getPayerAccount(hedgeSide, this.symbol, 'USDC');
+    const payerAccount = await getPayerAccount(hedgeSide, this.symbol, 'USDC', this.owner);
     console.log(this.symbol, hedgeSide, 'OpenBook-SPOT', amountDelta, 'Limit:', priceDelta, '#', deltaHedgeCount, 'ID', deltaID.toString());
     const deltaOrderTx = new Transaction();
     const deltaTx = await spotMarket.makePlaceOrderTransaction(this.connection, {
@@ -534,8 +534,8 @@ class Scalper {
       : roundQtyToSpotSize(Math.abs(spotDelta * ORDER_SIZE_BUFFER_PCT), this.minSpotSize);
     const priceBid = roundPriceToTickSize(Math.abs(gammaBid), this.tickSize);
     const priceAsk = roundPriceToTickSize(Math.abs(gammaAsk), this.tickSize);
-    const bidAccount = getPayerAccount('buy', this.symbol, 'USDC');
-    const askAccount = getPayerAccount('sell', this.symbol, 'USDC');
+    const bidAccount = await getPayerAccount('buy', this.symbol, 'USDC', this.owner);
+    const askAccount = await getPayerAccount('sell', this.symbol, 'USDC', this.owner);
     const gammaOrders = new Transaction();
 
     if (this.mode !== ScalperMode.BackOnly) {

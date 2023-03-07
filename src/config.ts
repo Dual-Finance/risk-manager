@@ -7,7 +7,7 @@ import {
 export const IS_DEV = process.env.DEV !== 'false';
 export const IS_DEMO = process.env.DEMO !== 'false';
 export const API_URL = process.env.RPC;
-// Manual Price Override
+export const TRADING_ACCOUNT = process.env.WALLET;
 export const PRICE_OVERRIDE = Number(process.env.PRICE);
 // Priority Fee to use for all txs in micro lamports
 export const PRIORITY_FEE = process.env.FEE ? parseInt(process.env.FEE, 10) : 1;
@@ -87,17 +87,6 @@ export const VIAL_WS_URL = 'wss://vial.mngo.cloud/v1/ws';
 export const usdcPk = IS_DEV ? USDC_DEVNET_PK : USDC_MAINNET_PK;
 export const OPENBOOK_FORK_ID = IS_DEV ? OPB_DEVNET_PROGRAM_ID : OPB_MAINNET_PROGRAM_ID;
 
-export const ACCOUNT_MAP = !IS_DEMO ? new Map<SYMBOL, string>([
-  ['BTC', '9N8KidKFxnS3BkHuRfPmhobbrv6iqAR7iGa7qc3QMaa7'], ['ETH', 'F7qSsLofbpZBfZ11wkajX9JPshSEeyGpaFvDeuur2mNW'],
-  ['SOL', '9EaYbxzU1YJwJojKsKp3U38PBy5aqcN2KS9Xc8hAxZB7'], ['USDC', '2gyJ4SZyQtUEXCLRa459nbWaFzuN8uvyoUsVb7xmpkh1'],
-  ['MNGO', '4zzgXnhfwdtASw9JugEyrPSKzvaN8i2WSDm1bnGiHFcK'], ['BONK', 'D8yD6us5X7YNeweppFdBR4idGsyPooetuW2fA6Suabqg'],
-  ['DUAL', 'F2ytwuKEP3Mv9hCwYNdma9GaYxP61KBSQtHpeRTRneUh'],
-])
-  : new Map<SYMBOL, string>([
-    ['SOL', '3om7RJB91HfPpYS3Ewk1U2fK1FHrDUDa5s9w1r74j3wu'], ['USDC', 'F4CfuvqwfPXRQvBGR8e7u1yCvjgYKSxcw5y4qD58h77v'],
-    ['BONK', '8yKGErXt3LiRJ5PpAji42srZxNH5q6BsZjAErDxuJxyw'], ['DUAL', 'Bta4qNUNdW2sy5AvZ5PcZHoQoBgn57mEyJUQekEAdE5m'],
-  ]);
-
 export const MinContractSize = new Map<SYMBOL, number>([
   ['BTC', 0.0001], ['ETH', 0.001], ['SOL', 0.01], ['MNGO', 0.01], ['BONK', 1000], ['DUAL', 0.01],
 ]);
@@ -126,7 +115,7 @@ export const BVE_VOL_MAP = new Map<SYMBOL, number>([
 export const treasuryPositions: DIPDeposit[] = [({
   splTokenName: 'MNGO',
   premiumAssetName: 'USDC',
-  expirationMs: 1677672000000,
+  expirationMs: 1682942400000,
   strikeUsdcPerToken: 0.018,
   callOrPut: CallOrPut.Put,
   qtyTokens: 6944444,
@@ -169,16 +158,16 @@ export const treasuryPositions: DIPDeposit[] = [({
   expirationMs: 1685793600000,
   strikeUsdcPerToken: 0.032,
   callOrPut: CallOrPut.Call,
-  qtyTokens: 300000,
-}), // TEST DUAL Position 1
+  qtyTokens: 246710,
+}),
 ({
   splTokenName: 'DUAL',
   premiumAssetName: 'USDC',
   expirationMs: 1685793600000,
-  strikeUsdcPerToken: 0.0320,
+  strikeUsdcPerToken: 0.032,
   callOrPut: CallOrPut.Put,
-  qtyTokens: 300000,
-}), // TEST DUAL Position 2
+  qtyTokens: 246710,
+}), // MM around DUAL Straddle
 ];
 
 // Amount to vary the sleep on a random sleep.

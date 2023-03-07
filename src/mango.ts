@@ -13,8 +13,8 @@ import {
   FILLS_URL, IS_DEV, GAMMA_THRESHOLD,
   MAX_DELTA_HEDGES, MANGO_DOWNTIME_THRESHOLD_MIN,
   PERP_FUNDING_RATE_THRESHOLD, GAMMA_CYCLES, OPENBOOK_FORK_ID,
-  slippageMax, GAMMA_COMPLETE_THRESHOLD_PCT, cluster,
-  IS_DEMO, HedgeProduct,
+  slippageMax, GAMMA_COMPLETE_THRESHOLD_PCT, CLUSTER,
+  HedgeProduct,
 } from './config';
 import { DIPDeposit } from './common';
 import {
@@ -26,8 +26,7 @@ import {
   roundPriceToTickSize, roundQtyToSpotSize,
 } from './scalper_utils';
 import {
-  MANGO_ACCOUNT_PK, MANGO_DEMO_PK, MANGO_MKT_MAP, OPENBOOK_MKT_MAP,
-  SEC_PER_YEAR,
+  MANGO_DEVNET_GROUP, MANGO_MAINNET_GROUP, OPENBOOK_MKT_MAP, SEC_PER_YEAR,
 } from './constants';
 // eslint-disable-next-line import/no-cycle
 import Scalper from './scalper';
@@ -408,17 +407,19 @@ export async function runMangoScalper(dipProduct: DIPDeposit[], scalper: Scalper
   // TODO: Add Priority Fee
   const mangoClient = MangoClient.connect(
     scalper.provider,
-    cluster,
-    MANGO_V4_ID[cluster],
+    CLUSTER,
+    MANGO_V4_ID[CLUSTER],
     {
       idsSource: 'get-program-accounts',
     },
   );
-  const mangoAccount = await mangoClient.getMangoAccount(
-    IS_DEMO ? new PublicKey(MANGO_DEMO_PK) : new PublicKey(MANGO_ACCOUNT_PK),
+  const mangoGroup = await mangoClient.getGroup(IS_DEV ? MANGO_DEVNET_GROUP : MANGO_MAINNET_GROUP);
+  const mangoAccount = await mangoClient.getMangoAccountForOwner(
+    mangoGroup,
+    scalper.owner.publicKey,
+    0,
   );
   await mangoAccount.reload(mangoClient);
-  const mangoGroup = await mangoClient.getGroup(mangoAccount.group);
   await mangoGroup.reloadAll(mangoClient);
   let perpMarket: PerpMarket;
   try {
@@ -452,7 +453,7 @@ export async function runMangoScalper(dipProduct: DIPDeposit[], scalper: Scalper
     const fillFeed = new WebSocket(FILLS_URL);
     const subscriptionData = {
       command: 'subscribe',
-      marketId: MANGO_MKT_MAP.get(scalper.symbol),
+      marketId: perpMarket.publicKey.toBase58(),
     };
     fillFeed.onopen = (_) => {
       fillFeed.send(JSON.stringify(subscriptionData));

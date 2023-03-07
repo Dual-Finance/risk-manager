@@ -13,12 +13,8 @@ export const OPENBOOK_MKT_MAP = new Map<string, string>([
   ['DUAL', 'H6rrYK3SUHF2eguZCyJxnSBMJqjXhUtuaki6PHiutvum'], ['BTC', '3BAKsQd3RuhZKES2DGysMhjBdwjZYKYmxRqnSMtZ4KSN'],
 ]);
 
-export const MANGO_MKT_MAP = new Map<string, string>([
-  ['BTC', 'HwhVGkfsSQ9JSQeQYu2CbkRCLvsh3qRZxG6m4oMVwZpN'],
-]);
-
-export const MANGO_ACCOUNT_PK = new PublicKey('EUQQaFnLBaTmjj9tuj4jP5a9byPYcrQ8M6PvkULtMBLD');
-export const MANGO_DEMO_PK = new PublicKey('5fEtAwzsXM4bHAT7gf3unPJFKJmQgYnce9L7GCxWTpEd');
+export const MANGO_MAINNET_GROUP = new PublicKey('78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX');
+export const MANGO_DEVNET_GROUP = new PublicKey('Bpk8VzppSEkygd4KgXSgVzgVHib4EArhbDzyRpiS4yaf');
 
 export const WSOL_PK = new PublicKey('So11111111111111111111111111111111111111112');
 export const BTC_PK = new PublicKey('3NZ9JMVBmGAqocybic2c7LQCJScmgsAZ6vQqTDzcqmJh');

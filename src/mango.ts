@@ -191,6 +191,7 @@ export async function deltaHedgeMango(
     }
   };
 
+  // TOOD: Move to helper functions
   // Setup a listener for the order.
   if (fillFeed.readyState === WebSocket.OPEN) {
     fillFeed.addEventListener('message', deltaFillListener);

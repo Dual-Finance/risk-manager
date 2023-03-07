@@ -6,6 +6,7 @@ import {
 
 export const IS_DEV = process.env.DEV !== 'false';
 export const API_URL = process.env.RPC;
+export const TRADING_ACCOUNT = process.env.WALLET;
 export const PRICE_OVERRIDE = Number(process.env.PRICE);
 // Priority Fee to use for all txs in micro lamports
 export const PRIORITY_FEE = process.env.FEE ? parseInt(process.env.FEE, 10) : 1;
@@ -78,13 +79,6 @@ export const FILLS_URL = IS_DEV ? 'ws://api.mngo.cloud:2082' : 'ws://v3.mngo.clo
 export const VIAL_WS_URL = 'wss://vial.mngo.cloud/v1/ws';
 export const usdcPk = IS_DEV ? USDC_DEVNET_PK : USDC_MAINNET_PK;
 export const OPENBOOK_FORK_ID = IS_DEV ? OPB_DEVNET_PROGRAM_ID : OPB_MAINNET_PROGRAM_ID;
-
-export const ACCOUNT_MAP = new Map<SYMBOL, string>([
-  ['BTC', '79ee6JPqTPUDzX4FeAWSntFatmpb5BY5LQrXzMX3aAE6'], ['ETH', 'F7qSsLofbpZBfZ11wkajX9JPshSEeyGpaFvDeuur2mNW'],
-  ['SOL', '9EaYbxzU1YJwJojKsKp3U38PBy5aqcN2KS9Xc8hAxZB7'], ['USDC', '2gyJ4SZyQtUEXCLRa459nbWaFzuN8uvyoUsVb7xmpkh1'],
-  ['MNGO', '4zzgXnhfwdtASw9JugEyrPSKzvaN8i2WSDm1bnGiHFcK'], ['BONK', 'D8yD6us5X7YNeweppFdBR4idGsyPooetuW2fA6Suabqg'],
-  ['DUAL', 'F2ytwuKEP3Mv9hCwYNdma9GaYxP61KBSQtHpeRTRneUh'],
-]);
 
 export const MinContractSize = new Map<SYMBOL, number>([
   ['BTC', 0.0001], ['ETH', 0.001], ['SOL', 0.01], ['MNGO', 0.01], ['BONK', 1000], ['DUAL', 0.01],

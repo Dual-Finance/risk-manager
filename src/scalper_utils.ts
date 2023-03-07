@@ -17,7 +17,7 @@ import {
 import {
   JUPITER_LIQUIDITY, MAX_MKT_SPREAD_PCT_FOR_PRICING, JUPITER_SEARCH_STEPS,
   RF_RATE, slippageMax, THEO_VOL_MAP, JUPITER_SLIPPAGE_BPS, PRIORITY_FEE,
-  GAMMA_CYCLES, RESOLVE_PERIOD_MS, HedgeProduct, PRICE_OVERRIDE,
+  GAMMA_CYCLES, RESOLVE_PERIOD_MS, HedgeProduct, PRICE_OVERRIDE, HedgeSide,
 } from './config';
 import {
   decimalsBaseSPL, getChainlinkPrice, getPythPrice, getSwitchboardPrice,
@@ -297,7 +297,12 @@ export async function tryToSettleOpenBook(
   return settleTx;
 }
 
-export async function getPayerAccount(hedgeSide: 'buy' | 'sell', base: SYMBOL, quote: SYMBOL, owner: Keypair) {
+export async function getPayerAccount(
+  hedgeSide: HedgeSide,
+  base: SYMBOL,
+  quote: SYMBOL,
+  owner: Keypair,
+) {
   const baseTokenAccount = await getAssociatedTokenAddress(
     owner.publicKey,
     tokenToSplMint(base),

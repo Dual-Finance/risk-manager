@@ -13,7 +13,7 @@ import {
   GAMMA_CYCLES, MinOpenBookSize, OPENBOOK_FORK_ID,
   treasuryPositions, slippageMax, GAMMA_COMPLETE_THRESHOLD_PCT, CLUSTER,
   MAX_ORDER_BOOK_SEARCH_DEPTH, MAX_BACK_GAMMA_MULTIPLE, API_URL, MODE_BY_SYMBOL,
-  WHALE_MAX_SPREAD, ScalperMode, ORDER_SIZE_BUFFER_PCT,
+  WHALE_MAX_SPREAD, ScalperMode, ORDER_SIZE_BUFFER_PCT, HedgeSide,
 } from './config';
 import { CallOrPut, DIPDeposit, SYMBOL } from './common';
 import {
@@ -32,7 +32,7 @@ import {
   SEC_PER_YEAR, SUFFICIENT_BOOK_DEPTH,
 } from './constants';
 // eslint-disable-next-line import/no-cycle
-import { runMangoScalper } from './mango';
+import { loadMangoAndPickScalper } from './mango';
 
 class Scalper {
   connection: Connection;
@@ -96,7 +96,7 @@ class Scalper {
     console.log(this.symbol, 'Choosing market to trade');
 
     if (this.mode === ScalperMode.Perp) {
-      await runMangoScalper(dipProduct, this);
+      await loadMangoAndPickScalper(dipProduct, this);
       return;
     }
     await this.scalperOpenBook(dipProduct);
@@ -190,7 +190,7 @@ class Scalper {
     const deltaID = new BN(new Date().getTime());
 
     let hedgeDeltaTotal: number = 0;
-    let hedgeSide: 'buy' | 'sell' = 'buy';
+    let hedgeSide = HedgeSide.buy;
     this.serumVialClient.streamData(
       ['trades'],
       [`${this.symbol}/USDC`],
@@ -198,7 +198,7 @@ class Scalper {
       (message: SerumVialTradeMessage) => {
         const side: string = message.makerClientId === deltaID.toString() ? 'Maker' : 'Taker';
         console.log(`${this.symbol} Delta Fill ${side} ${hedgeSide} ${tradeMessageToString(message)}`);
-        const fillQty = (hedgeSide === 'buy' ? 1 : -1) * message.size;
+        const fillQty = (hedgeSide === HedgeSide.buy ? 1 : -1) * message.size;
         hedgeDeltaTotal += fillQty;
       },
     );
@@ -221,7 +221,8 @@ class Scalper {
     const dipTotalDelta = getDIPDelta(dipProduct, fairValue, this.symbol);
     const spotDelta = await getSpotDelta(this.connection, this.symbol, this.owner, spotMarket);
     hedgeDeltaTotal = IS_DEV ? 0.1 : dipTotalDelta + spotDelta + this.deltaOffset;
-    hedgeSide = hedgeDeltaTotal < 0 ? 'buy' : 'sell';
+    const IS_BUYSIDE = hedgeDeltaTotal < 0;
+    hedgeSide = IS_BUYSIDE ? HedgeSide.buy : HedgeSide.sell;
 
     console.log(
       `${this.symbol} Target Delta Hedge: ${hedgeSide} SPOT ${-hedgeDeltaTotal} DIP Δ: ${dipTotalDelta} \
@@ -241,7 +242,7 @@ class Scalper {
       return;
     }
     const slippageTolerance = Math.min(stdDevSpread / 2, slippageMax.get(this.symbol));
-    let hedgePrice = hedgeDeltaTotal < 0
+    let hedgePrice = IS_BUYSIDE
       ? fairValue * (1 + slippageTolerance)
       : fairValue * (1 - slippageTolerance);
     const slippageDIPDelta = getDIPDelta(dipProduct, hedgePrice, this.symbol);
@@ -335,7 +336,7 @@ class Scalper {
 
       const [bidTOB, _bidSize] = bids.getL2(1)[0];
       const [askTOB, _askSize] = asks.getL2(1)[0];
-      const spreadDelta = hedgeDeltaTotal < 0
+      const spreadDelta = IS_BUYSIDE
         ? ((askTOB - hedgePrice) / hedgePrice) * 100
         : ((bidTOB - hedgePrice) / hedgePrice) * 100;
       console.log(`${this.symbol} OpenBook Delta Hedge Timeout. Spread % ${spreadDelta} \
@@ -534,8 +535,8 @@ class Scalper {
       : roundQtyToSpotSize(Math.abs(spotDelta * ORDER_SIZE_BUFFER_PCT), this.minSpotSize);
     const priceBid = roundPriceToTickSize(Math.abs(gammaBid), this.tickSize);
     const priceAsk = roundPriceToTickSize(Math.abs(gammaAsk), this.tickSize);
-    const bidAccount = await getPayerAccount('buy', this.symbol, 'USDC', this.owner);
-    const askAccount = await getPayerAccount('sell', this.symbol, 'USDC', this.owner);
+    const bidAccount = await getPayerAccount(HedgeSide.buy, this.symbol, 'USDC', this.owner);
+    const askAccount = await getPayerAccount(HedgeSide.sell, this.symbol, 'USDC', this.owner);
     const gammaOrders = new Transaction();
 
     if (this.mode !== ScalperMode.BackOnly) {

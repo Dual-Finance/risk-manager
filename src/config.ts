@@ -67,6 +67,11 @@ export enum HedgeProduct {
   Perp = '-PERP',
 }
 
+export enum HedgeSide {
+  buy = 'buy',
+  sell = 'sell',
+}
+
 export const MODE_BY_SYMBOL = new Map<SYMBOL, ScalperMode>([
   ['BTC', parseFloat(btcVars[4]) > 0 && parseFloat(btcVars[4]) < 5 ? parseFloat(btcVars[4]) : ScalperMode.Normal],
   ['ETH', parseFloat(ethVars[4]) > 0 && parseFloat(ethVars[4]) < 5 ? parseFloat(ethVars[4]) : ScalperMode.Normal],

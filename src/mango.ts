@@ -15,6 +15,7 @@ import {
   PERP_FUNDING_RATE_THRESHOLD, GAMMA_CYCLES, OPENBOOK_FORK_ID,
   slippageMax, GAMMA_COMPLETE_THRESHOLD_PCT, CLUSTER,
   HedgeProduct,
+  HedgeSide,
 } from './config';
 import { DIPDeposit } from './common';
 import {
@@ -125,20 +126,20 @@ export async function deltaHedgeMango(
 
   // TODO: Add slippage delta adjustment
   const slippageTolerance = Math.min(stdDevSpread / 2, slippageMax.get(scalper.symbol));
-  let hedgePrice = hedgeDeltaTotal < 0
+  const IS_BUYSIDE = hedgeDeltaTotal < 0;
+  let hedgePrice = IS_BUYSIDE
     ? fairValue * (1 + slippageTolerance)
     : fairValue * (1 - slippageTolerance);
   const slippageDIPDelta = getDIPDelta(dipProduct, hedgePrice, scalper.symbol);
   const dipDeltaDiff = slippageDIPDelta - dipTotalDelta;
   hedgeDeltaTotal += dipDeltaDiff;
   console.log(scalper.symbol, 'Adjust Slippage Delta by', dipDeltaDiff, 'to', -hedgeDeltaTotal);
-  const hedgeSide = hedgeDeltaTotal < 0 ? PerpOrderSide.bid : PerpOrderSide.ask;
-  const hedgeSideText = hedgeSide === PerpOrderSide.bid ? 'Buy' : 'Sell';
+  const hedgeSide = IS_BUYSIDE ? HedgeSide.buy : HedgeSide.sell;
 
   const notionalThreshold = deltaThreshold * fairValue;
   const notionalAmount = -hedgeDeltaTotal * fairValue;
-  if ((notionalAmount < notionalThreshold && hedgeSideText === 'Buy')
-       || (notionalAmount > notionalThreshold && hedgeSideText === 'Sell')) {
+  if ((notionalAmount < notionalThreshold && hedgeSide === HedgeSide.buy)
+       || (notionalAmount > notionalThreshold && hedgeSide === HedgeSide.sell)) {
     console.log(scalper.symbol, 'Delta Netural: Slippage', deltaThreshold);
     return;
   }
@@ -152,23 +153,23 @@ export async function deltaHedgeMango(
   const buySpot = fundingRate > PERP_FUNDING_RATE_THRESHOLD;
   const sellSpot = -fundingRate < PERP_FUNDING_RATE_THRESHOLD;
   let hedgeProduct = getMangoHedgeProduct(hedgeSide, buySpot, sellSpot);
-  // No OpenBook BTC market exists still
-  if (scalper.symbol === 'BTC') {
+  // Do not allow Mango balance to go negative
+  if (mangoSpotDelta <= hedgeDeltaTotal) {
     hedgeProduct = HedgeProduct.Perp;
   }
 
   console.log(
-    `${scalper.symbol} Target Delta Hedge: ${hedgeSideText} ${hedgeProduct} ${-hedgeDeltaTotal} \
+    `${scalper.symbol} Target Delta Hedge: ${hedgeSide} ${hedgeProduct} ${-hedgeDeltaTotal} \
       DIP Δ: ${dipTotalDelta} Mango Perp Δ: ${mangoPerpDelta} Mango Spot Δ: ${mangoSpotDelta} \
       Spot Δ: ${spotDelta} Offset Δ ${scalper.deltaOffset} Fair Value: ${fairValue}`,
   );
 
   // Determine what price to use for hedging depending on allowable slippage.
-  hedgePrice = roundPriceToTickSize(hedgeDeltaTotal < 0
+  hedgePrice = roundPriceToTickSize(IS_BUYSIDE
     ? fairValue * (1 + slippageTolerance) : fairValue * (1 - slippageTolerance), scalper.tickSize);
 
   // Break up order depending on whether the book can support it
-  const bookSide = hedgeDeltaTotal < 0 ? askSide : bidSide;
+  const bookSide = IS_BUYSIDE ? askSide : bidSide;
   const hedgeDeltaClip = roundQtyToSpotSize(hedgeDeltaTotal
       / orderSpliceMango(
         hedgeDeltaTotal,
@@ -188,9 +189,9 @@ export async function deltaHedgeMango(
       owner, clientOrderId, quantity, price,
     } = parsedEvent.event;
     if (owner === mangoAccount.publicKey.toBase58() && clientOrderId === deltaOrderId) {
-      const fillQty = (hedgeSide === PerpOrderSide.bid ? 1 : -1) * quantity;
+      const fillQty = (hedgeSide === HedgeSide.buy ? 1 : -1) * quantity;
       hedgeDeltaTotal += fillQty;
-      console.log(`${scalper.symbol} Delta Filled ${hedgeSideText} ${hedgeProduct} Qty ${fillQty} \
+      console.log(`${scalper.symbol} Delta Filled ${hedgeSide} ${hedgeProduct} Qty ${fillQty} \
           Price ${price} Remaining ${hedgeDeltaTotal} ID ${deltaOrderId} ${new Date().toUTCString()}`);
     }
   };
@@ -203,13 +204,12 @@ export async function deltaHedgeMango(
     console.log(scalper.symbol, 'Websocket State', fillFeed.readyState);
   }
 
-  console.log(`${scalper.symbol} ${hedgeSideText} ${hedgeProduct} ${Math.abs(hedgeDeltaClip)} \
+  console.log(`${scalper.symbol} ${hedgeSide} ${hedgeProduct} ${Math.abs(hedgeDeltaClip)} \
     Limit: ${hedgePrice} # ${deltaHedgeCount} ID ${deltaOrderId}`);
 
   try {
-    // TODO: Test Spot
     if (hedgeProduct === HedgeProduct.Spot) {
-      const spotHedgeSide = hedgeSide === PerpOrderSide.bid ? Serum3Side.bid : Serum3Side.ask;
+      const spotHedgeSide = hedgeSide === HedgeSide.buy ? Serum3Side.bid : Serum3Side.ask;
       await mangoClient.serum3PlaceOrder(
         mangoGroup,
         mangoAccount,
@@ -223,11 +223,12 @@ export async function deltaHedgeMango(
         10,
       );
     } else {
+      const perpHedgeSide = hedgeSide === HedgeSide.buy ? PerpOrderSide.bid : PerpOrderSide.ask;
       await mangoClient.perpPlaceOrder(
         mangoGroup,
         mangoAccount,
         perpMarket.perpMarketIndex,
-        hedgeSide,
+        perpHedgeSide,
         hedgePrice,
         Math.abs(hedgeDeltaClip),
         undefined,
@@ -403,8 +404,7 @@ export async function gammaScalpMango(
   fillFeed.removeEventListener('message', gammaFillListener);
 }
 
-export async function runMangoScalper(dipProduct: DIPDeposit[], scalper: Scalper) {
-  // Load Mango
+export async function loadMangoAndPickScalper(dipProduct: DIPDeposit[], scalper: Scalper) {
   // TODO: Add Priority Fee
   const mangoClient = MangoClient.connect(
     scalper.provider,

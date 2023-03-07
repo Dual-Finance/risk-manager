@@ -38,7 +38,6 @@ export async function cancelStaleMangoOrders(
   mangoGroup: Group,
   perpMarket: PerpMarket,
 ): Promise<void> {
-  await mangoAccount.reload(mangoClient);
   const openOrders = await mangoAccount.loadPerpOpenOrdersForMarket(
     mangoClient,
     mangoGroup,
@@ -72,6 +71,7 @@ export async function deltaHedgeMango(
   fillFeed: WebSocket,
   deltaHedgeCount: number,
 ): Promise<void> {
+  await mangoAccount.reload(mangoClient);
   await mangoGroup.reloadAll(mangoClient);
   // Cleanup from previous runs.
   await cancelStaleMangoOrders(scalper, mangoClient, mangoAccount, mangoGroup, perpMarket);
@@ -279,6 +279,7 @@ export async function gammaScalpMango(
   fillFeed: WebSocket,
   gammaScalpCount: number,
 ): Promise<void> {
+  await mangoAccount.reload(mangoClient);
   await mangoGroup.reloadAll(mangoClient);
   // Makes the recursive gamma scalps safer. Rerun will clear any stale
   // orders. Allows only 2 gamma orders at any time

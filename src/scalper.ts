@@ -11,7 +11,7 @@ import {
   ZSCORE, MinContractSize, TickSize, IS_DEV, GAMMA_THRESHOLD,
   MAX_DELTA_HEDGES, DELTA_OFFSET,
   GAMMA_CYCLES, MinOpenBookSize, OPENBOOK_FORK_ID,
-  treasuryPositions, slippageMax, GAMMA_COMPLETE_THRESHOLD_PCT, cluster,
+  treasuryPositions, slippageMax, GAMMA_COMPLETE_THRESHOLD_PCT, CLUSTER,
   MAX_ORDER_BOOK_SEARCH_DEPTH, MAX_BACK_GAMMA_MULTIPLE, API_URL, MODE_BY_SYMBOL,
   WHALE_MAX_SPREAD, ScalperMode, ORDER_SIZE_BUFFER_PCT,
 } from './config';
@@ -124,7 +124,7 @@ class Scalper {
       console.log(this.symbol, 'Loading Jupiter');
       jupiter = await Jupiter.load({
         connection: this.connection,
-        cluster,
+        cluster: CLUSTER,
         user: this.owner,
         wrapUnwrapSOL: false,
         restrictIntermediateTokens: true,
@@ -282,7 +282,7 @@ class Scalper {
             if (jupTx === swapTransaction) {
               const spotDeltaUpdate = jupValues.qty;
               hedgeDeltaTotal += spotDeltaUpdate;
-              console.log(this.symbol, 'Jupiter Hedge via', jupValues.venue, 'Price', jupValues.price, 'Qty', jupValues.qty, `https://solana.fm/tx/${txid}${cluster?.includes('devnet') ? '?cluster=devnet' : ''}`);
+              console.log(this.symbol, 'Jupiter Hedge via', jupValues.venue, 'Price', jupValues.price, 'Qty', jupValues.qty, `https://solana.fm/tx/${txid}${CLUSTER?.includes('devnet') ? '?cluster=devnet' : ''}`);
             }
           }
           console.log(this.symbol, 'Adjust', hedgeSide, 'Price', hedgePrice, 'to', jupValues.price, 'Remaining Qty', hedgeDeltaTotal);

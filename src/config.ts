@@ -5,7 +5,6 @@ import {
 } from './constants';
 
 export const IS_DEV = process.env.DEV !== 'false';
-export const IS_DEMO = process.env.DEMO !== 'false';
 export const API_URL = process.env.RPC;
 export const TRADING_ACCOUNT = process.env.WALLET;
 export const PRICE_OVERRIDE = Number(process.env.PRICE);
@@ -77,10 +76,7 @@ export const MODE_BY_SYMBOL = new Map<SYMBOL, ScalperMode>([
   ['DUAL', parseFloat(dualVars[4]) > 0 && parseFloat(dualVars[4]) < 5 ? parseFloat(dualVars[4]) : ScalperMode.Normal],
 ]);
 
-export const ENVIRONMENT: string = IS_DEV ? 'DEVNET' : 'MAINNET';
-
-export const networkName = IS_DEV ? 'devnet.2' : 'mainnet.1';
-export const cluster: Cluster = IS_DEV ? 'devnet' : 'mainnet-beta';
+export const CLUSTER: Cluster = IS_DEV ? 'devnet' : 'mainnet-beta';
 export const DUAL_API = IS_DEV ? 'https://dev.api.dual.finance' : 'https://api.dual.finance';
 export const FILLS_URL = IS_DEV ? 'ws://api.mngo.cloud:2082' : 'wss://api.mngo.cloud/fills/v1/';
 export const VIAL_WS_URL = 'wss://vial.mngo.cloud/v1/ws';

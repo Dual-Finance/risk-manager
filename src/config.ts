@@ -59,23 +59,31 @@ export enum ScalperMode {
   GammaBack,
   GammaBackStrikeAdjustment,
   BackOnly,
+  Perp,
+}
+
+export enum HedgeProduct {
+  Spot = '-SPOT',
+  Perp = '-PERP',
+}
+
+export enum HedgeSide {
+  buy = 'buy',
+  sell = 'sell',
 }
 
 export const MODE_BY_SYMBOL = new Map<SYMBOL, ScalperMode>([
-  ['BTC', parseFloat(btcVars[4]) > 0 && parseFloat(btcVars[4]) < 4 ? parseFloat(btcVars[4]) : ScalperMode.Normal],
-  ['ETH', parseFloat(ethVars[4]) > 0 && parseFloat(ethVars[4]) < 4 ? parseFloat(ethVars[4]) : ScalperMode.Normal],
-  ['SOL', parseFloat(solVars[4]) > 0 && parseFloat(solVars[4]) < 4 ? parseFloat(solVars[4]) : ScalperMode.Normal],
-  ['MNGO', parseFloat(mngoVars[4]) > 0 && parseFloat(mngoVars[4]) < 4 ? parseFloat(mngoVars[4]) : ScalperMode.Normal],
-  ['BONK', parseFloat(bonkVars[4]) > 0 && parseFloat(bonkVars[4]) < 4 ? parseFloat(bonkVars[4]) : ScalperMode.Normal],
-  ['DUAL', parseFloat(dualVars[4]) > 0 && parseFloat(dualVars[4]) < 4 ? parseFloat(dualVars[4]) : ScalperMode.Normal],
+  ['BTC', parseFloat(btcVars[4]) > 0 && parseFloat(btcVars[4]) < 5 ? parseFloat(btcVars[4]) : ScalperMode.Normal],
+  ['ETH', parseFloat(ethVars[4]) > 0 && parseFloat(ethVars[4]) < 5 ? parseFloat(ethVars[4]) : ScalperMode.Normal],
+  ['SOL', parseFloat(solVars[4]) > 0 && parseFloat(solVars[4]) < 5 ? parseFloat(solVars[4]) : ScalperMode.Normal],
+  ['MNGO', parseFloat(mngoVars[4]) > 0 && parseFloat(mngoVars[4]) < 5 ? parseFloat(mngoVars[4]) : ScalperMode.Normal],
+  ['BONK', parseFloat(bonkVars[4]) > 0 && parseFloat(bonkVars[4]) < 5 ? parseFloat(bonkVars[4]) : ScalperMode.Normal],
+  ['DUAL', parseFloat(dualVars[4]) > 0 && parseFloat(dualVars[4]) < 5 ? parseFloat(dualVars[4]) : ScalperMode.Normal],
 ]);
 
-export const ENVIRONMENT: string = IS_DEV ? 'DEVNET' : 'MAINNET';
-
-export const networkName = IS_DEV ? 'devnet.2' : 'mainnet.1';
-export const cluster: Cluster = IS_DEV ? 'devnet' : 'mainnet-beta';
+export const CLUSTER: Cluster = IS_DEV ? 'devnet' : 'mainnet-beta';
 export const DUAL_API = IS_DEV ? 'https://dev.api.dual.finance' : 'https://api.dual.finance';
-export const FILLS_URL = IS_DEV ? 'ws://api.mngo.cloud:2082' : 'ws://v3.mngo.cloud:8080';
+export const FILLS_URL = IS_DEV ? 'ws://api.mngo.cloud:2082' : 'wss://api.mngo.cloud/fills/v1/';
 export const VIAL_WS_URL = 'wss://vial.mngo.cloud/v1/ws';
 export const usdcPk = IS_DEV ? USDC_DEVNET_PK : USDC_MAINNET_PK;
 export const OPENBOOK_FORK_ID = IS_DEV ? OPB_DEVNET_PROGRAM_ID : OPB_MAINNET_PROGRAM_ID;
@@ -129,6 +137,22 @@ export const treasuryPositions: DIPDeposit[] = [({
   callOrPut: CallOrPut.Call,
   qtyTokens: 335284600,
 }), // BONK GSO Position
+({
+  splTokenName: 'BTC',
+  premiumAssetName: 'USDC',
+  expirationMs: 1680350400000,
+  strikeUsdcPerToken: 22000,
+  callOrPut: CallOrPut.Call,
+  qtyTokens: 0.007,
+}),
+({
+  splTokenName: 'BTC',
+  premiumAssetName: 'USDC',
+  expirationMs: 1680350400000,
+  strikeUsdcPerToken: 22000,
+  callOrPut: CallOrPut.Put,
+  qtyTokens: 0.007,
+}), // Test for Mango Perps
 ({
   splTokenName: 'DUAL',
   premiumAssetName: 'USDC',

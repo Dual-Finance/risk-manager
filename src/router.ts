@@ -9,7 +9,7 @@ import {
 } from './common';
 import {
   API_URL,
-  cluster,
+  CLUSTER,
   DUAL_API,
   usdcPk,
   BVE_VOL_MAP,
@@ -274,7 +274,7 @@ class Router {
 
           // Create a poller
           const poller: Poller = new Poller(
-            cluster,
+            CLUSTER,
             this.token,
             'USDC',
             expirationSec,

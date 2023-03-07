@@ -9,8 +9,12 @@ export const OPTION_MINT_ADDRESS_SEED = 'option-mint';
 export const OPENBOOK_MKT_MAP = new Map<string, string>([
   ['BTC', '3BAKsQd3RuhZKES2DGysMhjBdwjZYKYmxRqnSMtZ4KSN'], ['ETH', 'BbJgE7HZMaDp5NTYvRh5jZSkQPVDTU8ubPFtpogUkEj4'],
   ['SOL', '8BnEgHoWFysVcuFFX7QztDmzuH8r5ZFvyP3sYwn1XTh6'], ['MNGO', '3NnxQvDcZXputNMxaxsGvqiKpqgPfSYXpNigZNFcknmD'],
-  ['BONK', '8PhnCfgqpgFM7ZJvttGdBVMXHuU4Q23ACxCvWkbs1M71'], ['DUAL', 'H6rrYK3SUHF2eguZCyJxnSBMJqjXhUtuaki6PHiutvum'],
+  ['BONK', '8PhnCfgqpgFM7ZJvttGdBVMXHuU4Q23ACxCvWkbs1M71'], ['ETH', 'BbJgE7HZMaDp5NTYvRh5jZSkQPVDTU8ubPFtpogUkEj4'],
+  ['DUAL', 'H6rrYK3SUHF2eguZCyJxnSBMJqjXhUtuaki6PHiutvum'], ['BTC', '3BAKsQd3RuhZKES2DGysMhjBdwjZYKYmxRqnSMtZ4KSN'],
 ]);
+
+export const MANGO_MAINNET_GROUP = new PublicKey('78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX');
+export const MANGO_DEVNET_GROUP = new PublicKey('Bpk8VzppSEkygd4KgXSgVzgVHib4EArhbDzyRpiS4yaf');
 
 export const WSOL_PK = new PublicKey('So11111111111111111111111111111111111111112');
 export const BTC_PK = new PublicKey('3NZ9JMVBmGAqocybic2c7LQCJScmgsAZ6vQqTDzcqmJh');
@@ -33,6 +37,7 @@ export const RM_PROD_PK = new PublicKey('CkcJx7Uwgxck5zm3DqUp2N1ikkkoPn2wA8zf7oS
 export const MS_PER_YEAR = 365 * 60 * 60 * 24 * 1_000;
 export const SEC_PER_YEAR = 365 * 60 * 60 * 24;
 export const SIX_MONTHS_IN_MS = 1_000 * 60 * 60 * 24 * 30 * 6;
+export const HOURS_PER_YEAR = 24 * 365;
 
 export const DIP_STATE_LENGTH = 260;
 

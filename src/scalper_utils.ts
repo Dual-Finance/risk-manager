@@ -15,7 +15,7 @@ import {
   CallOrPut, DIPDeposit, RouteDetails, SYMBOL,
 } from './common';
 import {
-  ACCOUNT_MAP, JUPITER_LIQUIDITY, MAX_MKT_SPREAD_PCT_FOR_PRICING, JUPITER_SEARCH_STEPS,
+  JUPITER_LIQUIDITY, MAX_MKT_SPREAD_PCT_FOR_PRICING, JUPITER_SEARCH_STEPS,
   RF_RATE, slippageMax, THEO_VOL_MAP, JUPITER_SLIPPAGE_BPS, PRIORITY_FEE,
   GAMMA_CYCLES, RESOLVE_PERIOD_MS, PRICE_OVERRIDE,
 } from './config';
@@ -262,8 +262,14 @@ export async function tryToSettleOpenBook(
     owner.publicKey,
   )) {
     if (openOrders.baseTokenFree.toNumber() > 0 || openOrders.quoteTokenFree.toNumber() > 0) {
-      const baseRecipientAccount = new PublicKey(ACCOUNT_MAP.get(base));
-      const quoteRecipientAccount = new PublicKey(ACCOUNT_MAP.get(quote));
+      const baseRecipientAccount = await getAssociatedTokenAddress(
+        owner.publicKey,
+        tokenToSplMint(base),
+      );
+      const quoteRecipientAccount = await getAssociatedTokenAddress(
+        owner.publicKey,
+        tokenToSplMint(quote),
+      );
       const { transaction } = (
         await market.makeSettleFundsTransaction(
           connection,
@@ -291,9 +297,15 @@ export async function tryToSettleOpenBook(
   return settleTx;
 }
 
-export function getPayerAccount(hedgeSide: 'buy' | 'sell', base: SYMBOL, quote: SYMBOL) {
-  const baseTokenAccount = new PublicKey(ACCOUNT_MAP.get(base));
-  const quoteTokenAccount = new PublicKey(ACCOUNT_MAP.get(quote));
+export async function getPayerAccount(hedgeSide: 'buy' | 'sell', base: SYMBOL, quote: SYMBOL, owner: Keypair) {
+  const baseTokenAccount = await getAssociatedTokenAddress(
+    owner.publicKey,
+    tokenToSplMint(base),
+  );
+  const quoteTokenAccount = await getAssociatedTokenAddress(
+    owner.publicKey,
+    tokenToSplMint(quote),
+  );
   if (hedgeSide === 'buy') {
     return quoteTokenAccount;
   }

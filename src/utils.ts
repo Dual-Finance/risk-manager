@@ -10,7 +10,7 @@ import SwitchboardProgram from '@switchboard-xyz/sbv2-lite';
 import * as anchor from '@project-serum/anchor';
 import { OCR2Feed } from '@chainlink/solana-sdk';
 import {
-  API_URL, IS_DEV, RANDOM_SLEEP_MULTIPLIER, usdcPk,
+  API_URL, IS_DEV, RANDOM_SLEEP_MULTIPLIER, usdcPk, TRADING_ACCOUNT,
 } from './config';
 import {
   BONK_PK, CHAINLINK_PROGRAM_ID, DUAL_PK, MNGO_PK, BTC_PK, ETH_PK, WSOL_PK,
@@ -18,10 +18,10 @@ import {
 import { SYMBOL } from './common';
 
 export function readKeypair() {
-  return JSON.parse(
-    process.env.KEYPAIR
-      || fs.readFileSync(`${os.homedir()}/mango-explorer/id.json`, 'utf-8'),
-  );
+  if (TRADING_ACCOUNT === undefined) {
+    return JSON.parse(fs.readFileSync(`${os.homedir()}/mango-explorer/id.json`, 'utf-8'));
+  }
+  return JSON.parse(fs.readFileSync(TRADING_ACCOUNT, 'utf-8'));
 }
 
 // Sleep time with some slight randomness.

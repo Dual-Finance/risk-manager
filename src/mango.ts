@@ -14,19 +14,18 @@ import {
   MAX_DELTA_HEDGES, MANGO_DOWNTIME_THRESHOLD_MIN,
   PERP_FUNDING_RATE_THRESHOLD, GAMMA_CYCLES, OPENBOOK_FORK_ID,
   slippageMax, GAMMA_COMPLETE_THRESHOLD_PCT, CLUSTER,
-  HedgeProduct,
-  HedgeSide,
+  HedgeProduct, HedgeSide,
 } from './config';
 import { DIPDeposit } from './common';
 import {
   sleepExact, tokenToSplMint,
 } from './utils';
 import {
-  getDIPDelta, getDIPGamma,
-  getSpotDelta, orderSpliceMango, waitForFill, getMangoHedgeProduct,
-  roundPriceToTickSize, roundQtyToSpotSize,
+  getDIPDelta, getDIPGamma, getSpotDelta, orderSpliceMango, waitForFill,
+  getMangoHedgeProduct, roundPriceToTickSize, roundQtyToSpotSize,
 } from './scalper_utils';
 import {
+  HOURS_PER_YEAR,
   MANGO_DEVNET_GROUP, MANGO_MAINNET_GROUP, OPENBOOK_MKT_MAP, SEC_PER_YEAR,
 } from './constants';
 // eslint-disable-next-line import/no-cycle
@@ -39,6 +38,7 @@ export async function cancelStaleMangoOrders(
   mangoGroup: Group,
   perpMarket: PerpMarket,
 ): Promise<void> {
+  await mangoAccount.reload(mangoClient);
   const openOrders = await mangoAccount.loadPerpOpenOrdersForMarket(
     mangoClient,
     mangoGroup,
@@ -54,7 +54,7 @@ export async function cancelStaleMangoOrders(
         mangoGroup,
         mangoAccount,
         perpMarket.perpMarketIndex,
-        10,
+        10, /* Max number of order cancelations */
       );
       break;
     }
@@ -107,9 +107,8 @@ export async function deltaHedgeMango(
   );
 
   // Get Total Delta Position to hedge
-  let hedgeDeltaTotal = IS_DEV
-    ? 0.1
-    : mangoPerpDelta + dipTotalDelta + spotDelta + mangoSpotDelta + scalper.deltaOffset;
+  let hedgeDeltaTotal = mangoPerpDelta + dipTotalDelta + spotDelta
+   + mangoSpotDelta + scalper.deltaOffset;
 
   // Check whether we need to hedge.
   const dipTotalGamma = getDIPGamma(dipProduct, fairValue, scalper.symbol);
@@ -119,7 +118,7 @@ export async function deltaHedgeMango(
     dipTotalGamma * stdDevSpread * fairValue * GAMMA_THRESHOLD,
     scalper.minSize,
   );
-  if (Math.abs(hedgeDeltaTotal) < (deltaThreshold)) {
+  if (Math.abs(hedgeDeltaTotal) < deltaThreshold) {
     console.log(scalper.symbol, 'Delta Netural', hedgeDeltaTotal, '<', deltaThreshold);
     return;
   }
@@ -133,22 +132,18 @@ export async function deltaHedgeMango(
   const slippageDIPDelta = getDIPDelta(dipProduct, hedgePrice, scalper.symbol);
   const dipDeltaDiff = slippageDIPDelta - dipTotalDelta;
   hedgeDeltaTotal += dipDeltaDiff;
-  console.log(scalper.symbol, 'Adjust Slippage Delta by', dipDeltaDiff, 'to', -hedgeDeltaTotal);
   const hedgeSide = IS_BUYSIDE ? HedgeSide.buy : HedgeSide.sell;
 
-  const notionalThreshold = deltaThreshold * fairValue;
-  const notionalAmount = -hedgeDeltaTotal * fairValue;
-  if ((notionalAmount < notionalThreshold && hedgeSide === HedgeSide.buy)
-       || (notionalAmount > notionalThreshold && hedgeSide === HedgeSide.sell)) {
-    console.log(scalper.symbol, 'Delta Netural: Slippage', deltaThreshold);
+  if (Math.abs(hedgeDeltaTotal) < deltaThreshold) {
+    console.log(scalper.symbol, 'Adjust Delta By', dipDeltaDiff, 'Within threshold:', Math.abs(hedgeDeltaTotal), 'vs.', deltaThreshold);
     return;
   }
-  console.log(scalper.symbol, 'Outside delta threshold:', Math.abs(hedgeDeltaTotal), 'vs.', deltaThreshold);
+  console.log(scalper.symbol, 'Adjust Delta By', dipDeltaDiff, 'Outside threshold:', Math.abs(hedgeDeltaTotal), 'vs.', deltaThreshold);
 
   // Determine spot or perp order based on funding rate.
   const bidSide = await perpMarket.loadBids(mangoClient);
   const askSide = await perpMarket.loadAsks(mangoClient);
-  const fundingRate = (24 * 365)
+  const fundingRate = HOURS_PER_YEAR
     * perpMarket.getCurrentFundingRate(bidSide, askSide);
   const buySpot = fundingRate > PERP_FUNDING_RATE_THRESHOLD;
   const sellSpot = -fundingRate < PERP_FUNDING_RATE_THRESHOLD;
@@ -201,6 +196,7 @@ export async function deltaHedgeMango(
     fillFeed.addEventListener('message', deltaFillListener);
     console.log(scalper.symbol, 'Listening For Delta Hedges');
   } else {
+    // TODO: Try to recover fill feed
     console.log(scalper.symbol, 'Websocket State', fillFeed.readyState);
   }
 
@@ -243,14 +239,14 @@ export async function deltaHedgeMango(
   // Wait the twapInterval of time to see if the position gets to neutral.
   console.log(scalper.symbol, 'Scan Delta Fills for ~', TWAP_INTERVAL_SEC, 'seconds');
   await waitForFill(
-    (_) => Math.abs(hedgeDeltaTotal) < (deltaThreshold),
+    (_) => Math.abs(hedgeDeltaTotal) < deltaThreshold,
     TWAP_INTERVAL_SEC,
   );
 
   // Cleanup listener.
   fillFeed.removeEventListener('message', deltaFillListener);
 
-  if (Math.abs(hedgeDeltaTotal) < (deltaThreshold)) {
+  if (Math.abs(hedgeDeltaTotal) < deltaThreshold) {
     fillFeed.removeEventListener('message', deltaFillListener);
     console.log(scalper.symbol, 'Delta Hedge Complete', hedgeDeltaTotal, '<', deltaThreshold);
     return;
@@ -280,10 +276,10 @@ export async function gammaScalpMango(
   fillFeed: WebSocket,
   gammaScalpCount: number,
 ): Promise<void> {
+  // Resets Mango State. Makes the recursive gamma scalps safer.
+  // Rerun will clear any stale orders, thus allows 2 orders per scalp
   await mangoAccount.reload(mangoClient);
   await mangoGroup.reloadAll(mangoClient);
-  // Makes the recursive gamma scalps safer. Rerun will clear any stale
-  // orders. Allows only 2 gamma orders at any time
   await cancelStaleMangoOrders(scalper, mangoClient, mangoAccount, mangoGroup, perpMarket);
 
   // Avoid unsafe recursion.
@@ -304,11 +300,11 @@ export async function gammaScalpMango(
     ? Math.max(0.01, dipTotalGamma * stdDevSpread * fairValue)
     : dipTotalGamma * stdDevSpread * fairValue;
 
-  console.log(scalper.symbol, 'Position Gamma Γ:', netGamma, 'Fair Value', fairValue);
-  if ((netGamma * fairValue) < (scalper.minSize * fairValue)) {
-    console.log(scalper.symbol, 'Gamma Hedge Too Small');
+  if (netGamma < scalper.minSize) {
+    console.log(scalper.symbol, 'Gamma Hedge Too Small', netGamma, 'vs', scalper.minSize);
     return;
   }
+  console.log(scalper.symbol, 'Position Gamma Γ:', netGamma, 'Fair Value', fairValue);
 
   const orderIdGamma = new Date().getTime() * 2;
   const gammaBid = fairValue * (1 - stdDevSpread);
@@ -335,7 +331,7 @@ export async function gammaScalpMango(
           scalper.symbol,
           'Gamma Filled',
           gammaFillQty,
-          clientOrderId === gammaBidID ? 'BOUGHT FOR' : 'SOLD AT',
+          clientOrderId === gammaBidID ? 'Bought For' : 'Sold At',
           price,
           new Date().toUTCString(),
         );
@@ -394,6 +390,7 @@ export async function gammaScalpMango(
     console.log(scalper.symbol, 'Gamma Ask', gammaAsk, 'ID', gammaAskID);
     await mangoClient.sendAndConfirmTransaction(gammaOrdersTx);
   } catch (err) {
+    // TOOO: Handle Error by exponential backoff / allow single order placement
     console.log(scalper.symbol, 'Gamma Error', err, err.stack);
   }
   console.log(`${scalper.symbol} Gamma Spread % ${((gammaAsk - gammaBid) / fairValue) * 100} Liquidity $ ${netGamma * 2 * fairValue}`);
@@ -418,7 +415,7 @@ export async function loadMangoAndPickScalper(dipProduct: DIPDeposit[], scalper:
   const mangoAccount = await mangoClient.getMangoAccountForOwner(
     mangoGroup,
     scalper.owner.publicKey,
-    0,
+    0, /* First Mango account created */
   );
   await mangoAccount.reload(mangoClient);
   await mangoGroup.reloadAll(mangoClient);
@@ -432,7 +429,7 @@ export async function loadMangoAndPickScalper(dipProduct: DIPDeposit[], scalper:
   }
 
   // Check if Mango Perp is live
-  const lastUpdateMango = perpMarket.fundingLastUpdated.toNumber() * 1000;
+  const lastUpdateMango = perpMarket.fundingLastUpdated.toNumber() * 1_000;
   if ((Date.now() - lastUpdateMango)
         / (1_000 * 60) > MANGO_DOWNTIME_THRESHOLD_MIN) {
     console.log(scalper.symbol, 'Mango Down! Last Updated:', new Date(lastUpdateMango));
@@ -487,7 +484,7 @@ export async function loadMangoAndPickScalper(dipProduct: DIPDeposit[], scalper:
         1,
       );
     } catch (err) {
-      console.log(scalper.symbol, 'Main Error', err, err.stack);
+      console.log(scalper.symbol, 'Top Level Error Catch', err, err.stack);
     }
   }
 }

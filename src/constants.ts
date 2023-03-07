@@ -37,6 +37,7 @@ export const RM_PROD_PK = new PublicKey('CkcJx7Uwgxck5zm3DqUp2N1ikkkoPn2wA8zf7oS
 export const MS_PER_YEAR = 365 * 60 * 60 * 24 * 1_000;
 export const SEC_PER_YEAR = 365 * 60 * 60 * 24;
 export const SIX_MONTHS_IN_MS = 1_000 * 60 * 60 * 24 * 30 * 6;
+export const HOURS_PER_YEAR = 24 * 365;
 
 export const DIP_STATE_LENGTH = 260;
 

@@ -80,7 +80,7 @@ export const usdcPk = IS_DEV ? USDC_DEVNET_PK : USDC_MAINNET_PK;
 export const OPENBOOK_FORK_ID = IS_DEV ? OPB_DEVNET_PROGRAM_ID : OPB_MAINNET_PROGRAM_ID;
 
 export const ACCOUNT_MAP = new Map<SYMBOL, string>([
-  ['BTC', '79ee6JPqTPUDzX4FeAWSntFatmpb5BY5LQrXzMX3aAE6'], ['ETH', 'F7qSsLofbpZBfZ11wkajX9JPshSEeyGpaFvDeuur2mNW'],
+  ['BTC', '9N8KidKFxnS3BkHuRfPmhobbrv6iqAR7iGa7qc3QMaa7'], ['ETH', 'F7qSsLofbpZBfZ11wkajX9JPshSEeyGpaFvDeuur2mNW'],
   ['SOL', '9EaYbxzU1YJwJojKsKp3U38PBy5aqcN2KS9Xc8hAxZB7'], ['USDC', '2gyJ4SZyQtUEXCLRa459nbWaFzuN8uvyoUsVb7xmpkh1'],
   ['MNGO', '4zzgXnhfwdtASw9JugEyrPSKzvaN8i2WSDm1bnGiHFcK'], ['BONK', 'D8yD6us5X7YNeweppFdBR4idGsyPooetuW2fA6Suabqg'],
   ['DUAL', 'F2ytwuKEP3Mv9hCwYNdma9GaYxP61KBSQtHpeRTRneUh'],

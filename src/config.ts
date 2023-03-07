@@ -113,7 +113,7 @@ export const BVE_VOL_MAP = new Map<SYMBOL, number>([
 export const treasuryPositions: DIPDeposit[] = [({
   splTokenName: 'MNGO',
   premiumAssetName: 'USDC',
-  expirationMs: 1677672000000,
+  expirationMs: 1682942400000,
   strikeUsdcPerToken: 0.018,
   callOrPut: CallOrPut.Put,
   qtyTokens: 6944444,
@@ -138,10 +138,18 @@ export const treasuryPositions: DIPDeposit[] = [({
   splTokenName: 'DUAL',
   premiumAssetName: 'USDC',
   expirationMs: 1685793600000,
-  strikeUsdcPerToken: 0.05,
+  strikeUsdcPerToken: 0.032,
   callOrPut: CallOrPut.Call,
-  qtyTokens: 2467.1,
-}), // TEST DUAL Position
+  qtyTokens: 246710,
+}),
+({
+  splTokenName: 'DUAL',
+  premiumAssetName: 'USDC',
+  expirationMs: 1685793600000,
+  strikeUsdcPerToken: 0.032,
+  callOrPut: CallOrPut.Put,
+  qtyTokens: 246710,
+}), // MM around DUAL Straddle
 ];
 
 // Amount to vary the sleep on a random sleep.

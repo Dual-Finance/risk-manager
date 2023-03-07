@@ -6,6 +6,7 @@ import {
 
 export const IS_DEV = process.env.DEV !== 'false';
 export const API_URL = process.env.RPC;
+export const PRICE_OVERRIDE = Number(process.env.PRICE);
 // Priority Fee to use for all txs in micro lamports
 export const PRIORITY_FEE = process.env.FEE ? parseInt(process.env.FEE, 10) : 1;
 const solVars = process.env.SOL ? process.env.SOL.split(',') : [null, null, null, null];
@@ -196,5 +197,3 @@ export const WHALE_MAX_SPREAD = 0.4;
 export const RESOLVE_PERIOD_MS = 100;
 // Order size buffer in percent to use to reduce order sizes
 export const ORDER_SIZE_BUFFER_PCT = 0.99;
-// DUAL Starting Price
-export const DUAL_START_PRICE = 0.032;

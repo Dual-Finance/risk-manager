@@ -13,10 +13,11 @@ import {
   GAMMA_CYCLES, MinOpenBookSize, OPENBOOK_FORK_ID,
   treasuryPositions, slippageMax, GAMMA_COMPLETE_THRESHOLD_PCT, CLUSTER,
   MAX_ORDER_BOOK_SEARCH_DEPTH, MAX_BACK_GAMMA_MULTIPLE, API_URL, MODE_BY_SYMBOL,
-  WHALE_MAX_SPREAD, ScalperMode, ORDER_SIZE_BUFFER_PCT, HedgeSide,
+  WHALE_MAX_SPREAD, ScalperMode, ORDER_SIZE_BUFFER_PCT, HedgeSide, BACK_GAMMA_SPREAD_PRECENT,
 } from './config';
 import { CallOrPut, DIPDeposit, SYMBOL } from './common';
 import {
+  getRandomNumAround,
   readKeypair,
 } from './utils';
 import { SerumVialClient, SerumVialTradeMessage, tradeMessageToString } from './serumVial';
@@ -504,7 +505,11 @@ class Scalper {
     // Find the prices at which whale qty is bid & offered
     const bids = await spotMarket.loadBids(this.connection);
     const numBids = bids.getL2(MAX_ORDER_BOOK_SEARCH_DEPTH).length;
-    const dimQty = MAX_BACK_GAMMA_MULTIPLE * netGamma;
+    const randomMaxBackGammaMult = getRandomNumAround(
+      MAX_BACK_GAMMA_MULTIPLE,
+      BACK_GAMMA_SPREAD_PRECENT,
+    );
+    const dimQty = randomMaxBackGammaMult * netGamma - netGamma;
     let bidDepth = 0;
     let whaleBidPrice: number;
     // TODO: Fix this logic to avoid continuously reparsing L2.
@@ -526,7 +531,7 @@ class Scalper {
         break;
       }
     }
-    console.log(`${this.symbol} Whale Bid: ${whaleBidPrice} Ask ${whaleAskPrice} \
+    console.log(`${this.symbol} Dim Qty ${dimQty} Whale Bid: ${whaleBidPrice} Ask ${whaleAskPrice} \
     Spread % ${((whaleAskPrice - whaleBidPrice) / fairValue) * 100}`);
 
     amountGamma = roundQtyToSpotSize(Math.abs(netGamma), this.minSpotSize);
@@ -584,7 +589,7 @@ class Scalper {
       : undefined;
 
     // TODO: Do the same logic for whale bid. Less likely but still applicable.
-    const maxBackGamma = netGamma * (MAX_BACK_GAMMA_MULTIPLE - 1);
+    const maxBackGamma = Math.max(netGamma * randomMaxBackGammaMult, 0);
     const whaleBidGammaQty = Math.min(maxBackGamma, dipTotalGamma * whaleBidDiff - netGamma);
     let whaleAskGammaQty = Math.min(maxBackGamma, dipTotalGamma * whaleAskDiff - netGamma);
     // Reduce whale ask if not enough inventory

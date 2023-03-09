@@ -206,7 +206,9 @@ export const JUPITER_SLIPPAGE_BPS = 50;
 // Max num of levels to search for order book depth
 export const MAX_ORDER_BOOK_SEARCH_DEPTH = 100;
 // Max multiple of gamma to allow on the back bids
-export const MAX_BACK_GAMMA_MULTIPLE = 5;
+export const MAX_BACK_GAMMA_MULTIPLE = 3;
+// Percent random spread around MAX_BACK_GAMMA_MULTIPLE
+export const BACK_GAMMA_SPREAD_PRECENT = 0.8;
 // IV spread market maker at minimum must beat backstop to take fills
 export const VOL_SPREAD = 0.05;
 // Max % spread to allow whale bid/ask

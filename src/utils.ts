@@ -326,3 +326,9 @@ export async function getChainlinkPrice(splMint: PublicKey) {
   }
   return prettyLatestValue;
 }
+
+export function getRandomNumAround(midValue: number, spread: number) {
+  const min = midValue * (1 - spread);
+  const max = midValue * (1 + spread);
+  return Math.random() * (max - min) + min;
+}

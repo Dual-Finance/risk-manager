@@ -13,7 +13,7 @@ import {
   GAMMA_CYCLES, MinOpenBookSize, OPENBOOK_FORK_ID,
   treasuryPositions, slippageMax, GAMMA_COMPLETE_THRESHOLD_PCT, CLUSTER,
   MAX_ORDER_BOOK_SEARCH_DEPTH, MAX_BACK_GAMMA_MULTIPLE, API_URL, MODE_BY_SYMBOL,
-  WHALE_MAX_SPREAD, ScalperMode, ORDER_SIZE_BUFFER_PCT, HedgeSide, BACK_GAMMA_SPREAD_PRECENT,
+  WHALE_MAX_SPREAD, ScalperMode, ORDER_SIZE_BUFFER_PCT, HedgeSide, BACK_GAMMA_SPREAD_RATIO,
 } from './config';
 import { CallOrPut, DIPDeposit, SYMBOL } from './common';
 import {
@@ -507,7 +507,7 @@ class Scalper {
     const numBids = bids.getL2(MAX_ORDER_BOOK_SEARCH_DEPTH).length;
     const randomMaxBackGammaMult = getRandomNumAround(
       MAX_BACK_GAMMA_MULTIPLE,
-      BACK_GAMMA_SPREAD_PRECENT,
+      BACK_GAMMA_SPREAD_RATIO,
     );
     const dimQty = randomMaxBackGammaMult * netGamma - netGamma;
     let bidDepth = 0;

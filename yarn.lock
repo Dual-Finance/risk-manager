@@ -27,10 +27,10 @@
     toformat "^2.0.0"
     yargs "^17.0.1"
 
-"@blockworks-foundation/mango-v4@^0.5.25":
-  version "0.5.25"
-  resolved "https://registry.npmjs.org/@blockworks-foundation/mango-v4/-/mango-v4-0.5.25.tgz"
-  integrity sha512-YzTepE6Z/XVa2BHlwryB/jKvGzUhNsTjX4voggFHhVRcSQaj0oeOvgPfGhQPCcIL9pmlauTtSNuwirW2O/pb+g==
+"@blockworks-foundation/mango-v4@^0.5.27":
+  version "0.5.27"
+  resolved "https://registry.npmjs.org/@blockworks-foundation/mango-v4/-/mango-v4-0.5.27.tgz"
+  integrity sha512-Au/gCF4W/+yaufGqqLh+qJmTV1F76KBsbnHdLaDb+vGavDPATbNKs1mS3Jh+hmf8Rw+FiSGWhKVyKn6Jr/2HHg==
   dependencies:
     "@coral-xyz/anchor" "^0.26.0"
     "@project-serum/serum" "0.13.65"

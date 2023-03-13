@@ -38,11 +38,11 @@ export async function cancelStaleMangoOrders(
   mangoGroup: Group,
   perpMarket: PerpMarket,
 ): Promise<void> {
-  await mangoAccount.reload(mangoClient);
   const openOrders = await mangoAccount.loadPerpOpenOrdersForMarket(
     mangoClient,
     mangoGroup,
     perpMarket.perpMarketIndex,
+    true,
   );
   if (openOrders.length === 0) {
     return;

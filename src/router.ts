@@ -9,7 +9,7 @@ import {
 } from './common';
 import {
   API_URL,
-  CLUSTER,
+  cluster,
   DUAL_API,
   usdcPk,
   BVE_VOL_MAP,
@@ -76,7 +76,10 @@ class Router {
 
     await fetchMMOrder(symbol).then(async (order) => {
       // Run the risk manager if there is no MM order
-      if (!order || order.price === undefined || Number(order.remainingQuantity) === 0) {
+      // @ts-ignore
+      if (!order || order.price === undefined
+        // @ts-ignore
+        || Number(order.remainingQuantity) === 0) {
         this.dips[
           dipToString(
             dipDeposit.expirationMs / 1_000,
@@ -95,6 +98,7 @@ class Router {
         dipDeposit.splTokenName,
       ) * (1 + VOL_SPREAD + Math.random() * VOL_SPREAD);
       const thresholdPrice = blackScholes(currentPrice, dipDeposit.strikeUsdcPerToken, fractionOfYear, vol, RF_RATE, 'call');
+      // @ts-ignore
       const { price, remainingQuantity } = order;
       console.log('MM price:', price, 'BVE Re-Route price:', thresholdPrice);
       const userPremium = price * dipDeposit.qtyTokens;
@@ -282,7 +286,7 @@ class Router {
 
           // Create a poller
           const poller: Poller = new Poller(
-            CLUSTER,
+            cluster,
             this.token,
             'USDC',
             expirationSec,

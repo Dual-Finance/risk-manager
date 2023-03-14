@@ -1,7 +1,7 @@
 import * as greeks from 'greeks';
 import {
-  BookSide, PerpMarket, PerpOrderSide,
-} from '@blockworks-foundation/mango-v4';
+  BookSide, MangoCache, MangoGroup, PerpMarket,
+} from '@blockworks-foundation/mango-client';
 import {
   ComputeBudgetProgram, Connection, Keypair, LAMPORTS_PER_SOL, PublicKey,
   sendAndConfirmTransaction, Transaction,
@@ -15,18 +15,27 @@ import {
   CallOrPut, DIPDeposit, RouteDetails, SYMBOL,
 } from './common';
 import {
-  JUPITER_LIQUIDITY, MAX_MKT_SPREAD_PCT_FOR_PRICING, JUPITER_SEARCH_STEPS,
+  ACCOUNT_MAP, JUPITER_LIQUIDITY, MAX_MKT_SPREAD_PCT_FOR_PRICING, JUPITER_SEARCH_STEPS,
   RF_RATE, slippageMax, THEO_VOL_MAP, JUPITER_SLIPPAGE_BPS, PRIORITY_FEE,
-  GAMMA_CYCLES, RESOLVE_PERIOD_MS, HedgeProduct, PRICE_OVERRIDE, HedgeSide,
+  GAMMA_CYCLES, RESOLVE_PERIOD_MS,
 } from './config';
 import {
   decimalsBaseSPL, getChainlinkPrice, getPythPrice, getSwitchboardPrice,
   sleepExact, splMintToToken, tokenToSplMint,
 } from './utils';
 import {
-  RM_PROD_PK, MS_PER_YEAR, NO_FAIR_VALUE, OPTION_VAULT_PK, RM_BACKUP_PK,
-  SUFFICIENT_BOOK_DEPTH,
+  RM_PROD_PK, MS_PER_YEAR, NO_FAIR_VALUE, OPTION_VAULT_PK, RM_BACKUP_PK, SUFFICIENT_BOOK_DEPTH,
 } from './constants';
+
+export async function loadPrices(
+  mangoGroup: MangoGroup,
+  connection: Connection,
+) {
+  const [mangoCache]: [MangoCache] = await Promise.all([
+    mangoGroup.loadCache(connection),
+  ]);
+  return [mangoCache];
+}
 
 export function getDIPDelta(
   dipProduct: DIPDeposit[],
@@ -94,14 +103,13 @@ export function getDIPTheta(
   return thetaSum;
 }
 
-export function getMangoHedgeProduct(hedgeSide: PerpOrderSide, buySpot: boolean, sellSpot: boolean):
-  HedgeProduct.Spot | HedgeProduct.Perp {
-  if (hedgeSide === PerpOrderSide.bid && buySpot) {
-    return HedgeProduct.Spot;
-  } if (hedgeSide === PerpOrderSide.ask && sellSpot) {
-    return HedgeProduct.Spot;
+export function getMangoHedgeProduct(hedgeSide: string, buySpot: boolean, sellSpot: boolean): '-SPOT' | '-PERP' {
+  if (hedgeSide === 'buy' && buySpot) {
+    return '-SPOT';
+  } if (hedgeSide === 'sell' && sellSpot) {
+    return '-SPOT';
   }
-  return HedgeProduct.Perp;
+  return '-PERP';
 }
 
 // Splice delta hedge orders if available mango liquidity not supportive
@@ -114,7 +122,7 @@ export function orderSpliceMango(
   market: PerpMarket,
 ) {
   let spliceFactor: number;
-  const nativeQty = market.uiBaseToLots(qty);
+  const [_, nativeQty] = market.uiToNativePriceQuantity(0, qty);
   if (qty > 0 && side.getImpactPriceUi(nativeQty) < price * (1 - slippage)) {
     spliceFactor = Math.max((qty * price) / notionalMax, 1);
     console.log(`Sell Price Impact: ${side.getImpactPriceUi(nativeQty)} High Slippage!`);
@@ -164,25 +172,19 @@ export function liquidityCheckAndNumSplices(
 // Fill Size from any perp orders
 export async function fillSize(
   perpMarket: PerpMarket,
+  connection: Connection,
   orderID: number,
 ) {
   let filledQty = 0;
-  const recentFills = await perpMarket.loadFills(this.mangoClient);
-  for (const fill of recentFills) {
-    const { eventType } = fill;
-    const {
-      makerClientOrderId, takerClientOrderId, takerSide, quantity,
-    } = eventType[1];
-    if (eventType) {
-      if (
-        makerClientOrderId.toString() === orderID.toString()
-      || takerClientOrderId.toString() === orderID.toString()
-      ) {
-        if (takerSide === 'buy') {
-          filledQty += quantity;
-        } else if (takerSide === 'sell') {
-          filledQty -= quantity;
-        }
+  for (const fill of await perpMarket.loadFills(connection)) {
+    if (
+      fill.makerClientOrderId.toString() === orderID.toString()
+      || fill.takerClientOrderId.toString() === orderID.toString()
+    ) {
+      if (fill.takerSide === 'buy') {
+        filledQty += fill.quantity;
+      } else if (fill.takerSide === 'sell') {
+        filledQty -= fill.quantity;
       }
     }
   }
@@ -221,14 +223,12 @@ export async function getSpotDelta(
     }
     spotDelta = mainDelta + tokenDelta + spotDelta;
   }
-  if (market !== undefined) {
-    const openBookOO = await market.findOpenOrdersAccountsForOwner(
-      connection,
-      owner.publicKey,
-    );
-    for (const openOrders of openBookOO) {
-      openOrderQty += openOrders.baseTokenTotal.toNumber() / 10 ** tokenDecimals;
-    }
+  const openBookOO = await market.findOpenOrdersAccountsForOwner(
+    connection,
+    owner.publicKey,
+  );
+  for (const openOrders of openBookOO) {
+    openOrderQty += openOrders.baseTokenTotal.toNumber() / 10 ** tokenDecimals;
   }
   return spotDelta + openOrderQty;
 }
@@ -262,14 +262,8 @@ export async function tryToSettleOpenBook(
     owner.publicKey,
   )) {
     if (openOrders.baseTokenFree.toNumber() > 0 || openOrders.quoteTokenFree.toNumber() > 0) {
-      const baseRecipientAccount = await getAssociatedTokenAddress(
-        owner.publicKey,
-        tokenToSplMint(base),
-      );
-      const quoteRecipientAccount = await getAssociatedTokenAddress(
-        owner.publicKey,
-        tokenToSplMint(quote),
-      );
+      const baseRecipientAccount = new PublicKey(ACCOUNT_MAP.get(base));
+      const quoteRecipientAccount = new PublicKey(ACCOUNT_MAP.get(quote));
       const { transaction } = (
         await market.makeSettleFundsTransaction(
           connection,
@@ -297,20 +291,9 @@ export async function tryToSettleOpenBook(
   return settleTx;
 }
 
-export async function getPayerAccount(
-  hedgeSide: HedgeSide,
-  base: SYMBOL,
-  quote: SYMBOL,
-  owner: Keypair,
-) {
-  const baseTokenAccount = await getAssociatedTokenAddress(
-    owner.publicKey,
-    tokenToSplMint(base),
-  );
-  const quoteTokenAccount = await getAssociatedTokenAddress(
-    owner.publicKey,
-    tokenToSplMint(quote),
-  );
+export function getPayerAccount(hedgeSide: 'buy' | 'sell', base: SYMBOL, quote: SYMBOL) {
+  const baseTokenAccount = new PublicKey(ACCOUNT_MAP.get(base));
+  const quoteTokenAccount = new PublicKey(ACCOUNT_MAP.get(quote));
   if (hedgeSide === 'buy') {
     return quoteTokenAccount;
   }
@@ -448,9 +431,6 @@ export async function findFairValue(
   tries: number,
   waitSecPerTry: number,
 ) {
-  if (PRICE_OVERRIDE > 0) {
-    return PRICE_OVERRIDE;
-  }
   let fairValue = await getFairValue(connection, spotMarket, symbol, jupiter);
   for (let i = 0; i < tries; i++) {
     if (fairValue === NO_FAIR_VALUE) {

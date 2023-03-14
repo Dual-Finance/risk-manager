@@ -136,22 +136,30 @@ export const treasuryPositions: DIPDeposit[] = [({
   strikeUsdcPerToken: 0.0000009,
   callOrPut: CallOrPut.Call,
   qtyTokens: 335284600,
+}),
+({
+  splTokenName: 'BONK',
+  premiumAssetName: 'USDC',
+  expirationMs: 1680868800,
+  strikeUsdcPerToken: 0.0000006,
+  callOrPut: CallOrPut.Call,
+  qtyTokens: 81868030,
 }), // BONK GSO Position
 ({
   splTokenName: 'BTC',
   premiumAssetName: 'USDC',
   expirationMs: 1680350400000,
-  strikeUsdcPerToken: 22000,
+  strikeUsdcPerToken: 26000,
   callOrPut: CallOrPut.Call,
-  qtyTokens: 0.007,
+  qtyTokens: 0.005,
 }),
 ({
   splTokenName: 'BTC',
   premiumAssetName: 'USDC',
   expirationMs: 1680350400000,
-  strikeUsdcPerToken: 22000,
+  strikeUsdcPerToken: 26000,
   callOrPut: CallOrPut.Put,
-  qtyTokens: 0.007,
+  qtyTokens: 0.005,
 }), // Test for Mango Perps
 ({
   splTokenName: 'DUAL',

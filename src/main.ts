@@ -27,7 +27,7 @@ async function main() {
   ]));
   for (const [symbol, router] of routers) {
     if (productStatus.get(symbol)) {
-      const [pollers, mmAccounts] = await router.refresh_dips();
+      const [pollers, mmAccounts] = await router.refresh_dips_poller_accounts();
       console.log(`Check ${symbol} Position vs MM Quotes ${new Date().toUTCString()}`);
       await router.checkMMPrices();
       for (let i = 0; i < pollers.length; i++) {
@@ -44,7 +44,7 @@ async function main() {
         if (productStatus.get(symbol)) {
           console.log('------------------------------------------------');
           console.log(`RERUN ${symbol} Risk Manager ${new Date().toUTCString()}`);
-          const [pollers, mmAccounts] = await router.refresh_dips();
+          const [pollers, mmAccounts] = await router.refresh_dips_poller_accounts();
           console.log(`Re-Check ${symbol} Position vs MM Quotes ${new Date().toUTCString()}`);
           await router.checkMMPrices();
           for (let i = 0; i < pollers.length; i++) {

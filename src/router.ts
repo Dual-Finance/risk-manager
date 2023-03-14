@@ -188,7 +188,7 @@ class Router {
       console.log('Failed to router with error: ', err, 'proceeding to run risk manager.');
     }
     console.log('Checked', openPositionCount, 'DIP Positions');
-    await this.refresh_dips();
+    await this.refresh_dips_poller_accounts();
     if (dipDeposit !== undefined) {
       // TODO: Only run RM here if position changed from prior run
       if (dipDeposit.qtyTokens !== 0) {
@@ -231,7 +231,7 @@ class Router {
     };
   }
 
-  async refresh_dips() : Promise<[Poller[], string[]]> {
+  async refresh_dips_poller_accounts() : Promise<[Poller[], string[]]> {
     console.log('Refreshing dips', API_URL);
     const pollers: Poller[] = [];
     const mmAccounts: string[] = [];

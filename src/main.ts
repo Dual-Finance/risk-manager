@@ -2,14 +2,14 @@ import { DIPDeposit, SYMBOL } from './common';
 import Scalper from './scalper';
 import Router from './router';
 import {
-  SCALPER_WINDOW_SEC, cluster, PRODUCT_STAGGER_SEC, productStatus,
+  SCALPER_WINDOW_SEC, CLUSTER, PRODUCT_STAGGER_SEC, productStatus,
 } from './config';
 import { sleepExact } from './utils';
 
 async function main() {
-  console.log('Risk Manager Running on', cluster, new Date().toUTCString());
+  console.log('Risk Manager Running on', CLUSTER, new Date().toUTCString());
 
-  const symbols: SYMBOL[] = ['SOL', 'BTC', 'ETH', 'MNGO', 'BONK'];
+  const symbols: SYMBOL[] = ['SOL', 'BTC', 'ETH', 'MNGO', 'BONK', 'DUAL'];
 
   const scalpers: Map<SYMBOL, Scalper> = new Map(
     symbols.map((symbol) => [symbol, new Scalper(symbol)]),

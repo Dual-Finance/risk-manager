@@ -10,18 +10,18 @@ import SwitchboardProgram from '@switchboard-xyz/sbv2-lite';
 import * as anchor from '@project-serum/anchor';
 import { OCR2Feed } from '@chainlink/solana-sdk';
 import {
-  API_URL, IS_DEV, RANDOM_SLEEP_MULTIPLIER, usdcPk,
+  API_URL, IS_DEV, RANDOM_SLEEP_MULTIPLIER, usdcPk, TRADING_ACCOUNT,
 } from './config';
 import {
-  BONK_PK, CHAINLINK_PROGRAM_ID, MNGO_PK, SO_BTC_PK, SO_ETH_PK, WSOL_PK,
+  BONK_PK, CHAINLINK_PROGRAM_ID, DUAL_PK, MNGO_PK, BTC_PK, ETH_PK, WSOL_PK,
 } from './constants';
 import { SYMBOL } from './common';
 
 export function readKeypair() {
-  return JSON.parse(
-    process.env.KEYPAIR
-      || fs.readFileSync(`${os.homedir()}/mango-explorer/id.json`, 'utf-8'),
-  );
+  if (TRADING_ACCOUNT === undefined) {
+    return JSON.parse(fs.readFileSync(`${os.homedir()}/mango-explorer/id.json`, 'utf-8'));
+  }
+  return JSON.parse(fs.readFileSync(TRADING_ACCOUNT, 'utf-8'));
 }
 
 // Sleep time with some slight randomness.
@@ -101,10 +101,10 @@ export function splMintToToken(splMint: PublicKey): SYMBOL {
   if (splMint.toBase58() === WSOL_PK.toBase58()) {
     return 'SOL';
   }
-  if (splMint.toBase58() === SO_BTC_PK.toBase58()) {
+  if (splMint.toBase58() === BTC_PK.toBase58()) {
     return 'BTC';
   }
-  if (splMint.toBase58() === SO_ETH_PK.toBase58()) {
+  if (splMint.toBase58() === ETH_PK.toBase58()) {
     return 'ETH';
   }
   if (splMint.toBase58() === MNGO_PK.toBase58()) {
@@ -112,6 +112,9 @@ export function splMintToToken(splMint: PublicKey): SYMBOL {
   }
   if (splMint.toBase58() === BONK_PK.toBase58()) {
     return 'BONK';
+  }
+  if (splMint.toBase58() === DUAL_PK.toBase58()) {
+    return 'DUAL';
   }
   if (splMint.toBase58() === usdcPk.toBase58()) {
     return 'USDC';
@@ -125,16 +128,19 @@ export function tokenToSplMint(token: SYMBOL) {
     return WSOL_PK;
   }
   if (token === 'BTC') {
-    return SO_BTC_PK;
+    return BTC_PK;
   }
   if (token === 'ETH') {
-    return SO_ETH_PK;
+    return ETH_PK;
   }
   if (token === 'MNGO') {
     return MNGO_PK;
   }
   if (token === 'BONK') {
     return BONK_PK;
+  }
+  if (token === 'DUAL') {
+    return DUAL_PK;
   }
   if (token === 'USDC') {
     return usdcPk;
@@ -158,6 +164,7 @@ export function tokenToPythSymbol(token: SYMBOL) {
   if (token === 'BONK') {
     return 'Crypto.BONK/USD';
   }
+  // TODO: Add DUAL Pyth
   return undefined;
 }
 
@@ -196,6 +203,7 @@ function tokenToSBSymbol(token: SYMBOL) {
   if (token === 'BONK') {
     return '6qBqGAYmoZw2r4fda7671NSUbcDWE4XicJdJoWqK8aTe';
   }
+  // TODO: Add DUAL Switchboard
   return undefined;
 }
 
@@ -245,6 +253,9 @@ function tokenToChainlinkSymbol(token: SYMBOL) {
   if (token === 'BONK') {
     return '';
   }
+  if (token === 'DUAL') {
+    return '';
+  }
   return undefined;
 }
 
@@ -264,6 +275,9 @@ export function decimalsBaseSPL(token: SYMBOL) {
     }
     case 'BONK': {
       return 5;
+    }
+    case 'DUAL': {
+      return 6;
     }
     case 'USDC': {
       return 6;
@@ -311,4 +325,10 @@ export async function getChainlinkPrice(splMint: PublicKey) {
     return prettyLatestValue * 10;
   }
   return prettyLatestValue;
+}
+
+export function getRandomNumAround(midValue: number, spread: number) {
+  const min = midValue * (1 - spread);
+  const max = midValue * (1 + spread);
+  return Math.random() * (max - min) + min;
 }

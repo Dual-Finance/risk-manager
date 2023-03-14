@@ -27,9 +27,13 @@ async function main() {
   ]));
   for (const [symbol, router] of routers) {
     if (productStatus.get(symbol)) {
-      await router.refresh_dips();
+      const [pollers, mmAccounts] = await router.refresh_dips_poller_accounts();
       console.log(`Check ${symbol} Position vs MM Quotes ${new Date().toUTCString()}`);
-      router.checkMMPrices();
+      await router.checkMMPrices();
+      for (let i = 0; i < pollers.length; i++) {
+        pollers[i].subscribe(mmAccounts[i]);
+      }
+      router.run_risk_manager();
       await sleepExact(PRODUCT_STAGGER_SEC);
     }
   }
@@ -40,9 +44,13 @@ async function main() {
         if (productStatus.get(symbol)) {
           console.log('------------------------------------------------');
           console.log(`RERUN ${symbol} Risk Manager ${new Date().toUTCString()}`);
-          await router.refresh_dips();
+          const [pollers, mmAccounts] = await router.refresh_dips_poller_accounts();
           console.log(`Re-Check ${symbol} Position vs MM Quotes ${new Date().toUTCString()}`);
-          router.checkMMPrices();
+          await router.checkMMPrices();
+          for (let i = 0; i < pollers.length; i++) {
+            pollers[i].subscribe(mmAccounts[i]);
+          }
+          router.run_risk_manager();
           await sleepExact(PRODUCT_STAGGER_SEC);
         }
       }

@@ -173,18 +173,24 @@ class Router {
           )
         ] = dipDeposit;
       }
-      for (const dipDeposit of Object.values(this.dips)) {
-        if (dipDeposit.qtyTokens > 0) {
+      for (const dip of Object.values(this.dips)) {
+        if (dip.qtyTokens > 0) {
           openPositionCount++;
-          await this.route(dipDeposit);
+          // TODO await for a response back from the API
+          await this.route(dip);
         }
       }
     } catch (err) {
       console.log('Failed to router with error: ', err, 'proceeding to run risk manager.');
     }
-
-    console.log('Open DIP Positions', openPositionCount);
-    this.run_risk_manager();
+    console.log('Checked', openPositionCount, 'DIP Positions');
+    await this.refresh_dips_poller_accounts();
+    if (dipDeposit !== undefined) {
+      // TODO: Only run RM here if position changed from prior run
+      if (dipDeposit.qtyTokens !== 0) {
+        this.run_risk_manager();
+      }
+    }
   }
 
   run_risk_manager(): void {
@@ -221,8 +227,10 @@ class Router {
     };
   }
 
-  async refresh_dips() {
+  async refresh_dips_poller_accounts() : Promise<[Poller[], string[]]> {
     console.log('Refreshing dips', API_URL);
+    const pollers: Poller[] = [];
+    const mmAccounts: string[] = [];
     const connection = new Connection(API_URL, 'processed' as Commitment);
     const programAccountsPromise = connection.getProgramAccounts(DIP_PROGRAM_ID);
 
@@ -285,11 +293,12 @@ class Router {
             },
           );
 
-          // Start polling for a specific DIP option token account
-          poller.subscribe(mmOptionAccount.toBase58());
+          mmAccounts.push(mmOptionAccount.toBase58());
+          pollers.push(poller);
         }
       }
     });
+    return [pollers, mmAccounts];
   }
 }
 

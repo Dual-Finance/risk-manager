@@ -14,9 +14,11 @@ import {
   treasuryPositions, slippageMax, GAMMA_COMPLETE_THRESHOLD_PCT, CLUSTER,
   MAX_ORDER_BOOK_SEARCH_DEPTH, MAX_BACK_GAMMA_MULTIPLE, API_URL, MODE_BY_SYMBOL,
   WHALE_MAX_SPREAD, ScalperMode, ORDER_SIZE_BUFFER_PCT, HedgeSide, BACK_GAMMA_SPREAD_RATIO,
+  MAX_LOAD_TIME,
 } from './config';
 import { CallOrPut, DIPDeposit, SYMBOL } from './common';
 import {
+  asyncCallWithTimeoutasync,
   getRandomNumAround,
   readKeypair,
 } from './utils';
@@ -108,7 +110,6 @@ class Scalper {
 
     this.serumVialClient.removeAnyListeners();
     let spotMarket: Market;
-    let jupiter: Jupiter;
     try {
       spotMarket = await Market.load(
         this.connection,
@@ -121,35 +122,18 @@ class Scalper {
       return;
     }
 
-    try {
-      console.log(this.symbol, 'Loading Jupiter');
-      jupiter = await Jupiter.load({
-        connection: this.connection,
-        cluster: CLUSTER,
-        user: this.owner,
-        wrapUnwrapSOL: false,
-        restrictIntermediateTokens: true,
-        shouldLoadSerumOpenOrders: false,
-      });
-    } catch (err) {
-      console.log(this.symbol, 'Jupiter Failed', err);
-      return;
-    }
-
     if (this.mode === ScalperMode.Normal) {
       try {
         await this.deltaHedgeOpenBook(
           dipProduct,
           1 /* deltaHedgeCount */,
           spotMarket,
-          jupiter,
         );
         await this.gammaScalpOpenBook(
           dipProduct,
           1, /* gammaScalpCount */
           NO_FAIR_VALUE, /* priorFillPrice */
           spotMarket,
-          jupiter,
         );
       } catch (err) {
         console.log(this.symbol, 'Normal scalping error', err.stack);
@@ -162,7 +146,6 @@ class Scalper {
           1, /* gammaScalpCount */
           NO_FAIR_VALUE, /* priorFillPrice */
           spotMarket,
-          jupiter,
         );
       } catch (err) {
         console.log(this.symbol, 'Main Gamma Error', err.stack);
@@ -176,7 +159,6 @@ class Scalper {
     dipProduct: DIPDeposit[],
     deltaHedgeCount: number,
     spotMarket: Market,
-    jupiter: Jupiter,
   ): Promise<void> {
     // Clean the state by cancelling all existing open orders.
     await cancelOpenBookOrders(this.connection, this.owner, spotMarket, this.symbol);
@@ -207,9 +189,9 @@ class Scalper {
     console.log(this.symbol, 'Loading Fair Value');
     const fairValue = await findFairValue(
       this.connection,
+      this.owner,
       spotMarket,
       this.symbol,
-      jupiter,
       MAX_DELTA_HEDGES,
       TWAP_INTERVAL_SEC,
     );
@@ -274,6 +256,15 @@ class Scalper {
       if (spliceFactor !== SUFFICIENT_BOOK_DEPTH) {
         console.log(this.symbol, 'Not enough liquidity! Try Jupiter. Adjust Price', hedgePrice, 'Splice', spliceFactor);
         // Check on jupiter and sweep price
+        console.log(this.symbol, 'Loading Jupiter To Trade');
+        const jupiter = await asyncCallWithTimeoutasync(Jupiter.load({
+          connection: this.connection,
+          cluster: CLUSTER,
+          user: this.owner,
+          wrapUnwrapSOL: false,
+          restrictIntermediateTokens: true,
+          shouldLoadSerumOpenOrders: false,
+        }), MAX_LOAD_TIME);
         const jupValues = await jupiterHedge(hedgeSide, this.symbol, 'USDC', hedgeDeltaTotal, hedgePrice, jupiter);
         if (jupValues !== undefined) {
           const { setupTransaction, swapTransaction, cleanupTransaction } = jupValues.txs;
@@ -322,8 +313,11 @@ class Scalper {
       selfTradeBehavior: 'abortTransaction',
     });
     deltaOrderTx.add(deltaTx.transaction);
-    await sendAndConfirmTransaction(this.connection, setPriorityFee(deltaOrderTx), [this.owner]);
-
+    try {
+      await sendAndConfirmTransaction(this.connection, setPriorityFee(deltaOrderTx), [this.owner]);
+    } catch (err) {
+      console.log(this.symbol, 'Delta Order', err, err.stack);
+    }
     // Rest single order if the hedge should be completed in a single clip
     if (spliceFactor === 1) {
       const netHedgePeriod = TWAP_INTERVAL_SEC * MAX_DELTA_HEDGES;
@@ -360,7 +354,6 @@ class Scalper {
       dipProduct,
       deltaHedgeCount + 1,
       spotMarket,
-      jupiter,
     );
   }
 
@@ -369,7 +362,6 @@ class Scalper {
     gammaScalpCount: number,
     priorFillPrice: number,
     spotMarket: Market,
-    jupiter: Jupiter,
   ): Promise<void> {
     const orderIDBase = new Date().getTime() * 2;
     const bidID = new BN(orderIDBase);
@@ -414,7 +406,6 @@ class Scalper {
             gammaScalpCount + 1,
             fillPrice,
             spotMarket,
-            jupiter,
           );
         } else {
           console.log('Gamma Partially Filled', gammaFillQty, 'of', amountGamma);
@@ -441,9 +432,9 @@ class Scalper {
     } else {
       fairValue = await findFairValue(
         this.connection,
+        this.owner,
         spotMarket,
         this.symbol,
-        jupiter,
         GAMMA_CYCLES,
         TWAP_INTERVAL_SEC,
       );

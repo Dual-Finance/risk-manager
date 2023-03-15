@@ -225,3 +225,5 @@ export const WHALE_MAX_SPREAD = 0.4;
 export const RESOLVE_PERIOD_MS = 100;
 // Order size buffer in percent to use to reduce order sizes
 export const ORDER_SIZE_BUFFER_PCT = 0.99;
+// Time in secs to allow loading of price
+export const MAX_LOAD_TIME = 30;

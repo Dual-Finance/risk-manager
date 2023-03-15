@@ -332,3 +332,19 @@ export function getRandomNumAround(midValue: number, spread: number) {
   const max = midValue * (1 + spread);
   return Math.random() * (max - min) + min;
 }
+
+export async function asyncCallWithTimeoutasync(asyncPromise, timeLimit) {
+  let timeoutHandle;
+
+  const timeoutPromise = new Promise((_resolve, reject) => {
+    timeoutHandle = setTimeout(
+      () => reject(new Error('Async timeout limit reached')),
+      timeLimit * 1000,
+    );
+  });
+
+  return Promise.race([asyncPromise, timeoutPromise]).then((result) => {
+    clearTimeout(timeoutHandle);
+    return result;
+  });
+}

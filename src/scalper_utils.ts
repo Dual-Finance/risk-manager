@@ -17,9 +17,10 @@ import {
 import {
   JUPITER_LIQUIDITY, MAX_MKT_SPREAD_PCT_FOR_PRICING, JUPITER_SEARCH_STEPS,
   RF_RATE, slippageMax, THEO_VOL_MAP, JUPITER_SLIPPAGE_BPS, PRIORITY_FEE,
-  GAMMA_CYCLES, RESOLVE_PERIOD_MS, HedgeProduct, PRICE_OVERRIDE, HedgeSide,
+  GAMMA_CYCLES, RESOLVE_PERIOD_MS, HedgeProduct, PRICE_OVERRIDE, HedgeSide, CLUSTER, MAX_LOAD_TIME,
 } from './config';
 import {
+  asyncCallWithTimeoutasync,
   decimalsBaseSPL, getChainlinkPrice, getPythPrice, getSwitchboardPrice,
   sleepExact, splMintToToken, tokenToSplMint,
 } from './utils';
@@ -332,15 +333,28 @@ export async function cancelOpenBookOrders(
     console.log(symbol, 'Cancelling OpenBook Orders', order.size, symbol, '@', order.price, order.clientId.toString());
     cancelTx.add(spotMarket.makeCancelOrderInstruction(connection, owner.publicKey, order));
   }
-
-  await sendAndConfirmTransaction(connection, setPriorityFee(cancelTx), [owner]);
+  try {
+    await sendAndConfirmTransaction(connection, setPriorityFee(cancelTx), [owner]);
+  } catch (err) {
+    console.log(symbol, 'Cancel Order Failure', err);
+  }
 }
 
 export async function getJupiterPrice(
   base: SYMBOL,
   quote: SYMBOL,
-  jupiter: Jupiter,
+  connection: Connection,
+  owner: Keypair,
 ) {
+  console.log(base, 'Loading Jupiter For Price');
+  const jupiter = await Jupiter.load({
+    connection,
+    cluster: CLUSTER,
+    user: owner,
+    wrapUnwrapSOL: false,
+    restrictIntermediateTokens: true,
+    shouldLoadSerumOpenOrders: false,
+  });
   // Check asks
   const inputBuyToken = new PublicKey(tokenToSplMint(quote));
   const outputBuyToken = new PublicKey(tokenToSplMint(base));
@@ -422,45 +436,48 @@ async function getOraclePrice(symbol: SYMBOL, connection: Connection, spotMarket
 
 async function getFairValue(
   connection: Connection,
+  owner: Keypair,
   spotMarket: Market,
   symbol: SYMBOL,
-  jupiter: Jupiter,
 ) {
   const fairValue = await getOraclePrice(symbol, connection, spotMarket);
 
-  const jupPrice = await getJupiterPrice(symbol, 'USDC', jupiter);
-  const oracleSlippage = Math.abs(fairValue - jupPrice) / fairValue;
-  if (oracleSlippage > slippageMax.get(symbol)) {
-    const oracleSlippageBps = Math.round(oracleSlippage * 100 * 100);
-    console.log(
-      `${symbol}: Using Jupiter Mid Price ${jupPrice} Oracle Slippage: ${oracleSlippageBps}`,
-    );
-    return jupPrice;
+  try {
+    let jupPrice : number = await asyncCallWithTimeoutasync(getJupiterPrice(symbol, 'USDC', connection, owner), MAX_LOAD_TIME);
+    jupPrice = jupPrice > 0 ? jupPrice : 0;
+    const oracleSlippage = Math.abs(fairValue - jupPrice) / fairValue;
+    if (oracleSlippage > slippageMax.get(symbol)) {
+      const oracleSlippageBps = Math.round(oracleSlippage * 100 * 100);
+      console.log(
+        `${symbol}: Using Jupiter Mid Price ${jupPrice} Oracle Slippage: ${oracleSlippageBps}`,
+      );
+      return jupPrice;
+    }
+    return fairValue;
+  } catch (err) {
+    console.log(symbol, 'Jupiter Price Failed', err);
+    return fairValue;
   }
-  return fairValue;
 }
 
 export async function findFairValue(
   connection: Connection,
+  owner: Keypair,
   spotMarket: Market,
   symbol: SYMBOL,
-  jupiter: Jupiter,
   tries: number,
   waitSecPerTry: number,
 ) {
   if (PRICE_OVERRIDE > 0) {
     return PRICE_OVERRIDE;
   }
-  let fairValue = await getFairValue(connection, spotMarket, symbol, jupiter);
+  let fairValue = await getFairValue(connection, owner, spotMarket, symbol);
   for (let i = 0; i < tries; i++) {
     if (fairValue === NO_FAIR_VALUE) {
-      console.log(this.symbol, 'Cannot find fair value');
+      console.log(symbol, 'Cannot find fair value');
       await sleepExact(waitSecPerTry);
-      fairValue = await getFairValue(this.connection, spotMarket, this.symbol, jupiter);
+      fairValue = await getFairValue(connection, owner, spotMarket, symbol);
     }
-  }
-  if (fairValue === NO_FAIR_VALUE) {
-    console.log(this.symbol, 'No Robust Pricing. Exiting Gamma Scalp', waitSecPerTry);
   }
   return fairValue;
 }

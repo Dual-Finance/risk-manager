@@ -14,9 +14,11 @@ import {
   treasuryPositions, slippageMax, GAMMA_COMPLETE_THRESHOLD_PCT, CLUSTER,
   MAX_ORDER_BOOK_SEARCH_DEPTH, MAX_BACK_GAMMA_MULTIPLE, API_URL, MODE_BY_SYMBOL,
   WHALE_MAX_SPREAD, ScalperMode, ORDER_SIZE_BUFFER_PCT, HedgeSide, BACK_GAMMA_SPREAD_RATIO,
+  MAX_LOAD_TIME,
 } from './config';
 import { CallOrPut, DIPDeposit, SYMBOL } from './common';
 import {
+  asyncCallWithTimeoutasync,
   getRandomNumAround,
   readKeypair,
 } from './utils';
@@ -255,14 +257,14 @@ class Scalper {
         console.log(this.symbol, 'Not enough liquidity! Try Jupiter. Adjust Price', hedgePrice, 'Splice', spliceFactor);
         // Check on jupiter and sweep price
         console.log(this.symbol, 'Loading Jupiter To Trade');
-        const jupiter = await Jupiter.load({
+        const jupiter = await asyncCallWithTimeoutasync(Jupiter.load({
           connection: this.connection,
           cluster: CLUSTER,
           user: this.owner,
           wrapUnwrapSOL: false,
           restrictIntermediateTokens: true,
           shouldLoadSerumOpenOrders: false,
-        });
+        }), MAX_LOAD_TIME);
         const jupValues = await jupiterHedge(hedgeSide, this.symbol, 'USDC', hedgeDeltaTotal, hedgePrice, jupiter);
         if (jupValues !== undefined) {
           const { setupTransaction, swapTransaction, cleanupTransaction } = jupValues.txs;
@@ -311,8 +313,11 @@ class Scalper {
       selfTradeBehavior: 'abortTransaction',
     });
     deltaOrderTx.add(deltaTx.transaction);
-    await sendAndConfirmTransaction(this.connection, setPriorityFee(deltaOrderTx), [this.owner]);
-
+    try {
+      await sendAndConfirmTransaction(this.connection, setPriorityFee(deltaOrderTx), [this.owner]);
+    } catch (err) {
+      console.log(this.symbol, 'Delta Order', err, err.stack);
+    }
     // Rest single order if the hedge should be completed in a single clip
     if (spliceFactor === 1) {
       const netHedgePeriod = TWAP_INTERVAL_SEC * MAX_DELTA_HEDGES;

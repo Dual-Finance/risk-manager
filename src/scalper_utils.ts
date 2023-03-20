@@ -11,9 +11,7 @@ import { getAssociatedTokenAddress } from '@project-serum/associated-token';
 import fetch from 'node-fetch';
 import { Jupiter } from '@jup-ag/core';
 import JSBI from 'jsbi';
-import {
-  CallOrPut, DIPDeposit, RouteDetails, SYMBOL,
-} from './common';
+import { DIPDeposit, RouteDetails, SYMBOL } from './common';
 import {
   JUPITER_LIQUIDITY, MAX_MKT_SPREAD_PCT_FOR_PRICING, JUPITER_SEARCH_STEPS,
   RF_RATE, slippageMax, THEO_VOL_MAP, JUPITER_SLIPPAGE_BPS, PRIORITY_FEE,
@@ -599,7 +597,7 @@ export function findMinStrike(dipProduct: DIPDeposit[]) {
 // Find the nearest strike of a set of DIPs/SOs
 export function findNearestStrikeType(dipProduct: DIPDeposit[], fairValue: number) {
   let nearestStrike = dipProduct[0].strikeUsdcPerToken;
-  let nearStrikeType: CallOrPut;
+  let nearStrikeType = dipProduct[0].callOrPut;
   for (const dip of dipProduct) {
     if (Math.abs(dip.strikeUsdcPerToken - fairValue) < Math.abs(nearestStrike - fairValue)) {
       nearestStrike = dip.strikeUsdcPerToken;

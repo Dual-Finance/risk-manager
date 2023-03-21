@@ -1,7 +1,3 @@
-/* eslint-disable no-underscore-dangle */
-/* eslint-disable no-param-reassign */
-/* eslint-disable max-len */
-/* eslint-disable camelcase */
 import * as os from 'os';
 import * as fs from 'fs';
 import {
@@ -14,7 +10,7 @@ import {
 
 import * as fzstd from 'fzstd';
 import { Market } from '@project-serum/serum';
-import * as buffer_layout from 'buffer-layout';
+import * as bufferLayout from 'buffer-layout';
 import { Token, TOKEN_PROGRAM_ID } from '@solana/spl-token';
 
 export async function sleep(ms) {
@@ -22,7 +18,8 @@ export async function sleep(ms) {
 }
 
 export function chunk(array, size) {
-  return Array.apply(0, new Array(Math.ceil(array.length / size))).map((_, index) => array.slice(index * size, (index + 1) * size));
+  return Array.apply(0, new Array(Math.ceil(array.length / size)))
+    .map((_, index) => array.slice(index * size, (index + 1) * size));
 }
 
 export async function getMultipleAccounts(
@@ -44,16 +41,14 @@ export async function getMultipleAccounts(
 
   // asynchronously fetch each chunk of accounts and combine the results
   return (await Promise.all(chunkedPks.map(async (pkChunk) => {
-    // load connection commitment as a default
-    commitment ||= connection.commitment;
     // use zstd to compress large responses
     const encoding = 'base64+zstd';
-    // set no minimum context slot by default
-    minContextSlot ||= 0;
 
     const args = [pkChunk, { commitment, encoding, minContextSlot }];
 
+    // TODO: Use getMultipleAccounts()
     // @ts-ignore
+    // eslint-disable-next-line no-underscore-dangle
     const gmaResult = await connection._rpcRequest('getMultipleAccounts', args);
 
     if (gmaResult.error) {
@@ -77,8 +72,9 @@ export async function getMultipleAccounts(
   }))).flat();
 }
 
-// load multiple markets at once instead of calling getAccountInfo for each market 3 times
-// by default it is 1 call to get the market and 2 calls to get the decimals for baseMint and quoteMint
+// load multiple markets at once instead of calling getAccountInfo
+// for each market 3 times by default it is 1 call to get the market
+// and 2 calls to get the decimals for baseMint and quoteMint
 // this can be condensed into 2 calls total per 100 markets
 export async function loadMultipleOpenbookMarkets(connection, programId, marketsList) {
   const marketsMap = new Map();
@@ -102,20 +98,30 @@ export async function loadMultipleOpenbookMarkets(connection, programId, markets
   });
 
   // get all the token's decimal values
-  const MINT_LAYOUT = buffer_layout.struct([buffer_layout.blob(44), buffer_layout.u8('decimals'), buffer_layout.blob(37)]);
-  const uniqueMintsPubKeys = Array.from(uniqueMints).map((mint) => new PublicKey(<PublicKeyInitData>mint));
+  const MINT_LAYOUT = bufferLayout.struct([bufferLayout.blob(44), bufferLayout.u8('decimals'), bufferLayout.blob(37)]);
+  const uniqueMintsPubKeys = Array.from(uniqueMints).map((mint) => new PublicKey(
+    <PublicKeyInitData>mint,
+  ));
   const uniqueMintsAccountInfos = await getMultipleAccounts(connection, uniqueMintsPubKeys, 'processed');
   uniqueMintsAccountInfos.forEach((result) => {
     const { decimals } = MINT_LAYOUT.decode(result.accountInfo.data);
     decimalMap.set(result.publicKey.toString(), decimals);
   });
 
-  // loop back through the markets and load the market with the decoded data and the base/quote decimals
+  // loop back through the markets and load the market with
+  // the decoded data and the base/quote decimals
   const spotMarkets: Market[] = [];
   marketsMap.forEach((market) => {
     const baseMint = market.baseMint.toString();
     const quoteMint = market.quoteMint.toString();
-    const openbookMarket = new Market(market.decoded, decimalMap.get(baseMint), decimalMap.get(quoteMint), {}, programId, null);
+    const openbookMarket = new Market(
+      market.decoded,
+      decimalMap.get(baseMint),
+      decimalMap.get(quoteMint),
+      {},
+      programId,
+      null,
+    );
     spotMarkets.push(openbookMarket);
   });
 
@@ -130,7 +136,12 @@ export async function getMultipleAssociatedTokenAddresses(connection, owner, tok
   const associatedAccounts: PublicKey[] = [];
 
   for (const tokenAccount of tokenAccounts) {
-    const associatedAddress = await Token.getAssociatedTokenAddress(token.associatedProgramId, token.programId, tokenAccount, owner.publicKey);
+    const associatedAddress = await Token.getAssociatedTokenAddress(
+      token.associatedProgramId,
+      token.programId,
+      tokenAccount,
+      owner.publicKey,
+    );
     associatedAccounts.push(associatedAddress);
   }
 

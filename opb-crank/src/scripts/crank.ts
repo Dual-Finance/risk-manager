@@ -15,25 +15,16 @@ import axios from 'axios';
 import {
   getMultipleAccounts, loadMultipleOpenbookMarkets, sleep, chunk, readKeypair,
 } from '../utils/utils';
-
-const URL_MARKETS_BY_VOLUME = 'https://openserum.io/api/serum/markets.json?min24hVolume=';
-const VOLUME_THRESHOLD = 1000;
-const {
-  RPC_URL,
-  PROGRAM_ID,
-  MAX_UNIQUE_ACCOUNTS,
-  CONSUME_EVENTS_LIMIT,
-  CLUSTER,
-  PRIORITY_QUEUE_LIMIT, // queue length at which to apply the priority fee
-  PRIORITY_CU_LIMIT, // compute limit
-  POLL_MARKETS, // optional for using Top markets
-  MAX_TX_INSTRUCTIONS, // max instructions per transaction
-  PRIORITY_MARKETS, // input to add comma seperated list of markets that force fee bump
-} = process.env;
+import {
+  CLUSTER, CONSUME_EVENTS_LIMIT, MAX_TX_INSTRUCTIONS, MAX_UNIQUE_ACCOUNTS,
+  POLL_MARKETS, PRIORITY_CU_LIMIT, PRIORITY_MARKETS, PRIORITY_QUEUE_LIMIT,
+  PROGRAM_ID, RPC_URL, URL_MARKETS_BY_VOLUME, VOLUME_THRESHOLD,
+} from '../constants';
 
 // Read the alternate markets file if provided
 const markets = require('../markets.json');
 
+// TODO: Add to constants files and use caps
 const cluster = CLUSTER || 'mainnet';
 const interval = 10; // seconds between crank attempts
 const maxUniqueAccounts = parseInt(MAX_UNIQUE_ACCOUNTS || '10', 10);
@@ -53,6 +44,7 @@ const log: Logger = new Logger({
   name: 'openbook-cranker', displayFunctionName: false, displayFilePath: 'hidden', minLevel: 'info',
 });
 
+// TODO: Remove log line outside of functions
 log.info(payer.publicKey.toString());
 
 const connection = new Connection(RPC_URL!, 'processed' as Commitment);
@@ -69,6 +61,7 @@ try {
   log.error(`Couldn't get blockhash: ${e}`);
 }
 setInterval(async () => {
+  // TODO: Move to function, not top level
   try {
     recentBlockhash = await connection.getLatestBlockhash('finalized');
   } catch (e) {
@@ -122,6 +115,7 @@ async function trytoCrank(spotMarkets: Market[]) {
       // coinFee & pcFee are redundant for cranking.
       // Instead, we pass spotMarkets[i]['_decoded'].eventQueue
       // using duplicate accounts will reduce transaction size
+      // TODO: Remove if unnecessary
       const instr = DexInstructions.consumeEvents({
         market: spotMarkets[i].publicKey,
         eventQueue: spotMarkets[i].decoded.eventQueue,
@@ -166,6 +160,7 @@ async function trytoCrank(spotMarkets: Market[]) {
         crankTransaction.sign(payer);
 
         // send the transaction
+        // TODO: Make tx a const
         connection.sendRawTransaction(crankTransaction.serialize(), {
           skipPreflight: true,
           maxRetries: 2,
@@ -190,6 +185,7 @@ async function trytoCrank(spotMarkets: Market[]) {
 
 async function run() {
   // list of markets to crank
+  // TODO: Move to constants and use caps
   let marketsList;
   let count = 0;
   const TotalRetry = 3;

@@ -11,7 +11,6 @@ import {
 import * as fzstd from 'fzstd';
 import { Market } from '@project-serum/serum';
 import * as bufferLayout from 'buffer-layout';
-import { Token, TOKEN_PROGRAM_ID } from '@solana/spl-token';
 
 export async function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -76,13 +75,18 @@ export async function getMultipleAccounts(
 // for each market 3 times by default it is 1 call to get the market
 // and 2 calls to get the decimals for baseMint and quoteMint
 // this can be condensed into 2 calls total per 100 markets
-export async function loadMultipleOpenbookMarkets(connection, programId, marketsList) {
+export async function loadMultipleOpenbookMarkets(
+  connection: Connection,
+  programId: PublicKey,
+  marketsList: Market[],
+) {
   const marketsMap = new Map();
   const decimalMap = new Map();
   const uniqueMints = new Set();
 
   // get all the market data for an openbook market
   const pubKeys = marketsList.map((item) => new PublicKey(item.address));
+  // TODO: Use RPC instead of chunking helper
   const marketsAccountInfos = await getMultipleAccounts(connection, pubKeys, 'processed');
   marketsAccountInfos.forEach((result) => {
     const layout = Market.getLayout(programId);
@@ -97,12 +101,14 @@ export async function loadMultipleOpenbookMarkets(connection, programId, markets
     });
   });
 
+  // TODO: Move to the top outside fct
   // get all the token's decimal values
   const MINT_LAYOUT = bufferLayout.struct([bufferLayout.blob(44), bufferLayout.u8('decimals'), bufferLayout.blob(37)]);
   const uniqueMintsPubKeys = Array.from(uniqueMints).map((mint) => new PublicKey(
     <PublicKeyInitData>mint,
   ));
   const uniqueMintsAccountInfos = await getMultipleAccounts(connection, uniqueMintsPubKeys, 'processed');
+  // TODO: Use helper mint fct
   uniqueMintsAccountInfos.forEach((result) => {
     const { decimals } = MINT_LAYOUT.decode(result.accountInfo.data);
     decimalMap.set(result.publicKey.toString(), decimals);
@@ -126,26 +132,6 @@ export async function loadMultipleOpenbookMarkets(connection, programId, markets
   });
 
   return spotMarkets;
-}
-
-// get the associated accounts but don't check if they exist.
-// connection is passed to constructor but no RPC calls are made.
-export async function getMultipleAssociatedTokenAddresses(connection, owner, tokenAccounts) {
-  // token.associatedProgramId & token.programId will be the same for each token
-  const token = new Token(connection, tokenAccounts[0].toString(), TOKEN_PROGRAM_ID, owner);
-  const associatedAccounts: PublicKey[] = [];
-
-  for (const tokenAccount of tokenAccounts) {
-    const associatedAddress = await Token.getAssociatedTokenAddress(
-      token.associatedProgramId,
-      token.programId,
-      tokenAccount,
-      owner.publicKey,
-    );
-    associatedAccounts.push(associatedAddress);
-  }
-
-  return associatedAccounts;
 }
 
 export function readKeypair() {

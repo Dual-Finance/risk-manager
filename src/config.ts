@@ -88,6 +88,9 @@ export const VIAL_WS_URL = 'wss://vial.mngo.cloud/v1/ws';
 export const usdcPk = IS_DEV ? USDC_DEVNET_PK : USDC_MAINNET_PK;
 export const OPENBOOK_FORK_ID = IS_DEV ? OPB_DEVNET_PROGRAM_ID : OPB_MAINNET_PROGRAM_ID;
 
+// Products to not bother pulling Jupiter Mid Market Pricing
+export const LIQUID_SYMBOLS = ['SOL', 'ETH', 'BTC'];
+
 export const MinContractSize = new Map<SYMBOL, number>([
   ['BTC', 0.0001], ['ETH', 0.001], ['SOL', 0.01], ['MNGO', 0.01], ['BONK', 1000], ['DUAL', 0.01],
 ]);

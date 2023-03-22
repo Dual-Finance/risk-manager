@@ -1,4 +1,4 @@
-import { Transaction } from '@solana/web3.js';
+import { Transaction, VersionedTransaction } from '@solana/web3.js';
 
 export type SYMBOL = 'BTC' | 'ETH' | 'SOL' | 'MNGO' | 'BONK' | 'DUAL' | 'USDC' | 'UNKNOWN_TOKEN';
 
@@ -20,9 +20,5 @@ export interface RouteDetails {
   price: number;
   qty: number;
   venue: string;
-  txs: {
-    setupTransaction?: Transaction,
-    swapTransaction: Transaction,
-    cleanupTransaction?: Transaction
-  };
+  swapTransaction: Transaction | VersionedTransaction,
 }

@@ -267,17 +267,22 @@ class Scalper {
         }), MAX_LOAD_TIME);
         const jupValues = await jupiterHedge(hedgeSide, this.symbol, 'USDC', hedgeDeltaTotal, hedgePrice, jupiter);
         if (jupValues !== undefined) {
-          const { setupTransaction, swapTransaction, cleanupTransaction } = jupValues.txs;
-          for (const jupTx of [setupTransaction, swapTransaction, cleanupTransaction].filter(
-            Boolean,
-          )) {
-            const txid = await sendAndConfirmTransaction(this.connection, jupTx, [this.owner]);
-            if (jupTx === swapTransaction) {
-              const spotDeltaUpdate = jupValues.qty;
-              hedgeDeltaTotal += spotDeltaUpdate;
-              console.log(this.symbol, 'Jupiter Hedge via', jupValues.venue, 'Price', jupValues.price, 'Qty', jupValues.qty, `https://solana.fm/tx/${txid}${CLUSTER?.includes('devnet') ? '?cluster=devnet' : ''}`);
-            }
+          const { swapTransaction } = jupValues;
+          let txid: string;
+          if (swapTransaction instanceof Transaction) {
+            txid = await sendAndConfirmTransaction(
+              this.connection,
+              swapTransaction,
+              [this.owner],
+            );
+          } else {
+            swapTransaction.sign([this.owner]);
+            const rawTx = swapTransaction.serialize();
+            txid = await this.connection.sendRawTransaction(rawTx);
           }
+          const spotDeltaUpdate = jupValues.qty;
+          hedgeDeltaTotal += spotDeltaUpdate;
+          console.log(this.symbol, 'Jupiter Hedge via', jupValues.venue, 'Price', jupValues.price, 'Qty', jupValues.qty, `https://solana.fm/tx/${txid}${CLUSTER?.includes('devnet') ? '?cluster=devnet' : ''}`);
           console.log(this.symbol, 'Adjust', hedgeSide, 'Price', hedgePrice, 'to', jupValues.price, 'Remaining Qty', hedgeDeltaTotal);
           hedgePrice = jupValues.price;
         } else {
@@ -424,7 +429,7 @@ class Scalper {
       return;
     }
 
-    console.log(this.symbol, 'Loading Fair Value For Scalp', gammaScalpCount);
+    console.log(this.symbol, 'Loading Fair Value For Gamma Scalp', gammaScalpCount);
     let fairValue: number;
     if (priorFillPrice > NO_FAIR_VALUE) {
       fairValue = priorFillPrice;

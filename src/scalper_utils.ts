@@ -15,7 +15,8 @@ import { DIPDeposit, RouteDetails, SYMBOL } from './common';
 import {
   JUPITER_LIQUIDITY, MAX_MKT_SPREAD_PCT_FOR_PRICING, JUPITER_SEARCH_STEPS,
   RF_RATE, slippageMax, THEO_VOL_MAP, JUPITER_SLIPPAGE_BPS, PRIORITY_FEE,
-  GAMMA_CYCLES, RESOLVE_PERIOD_MS, HedgeProduct, PRICE_OVERRIDE, HedgeSide, CLUSTER, MAX_LOAD_TIME,
+  GAMMA_CYCLES, RESOLVE_PERIOD_MS, HedgeProduct, PRICE_OVERRIDE, HedgeSide,
+  CLUSTER, MAX_LOAD_TIME, LIQUID_SYMBOLS,
 } from './config';
 import {
   asyncCallWithTimeoutasync,
@@ -439,7 +440,9 @@ async function getFairValue(
   symbol: SYMBOL,
 ) {
   const fairValue = await getOraclePrice(symbol, connection, spotMarket);
-
+  if (LIQUID_SYMBOLS.includes(symbol)) {
+    return fairValue;
+  }
   try {
     let jupPrice : number = await asyncCallWithTimeoutasync(getJupiterPrice(symbol, 'USDC', connection, owner), MAX_LOAD_TIME);
     jupPrice = jupPrice > 0 ? jupPrice : 0;
@@ -527,13 +530,13 @@ export async function jupiterHedge(
 
     const netPrice = hedgeSide === 'sell' ? outQty / inQty : inQty / outQty;
     const venue = bestRoute.marketInfos[numRoutes - 1].amm.label;
-    const { transactions } = await jupiter.exchange({ routeInfo: routes.routesInfos[0] });
+    const { swapTransaction } = await jupiter.exchange({ routeInfo: routes.routesInfos[0] });
 
     if (hedgeSide === 'sell') {
       if (netPrice > hedgePrice) {
         const swapQty = -searchQty / inAtomsPerToken;
         routeDetails = {
-          price: netPrice, qty: swapQty, venue, txs: transactions,
+          price: netPrice, qty: swapQty, venue, swapTransaction,
         };
         lastSucess = true;
         if (i === 0) {
@@ -543,7 +546,7 @@ export async function jupiterHedge(
     } else if (netPrice < hedgePrice) {
       const swapQty = searchQty / inAtomsPerToken / hedgePrice;
       routeDetails = {
-        price: netPrice, qty: swapQty, venue, txs: transactions,
+        price: netPrice, qty: swapQty, venue, swapTransaction,
       };
       lastSucess = true;
       if (i === 0) {

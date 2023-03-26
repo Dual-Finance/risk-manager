@@ -60,6 +60,7 @@ export enum ScalperMode {
   GammaBackStrikeAdjustment,
   BackOnly,
   Perp,
+  PerpGamma,
 }
 
 export enum HedgeProduct {
@@ -73,12 +74,12 @@ export enum HedgeSide {
 }
 
 export const MODE_BY_SYMBOL = new Map<SYMBOL, ScalperMode>([
-  ['BTC', parseFloat(btcVars[4]) > 0 && parseFloat(btcVars[4]) < 5 ? parseFloat(btcVars[4]) : ScalperMode.Normal],
-  ['ETH', parseFloat(ethVars[4]) > 0 && parseFloat(ethVars[4]) < 5 ? parseFloat(ethVars[4]) : ScalperMode.Normal],
-  ['SOL', parseFloat(solVars[4]) > 0 && parseFloat(solVars[4]) < 5 ? parseFloat(solVars[4]) : ScalperMode.Normal],
-  ['MNGO', parseFloat(mngoVars[4]) > 0 && parseFloat(mngoVars[4]) < 5 ? parseFloat(mngoVars[4]) : ScalperMode.Normal],
-  ['BONK', parseFloat(bonkVars[4]) > 0 && parseFloat(bonkVars[4]) < 5 ? parseFloat(bonkVars[4]) : ScalperMode.Normal],
-  ['DUAL', parseFloat(dualVars[4]) > 0 && parseFloat(dualVars[4]) < 5 ? parseFloat(dualVars[4]) : ScalperMode.Normal],
+  ['BTC', parseFloat(btcVars[4]) > 0 && parseFloat(btcVars[4]) < 6 ? parseFloat(btcVars[4]) : ScalperMode.Normal],
+  ['ETH', parseFloat(ethVars[4]) > 0 && parseFloat(ethVars[4]) < 6 ? parseFloat(ethVars[4]) : ScalperMode.Normal],
+  ['SOL', parseFloat(solVars[4]) > 0 && parseFloat(solVars[4]) < 6 ? parseFloat(solVars[4]) : ScalperMode.Normal],
+  ['MNGO', parseFloat(mngoVars[4]) > 0 && parseFloat(mngoVars[4]) < 6 ? parseFloat(mngoVars[4]) : ScalperMode.Normal],
+  ['BONK', parseFloat(bonkVars[4]) > 0 && parseFloat(bonkVars[4]) < 6 ? parseFloat(bonkVars[4]) : ScalperMode.Normal],
+  ['DUAL', parseFloat(dualVars[4]) > 0 && parseFloat(dualVars[4]) < 6 ? parseFloat(dualVars[4]) : ScalperMode.Normal],
 ]);
 
 export const CLUSTER: Cluster = IS_DEV ? 'devnet' : 'mainnet-beta';
@@ -152,17 +153,17 @@ export const treasuryPositions: DIPDeposit[] = [({
   splTokenName: 'BTC',
   premiumAssetName: 'USDC',
   expirationMs: 1680350400000,
-  strikeUsdcPerToken: 26000,
+  strikeUsdcPerToken: 30000,
   callOrPut: CallOrPut.Call,
-  qtyTokens: 0.005,
+  qtyTokens: 0.008,
 }),
 ({
   splTokenName: 'BTC',
   premiumAssetName: 'USDC',
   expirationMs: 1680350400000,
-  strikeUsdcPerToken: 26000,
+  strikeUsdcPerToken: 27000,
   callOrPut: CallOrPut.Put,
-  qtyTokens: 0.005,
+  qtyTokens: 0.008,
 }), // Test for Mango Perps
 ({
   splTokenName: 'DUAL',

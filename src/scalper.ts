@@ -28,7 +28,7 @@ import {
   getSpotDelta, liquidityCheckAndNumSplices,
   tryToSettleOpenBook, setPriorityFee, waitForFill, findMaxStrike, findMinStrike,
   findNearestStrikeType, cancelOpenBookOrders,
-  findFairValue, roundPriceToTickSize, roundQtyToSpotSize,
+  findFairValue, roundPriceToTickSize, roundQtyToMinOrderStep,
 } from './scalper_utils';
 import {
   NO_FAIR_VALUE, OPENBOOK_MKT_MAP,
@@ -98,7 +98,7 @@ class Scalper {
 
     console.log(this.symbol, 'Choosing market to trade');
 
-    if (this.mode === ScalperMode.Perp) {
+    if (this.mode === ScalperMode.Perp || this.mode === ScalperMode.PerpGamma) {
       await loadMangoAndPickScalper(dipProduct, this);
       return;
     }
@@ -302,7 +302,7 @@ class Scalper {
 
     // Send the delta hedge order to openbook.
     console.log(this.symbol, 'Sweep OpenBook');
-    const amountDelta = roundQtyToSpotSize(Math.abs(hedgeDeltaClip), this.minSpotSize);
+    const amountDelta = roundQtyToMinOrderStep(Math.abs(hedgeDeltaClip), this.minSpotSize);
     const priceDelta = roundPriceToTickSize(Math.abs(hedgePrice), this.tickSize);
     const payerAccount = await getPayerAccount(hedgeSide, this.symbol, 'USDC', this.owner);
     console.log(this.symbol, hedgeSide, 'OpenBook-SPOT', amountDelta, 'Limit:', priceDelta, '#', deltaHedgeCount, 'ID', deltaID.toString());
@@ -530,10 +530,10 @@ class Scalper {
     console.log(`${this.symbol} Dim Qty ${dimQty} Whale Bid: ${whaleBidPrice} Ask ${whaleAskPrice} \
     Spread % ${((whaleAskPrice - whaleBidPrice) / fairValue) * 100}`);
 
-    amountGamma = roundQtyToSpotSize(Math.abs(netGamma), this.minSpotSize);
-    // Reduce gamma ask if not enough inventory.
+    amountGamma = roundQtyToMinOrderStep(Math.abs(netGamma), this.minSpotSize);
+    // Reduce gamma ask if not enough inventory. Assumes we always have enough to bid
     const gammaAskQty = Math.abs(spotDelta) > amountGamma ? amountGamma
-      : roundQtyToSpotSize(Math.abs(spotDelta * ORDER_SIZE_BUFFER_PCT), this.minSpotSize);
+      : roundQtyToMinOrderStep(Math.abs(spotDelta * ORDER_SIZE_BUFFER_PCT), this.minSpotSize);
     const priceBid = roundPriceToTickSize(Math.abs(gammaBid), this.tickSize);
     const priceAsk = roundPriceToTickSize(Math.abs(gammaAsk), this.tickSize);
     const bidAccount = await getPayerAccount(HedgeSide.buy, this.symbol, 'USDC', this.owner);
@@ -594,8 +594,8 @@ class Scalper {
     } else if (whaleAskGammaQty + amountGamma > Math.abs(spotDelta)) {
       whaleAskGammaQty = Math.abs(spotDelta * ORDER_SIZE_BUFFER_PCT) - amountGamma;
     }
-    const backBidQty = roundQtyToSpotSize(Math.abs(whaleBidGammaQty), this.minSpotSize);
-    const backAskQty = roundQtyToSpotSize(Math.abs(whaleAskGammaQty), this.minSpotSize);
+    const backBidQty = roundQtyToMinOrderStep(Math.abs(whaleBidGammaQty), this.minSpotSize);
+    const backAskQty = roundQtyToMinOrderStep(Math.abs(whaleAskGammaQty), this.minSpotSize);
 
     // Enter bid & offer if outside of range from gamma orders
     if (backBidPrice !== undefined && backBidQty > 0) {

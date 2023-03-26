@@ -293,6 +293,7 @@ export async function gammaScalpMango(
     console.log(scalper.symbol, 'Maximum scalps acheived!', gammaScalpCount - 1, 'Wait for Rerun');
     return;
   }
+  // Oracle rather than perpUI price used since doesn't depend on last trade price
   let fairValue: number;
   if (priorFillPrice > NO_FAIR_VALUE) {
     fairValue = priorFillPrice;
@@ -491,7 +492,7 @@ export async function loadMangoAndPickScalper(dipProduct: DIPDeposit[], scalper:
           1,
         );
       } catch (err) {
-        console.log(scalper.symbol, 'Top Level Delta Error Catch', err, err.stack);
+        console.log(scalper.symbol, 'Delta Level Error Catch', err, err.stack);
       }
     }
     try {
@@ -507,7 +508,7 @@ export async function loadMangoAndPickScalper(dipProduct: DIPDeposit[], scalper:
         NO_FAIR_VALUE,
       );
     } catch (err) {
-      console.log(scalper.symbol, 'Top Level Gamma Error Catch', err, err.stack);
+      console.log(scalper.symbol, 'Gamma Level Error Catch', err, err.stack);
     }
   }
 }

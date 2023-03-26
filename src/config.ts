@@ -73,6 +73,7 @@ export enum HedgeSide {
   sell = 'sell',
 }
 
+// TODO: Use named arguments and better input variable management
 export const MODE_BY_SYMBOL = new Map<SYMBOL, ScalperMode>([
   ['BTC', parseFloat(btcVars[4]) > 0 && parseFloat(btcVars[4]) < 6 ? parseFloat(btcVars[4]) : ScalperMode.Normal],
   ['ETH', parseFloat(ethVars[4]) > 0 && parseFloat(ethVars[4]) < 6 ? parseFloat(ethVars[4]) : ScalperMode.Normal],
@@ -153,17 +154,17 @@ export const treasuryPositions: DIPDeposit[] = [({
   splTokenName: 'BTC',
   premiumAssetName: 'USDC',
   expirationMs: 1680350400000,
-  strikeUsdcPerToken: 30000,
+  strikeUsdcPerToken: 26000,
   callOrPut: CallOrPut.Call,
-  qtyTokens: 0.008,
+  qtyTokens: 0.005,
 }),
 ({
   splTokenName: 'BTC',
   premiumAssetName: 'USDC',
   expirationMs: 1680350400000,
-  strikeUsdcPerToken: 27000,
+  strikeUsdcPerToken: 26000,
   callOrPut: CallOrPut.Put,
-  qtyTokens: 0.008,
+  qtyTokens: 0.005,
 }), // Test for Mango Perps
 ({
   splTokenName: 'DUAL',

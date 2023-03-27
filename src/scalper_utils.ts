@@ -400,7 +400,7 @@ export async function getJupiterPrice(
 }
 
 // Check oracles in order of preference and then use openbook midpoint if all fail.
-async function getOraclePrice(symbol: SYMBOL, connection: Connection, spotMarket: Market) {
+export async function getOraclePrice(symbol: SYMBOL) {
   const chainlinkPrice = await getChainlinkPrice(new PublicKey(tokenToSplMint(symbol)));
   if (chainlinkPrice > 0) {
     console.log(`${symbol}: Chainlink Price: ${chainlinkPrice}`);
@@ -419,6 +419,14 @@ async function getOraclePrice(symbol: SYMBOL, connection: Connection, spotMarket
     return pythPrice;
   }
 
+  return NO_FAIR_VALUE;
+}
+
+export async function getOpenBookMidPrice(
+  symbol: SYMBOL,
+  spotMarket:Market,
+  connection: Connection,
+) {
   const bids = await spotMarket.loadBids(connection);
   const asks = await spotMarket.loadAsks(connection);
   const [bidPrice, _bidSize] = bids.getL2(1)[0];
@@ -433,13 +441,16 @@ async function getOraclePrice(symbol: SYMBOL, connection: Connection, spotMarket
   return NO_FAIR_VALUE;
 }
 
-async function getFairValue(
+export async function getFairValue(
   connection: Connection,
   owner: Keypair,
   spotMarket: Market,
   symbol: SYMBOL,
 ) {
-  const fairValue = await getOraclePrice(symbol, connection, spotMarket);
+  const fairValue = await getOraclePrice(symbol);
+  if (fairValue === NO_FAIR_VALUE) {
+    getOpenBookMidPrice(symbol, spotMarket, connection);
+  }
   if (LIQUID_SYMBOLS.includes(symbol)) {
     return fairValue;
   }
@@ -614,6 +625,6 @@ export function roundPriceToTickSize(amount: number, tickSize: number) {
   return Math.round(amount * (1 / tickSize)) / (1 / tickSize);
 }
 
-export function roundQtyToSpotSize(amount: number, spotSize: number) {
-  return Math.round(amount * (1 / spotSize)) / (1 / spotSize);
+export function roundQtyToMinOrderStep(amount: number, minSize: number) {
+  return Math.round(amount * (1 / minSize)) / (1 / minSize);
 }

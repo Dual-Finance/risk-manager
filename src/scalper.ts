@@ -467,9 +467,10 @@ class Scalper {
       const dipTotalDelta = getDIPDelta(dipProduct, fairValue, this.symbol);
       const isShort = dipTotalDelta + spotDelta + this.deltaOffset < 0;
       // TODO: Create a gamma table to find relevant long & short strikes
+      // TODO: Track average sell or buy to allow scalps above put strike & below call strike
       const nearStrikeType = findNearestStrikeType(dipProduct, fairValue);
       console.log(this.symbol, 'Delta Position', dipTotalDelta + spotDelta + this.deltaOffset, nearStrikeType, 'isShort', isShort);
-      if (nearStrikeType === CallOrPut.Put && isShort) {
+      if (nearStrikeType === CallOrPut.Put) {
         const maxStrike = findMaxStrike(dipProduct);
         const isOTM = fairValue > maxStrike;
         if (isOTM) {
@@ -479,7 +480,7 @@ class Scalper {
           gammaAsk = Math.max(maxStrike * (1 + stdDevSpread + stdDevWidenedSpread), gammaAsk);
           console.log('Strike Adjusted Gamma Ask', gammaAsk, maxStrike);
         }
-      } else if (nearStrikeType === CallOrPut.Call && !isShort) {
+      } else if (nearStrikeType === CallOrPut.Call) {
         const minStrike = findMinStrike(dipProduct);
         const isOTM = (fairValue < minStrike);
         if (isOTM) {

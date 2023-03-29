@@ -14,16 +14,19 @@ import {
   MAX_DELTA_HEDGES, MANGO_DOWNTIME_THRESHOLD_MIN,
   PERP_FUNDING_RATE_THRESHOLD, GAMMA_CYCLES, OPENBOOK_FORK_ID,
   slippageMax, GAMMA_COMPLETE_THRESHOLD_PCT, CLUSTER,
-  HedgeProduct, HedgeSide, ScalperMode,
+  HedgeProduct, HedgeSide, ScalperMode, PRIORITY_FEE,
 } from './config';
 import { DIPDeposit } from './common';
 import {
   sleepExact, tokenToSplMint,
 } from './utils';
 import {
-  getDIPDelta, getDIPGamma, getSpotDelta, orderSpliceMango, waitForFill,
-  getMangoHedgeProduct, roundPriceToTickSize, roundQtyToMinOrderStep, getOraclePrice,
+  getDIPDelta, getDIPGamma, getSpotDelta, waitForFill,
+  roundPriceToTickSize, roundQtyToMinOrderStep, getOraclePrice,
 } from './scalper_utils';
+import {
+  connectMangoFillListener, getMangoHedgeProduct, orderSpliceMango, setupMangoFillListener,
+} from './mango_utils';
 import {
   HOURS_PER_YEAR,
   MANGO_DEVNET_GROUP, MANGO_MAINNET_GROUP, NO_FAIR_VALUE, OPENBOOK_MKT_MAP, SEC_PER_YEAR,
@@ -127,7 +130,7 @@ export async function deltaHedgeMango(
     return;
   }
 
-  // TODO: Add slippage delta adjustment
+  // Check what the delta is including slipapge. Avoids over trading
   const slippageTolerance = Math.min(stdDevSpread / 2, slippageMax.get(scalper.symbol));
   const IS_BUYSIDE = hedgeDeltaTotal < 0;
   let hedgePrice = IS_BUYSIDE
@@ -182,7 +185,7 @@ export async function deltaHedgeMango(
   const deltaOrderId = new Date().getTime() * 2;
 
   // Start listening for Delta Hedge Fills
-  const deltaFillListener = async (event: WebSocket.MessageEvent) => {
+  const deltaFillListener = (event: WebSocket.MessageEvent) => {
     const parsedEvent = JSON.parse(event.data as string);
     const {
       takerClientOrderId, makerClientOrderId, quantity, price,
@@ -195,15 +198,8 @@ export async function deltaHedgeMango(
     }
   };
 
-  // TOOD: Move to helper functions
-  // Setup a listener for the order.
-  if (fillFeed.readyState === WebSocket.OPEN) {
-    fillFeed.addEventListener('message', deltaFillListener);
-    console.log(scalper.symbol, 'Listening For Delta Hedges');
-  } else {
-    // TODO: Try to recover fill feed
-    console.log(scalper.symbol, 'Websocket State', fillFeed.readyState);
-  }
+  // Setup a listener for the delta hedges
+  setupMangoFillListener(fillFeed, deltaFillListener, perpMarket);
 
   console.log(`${scalper.symbol} ${hedgeSide} ${hedgeProduct} ${Math.abs(hedgeDeltaClip)} \
     Limit: ${hedgePrice} # ${deltaHedgeCount} ID ${deltaOrderId}`);
@@ -371,13 +367,8 @@ export async function gammaScalpMango(
       }
     }
   };
-
-  if (fillFeed.readyState === WebSocket.OPEN) {
-    fillFeed.addEventListener('message', gammaFillListener);
-    console.log(scalper.symbol, 'Listening For gamma scalps');
-  } else {
-    console.log(scalper.symbol, 'Websocket State', fillFeed.readyState);
-  }
+  // Setup a listener for the gamma hedges
+  setupMangoFillListener(fillFeed, gammaFillListener, perpMarket);
 
   // Place gamma scalp bid & offer.
   try {
@@ -420,13 +411,13 @@ export async function gammaScalpMango(
 }
 
 export async function loadMangoAndPickScalper(dipProduct: DIPDeposit[], scalper: Scalper) {
-  // TODO: Add Priority Fee
   const mangoClient = MangoClient.connect(
     scalper.provider,
     CLUSTER,
     MANGO_V4_ID[CLUSTER],
     {
       idsSource: 'get-program-accounts',
+      prioritizationFee: PRIORITY_FEE,
     },
   );
   const mangoGroup = await mangoClient.getGroup(IS_DEV ? MANGO_DEVNET_GROUP : MANGO_MAINNET_GROUP);
@@ -467,17 +458,7 @@ export async function loadMangoAndPickScalper(dipProduct: DIPDeposit[], scalper:
 
     // Open Mango Websocket
     const fillFeed = new WebSocket(FILLS_URL);
-    const subscriptionData = {
-      command: 'subscribe',
-      marketId: perpMarket.publicKey.toBase58(),
-    };
-    fillFeed.onopen = (_) => {
-      fillFeed.send(JSON.stringify(subscriptionData));
-      console.log('Connected to Mango Websocket', subscriptionData.marketId, new Date().toUTCString());
-    };
-    fillFeed.onerror = (error) => {
-      console.log(`Websocket Error ${error.message}`);
-    };
+    connectMangoFillListener(fillFeed, perpMarket);
     if (scalper.mode === ScalperMode.Perp) {
       try {
         await deltaHedgeMango(

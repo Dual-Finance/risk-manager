@@ -1,8 +1,5 @@
 import * as greeks from 'greeks';
 import {
-  BookSide, PerpMarket, PerpOrderSide,
-} from '@blockworks-foundation/mango-v4';
-import {
   ComputeBudgetProgram, Connection, Keypair, LAMPORTS_PER_SOL, PublicKey,
   sendAndConfirmTransaction, Transaction,
 } from '@solana/web3.js';
@@ -15,7 +12,7 @@ import { DIPDeposit, RouteDetails, SYMBOL } from './common';
 import {
   JUPITER_LIQUIDITY, MAX_MKT_SPREAD_PCT_FOR_PRICING, JUPITER_SEARCH_STEPS,
   RF_RATE, slippageMax, THEO_VOL_MAP, JUPITER_SLIPPAGE_BPS, PRIORITY_FEE,
-  GAMMA_CYCLES, RESOLVE_PERIOD_MS, HedgeProduct, PRICE_OVERRIDE, HedgeSide,
+  GAMMA_CYCLES, RESOLVE_PERIOD_MS, PRICE_OVERRIDE, HedgeSide,
   CLUSTER, MAX_LOAD_TIME, LIQUID_SYMBOLS,
 } from './config';
 import {
@@ -94,44 +91,6 @@ export function getDIPTheta(
   return thetaSum;
 }
 
-export function getMangoHedgeProduct(hedgeSide: PerpOrderSide, buySpot: boolean, sellSpot: boolean):
-  HedgeProduct.Spot | HedgeProduct.Perp {
-  if (hedgeSide === PerpOrderSide.bid && buySpot) {
-    return HedgeProduct.Spot;
-  } if (hedgeSide === PerpOrderSide.ask && sellSpot) {
-    return HedgeProduct.Spot;
-  }
-  return HedgeProduct.Perp;
-}
-
-// Splice delta hedge orders if available mango liquidity not supportive
-export function orderSpliceMango(
-  qty: number,
-  price: number,
-  notionalMax: number,
-  slippage: number,
-  side: BookSide,
-  market: PerpMarket,
-) {
-  let spliceFactor: number;
-  const nativeQty = market.uiBaseToLots(qty);
-  if (qty > 0 && side.getImpactPriceUi(nativeQty) < price * (1 - slippage)) {
-    spliceFactor = Math.max((qty * price) / notionalMax, 1);
-    console.log(`Sell Price Impact: ${side.getImpactPriceUi(nativeQty)} High Slippage!`);
-  } else if (
-    qty < 0
-    && side.getImpactPriceUi(nativeQty) > price * (1 + slippage)
-  ) {
-    spliceFactor = Math.max((qty * price) / notionalMax, 1);
-    console.log(`Buy Price Impact: ${side.getImpactPriceUi(nativeQty)} High Slippage!`);
-  } else {
-    spliceFactor = 1;
-    console.log(`Slippage Tolerable ${side.getImpactPriceUi(nativeQty)}`);
-  }
-  console.log(`Splice factor: ${spliceFactor}`);
-  return spliceFactor;
-}
-
 // Check if liquidity is supportive & splice order
 export function liquidityCheckAndNumSplices(
   qty: number,
@@ -159,34 +118,6 @@ export function liquidityCheckAndNumSplices(
     return SUFFICIENT_BOOK_DEPTH;
   }
   return Math.max((Math.abs(qty) * price) / notionalMax, 1);
-}
-
-// Fill Size from any perp orders
-export async function fillSize(
-  perpMarket: PerpMarket,
-  orderID: number,
-) {
-  let filledQty = 0;
-  const recentFills = await perpMarket.loadFills(this.mangoClient);
-  for (const fill of recentFills) {
-    const { eventType } = fill;
-    const {
-      makerClientOrderId, takerClientOrderId, takerSide, quantity,
-    } = eventType[1];
-    if (eventType) {
-      if (
-        makerClientOrderId.toString() === orderID.toString()
-      || takerClientOrderId.toString() === orderID.toString()
-      ) {
-        if (takerSide === 'buy') {
-          filledQty += quantity;
-        } else if (takerSide === 'sell') {
-          filledQty -= quantity;
-        }
-      }
-    }
-  }
-  return filledQty;
 }
 
 // TODO: Update this to also take into account the openbook position

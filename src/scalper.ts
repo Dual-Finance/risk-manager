@@ -200,7 +200,7 @@ class Scalper {
       return;
     }
 
-    // Get total delta position to hedge. Use .1 for DEV to force that it does something.
+    // Get total delta position to hedge
     const dipTotalDelta = getDIPDelta(dipProduct, fairValue, this.symbol);
     const spotDelta = await getSpotDelta(this.connection, this.symbol, this.owner, spotMarket);
     hedgeDeltaTotal = IS_DEV ? 0.1 : dipTotalDelta + spotDelta + this.deltaOffset;

@@ -153,18 +153,18 @@ export const treasuryPositions: DIPDeposit[] = [({
 ({
   splTokenName: 'BTC',
   premiumAssetName: 'USDC',
-  expirationMs: 1680350400000,
-  strikeUsdcPerToken: 26000,
+  expirationMs: 1680868800000,
+  strikeUsdcPerToken: 29000,
   callOrPut: CallOrPut.Call,
-  qtyTokens: 0.005,
+  qtyTokens: 0.01,
 }),
 ({
   splTokenName: 'BTC',
   premiumAssetName: 'USDC',
-  expirationMs: 1680350400000,
+  expirationMs: 1680868800000,
   strikeUsdcPerToken: 26000,
   callOrPut: CallOrPut.Put,
-  qtyTokens: 0.005,
+  qtyTokens: 0.01,
 }), // Test for Mango Perps
 ({
   splTokenName: 'DUAL',

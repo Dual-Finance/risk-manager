@@ -16,12 +16,15 @@ import {
   MIN_EXECUTION_PREMIUM,
   VOL_SPREAD,
   RF_RATE,
+  MAX_ROUTE_ATTEMPTS,
+  MM_REFRESH_TIME,
 } from './config';
 import Poller from './poller';
 import {
   findProgramAddressWithMintAndStrikeAndExpiration,
   getPythPrice,
   parseDipState,
+  sleepExact,
   splMintToToken,
   tokenToSplMint,
 } from './utils';
@@ -54,7 +57,7 @@ class Router {
 
   // Accepts a DIP Deposit and decides whether to send it to the mm_callback
   // or risk_manager_callback
-  async route(dipDeposit: DIPDeposit): Promise<void> {
+  async route(dipDeposit: DIPDeposit): Promise<number> {
     const date = new Date(dipDeposit.expirationMs);
 
     // TODO: Update this for other types of assets
@@ -74,6 +77,7 @@ class Router {
       return;
     }
 
+    let routedSize = 0;
     await fetchMMOrder(symbol).then(async (order) => {
       // Run the risk manager if there is no MM order
       if (!order || order.price === undefined || Number(order.remainingQuantity) === 0) {
@@ -84,7 +88,7 @@ class Router {
           )
         ] = dipDeposit;
         console.log('No available MM bid', order);
-        return;
+        return routedSize;
       }
 
       const currentPrice = await getPythPrice(
@@ -107,7 +111,7 @@ class Router {
             dipDeposit.strikeUsdcPerToken,
           )
         ] = dipDeposit;
-        return;
+        return routedSize;
       }
 
       if (thresholdPrice > price || !(thresholdPrice > 0)) {
@@ -120,7 +124,7 @@ class Router {
             dipDeposit.strikeUsdcPerToken,
           )
         ] = dipDeposit;
-        return;
+        return routedSize;
       }
 
       const clientOrderId = `clientOrderId${Date.now()}`;
@@ -158,6 +162,8 @@ class Router {
         throw new Error('Failed to sell to API');
       }
       console.log('API response', await response.json());
+      routedSize = quantityTrade;
+      return routedSize;
     });
   }
 
@@ -173,12 +179,22 @@ class Router {
           )
         ] = dipDeposit;
       }
-      for (const dip of Object.values(this.dips)) {
-        if (dip.qtyTokens > 0) {
-          openPositionCount++;
-          // TODO await for a response back from the API
-          await this.route(dip);
+      let totalRoutedQty = 0;
+      for (let i = 0; i < MAX_ROUTE_ATTEMPTS; i++) {
+        for (const dip of Object.values(this.dips)) {
+          if (dip.qtyTokens > 0) {
+            openPositionCount++;
+            // Poller will immediately fire after position changes there may be a race to route
+            // See TODO: Delaying Poller or Putting on a timer
+            totalRoutedQty += await this.route(dip);
+          }
         }
+        if (totalRoutedQty === 0) {
+          break;
+        }
+        console.log('Routed', totalRoutedQty, 'DIPs. Wait', MM_REFRESH_TIME, 'seconds to check refreshed MM Orders', i);
+        await sleepExact(MM_REFRESH_TIME);
+        await this.refresh_dips_poller_accounts();
       }
     } catch (err) {
       console.log('Failed to router with error: ', err, 'proceeding to run risk manager.');
@@ -288,6 +304,7 @@ class Router {
             expirationSec,
             strikeTokensPerToken,
             CallOrPut.Call,
+            // TODO: Need to add a delay to Poller or check on a timer
             (deposit: DIPDeposit) => {
               this.checkMMPrices(deposit);
             },

@@ -58,6 +58,7 @@ class Router {
   // Accepts a DIP Deposit and decides whether to send it to the mm_callback
   // or risk_manager_callback
   async route(dipDeposit: DIPDeposit): Promise<number> {
+    let routedSize = 0;
     const date = new Date(dipDeposit.expirationMs);
 
     // TODO: Update this for other types of assets
@@ -74,10 +75,9 @@ class Router {
         dipToString(dipDeposit.expirationMs / 1_000, dipDeposit.strikeUsdcPerToken)
       ] = dipDeposit;
       console.log('DIP Deposit quantity zero. Rerun');
-      return;
+      return routedSize;
     }
 
-    let routedSize = 0;
     await fetchMMOrder(symbol).then(async (order) => {
       // Run the risk manager if there is no MM order
       if (!order || order.price === undefined || Number(order.remainingQuantity) === 0) {
@@ -165,11 +165,13 @@ class Router {
       routedSize = quantityTrade;
       return routedSize;
     });
+    return routedSize;
   }
 
   // Reads existing DIP Deposits & new deposit and decides whether to send it to the mm_callback
   async checkMMPrices(dipDeposit?: DIPDeposit): Promise<void> {
     let openPositionCount = 0;
+    let totalRoutedQty = 0;
     try {
       if (dipDeposit !== undefined) {
         this.dips[
@@ -179,22 +181,25 @@ class Router {
           )
         ] = dipDeposit;
       }
-      let totalRoutedQty = 0;
       for (let i = 0; i < MAX_ROUTE_ATTEMPTS; i++) {
+        totalRoutedQty = 0;
         for (const dip of Object.values(this.dips)) {
           if (dip.qtyTokens > 0) {
             openPositionCount++;
-            // Poller will immediately fire after position changes there may be a race to route
-            // See TODO: Delaying Poller or Putting on a timer
-            totalRoutedQty += await this.route(dip);
+            totalRoutedQty = await this.route(dip);
           }
         }
         if (totalRoutedQty === 0) {
+          console.log('No DIPs Routed. Do not recheck quotes. Run Risk Manager');
           break;
         }
         console.log('Routed', totalRoutedQty, 'DIPs. Wait', MM_REFRESH_TIME, 'seconds to check refreshed MM Orders', i);
         await sleepExact(MM_REFRESH_TIME);
         await this.refresh_dips_poller_accounts();
+      }
+      // Poller will immediately fire after position changes so no need to run risk manager
+      if (totalRoutedQty > 0) {
+        return;
       }
     } catch (err) {
       console.log('Failed to router with error: ', err, 'proceeding to run risk manager.');

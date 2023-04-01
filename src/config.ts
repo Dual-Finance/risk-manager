@@ -236,3 +236,5 @@ export const MAX_LOAD_TIME = 30;
 export const MAX_ROUTE_ATTEMPTS = 10;
 // Time to wait for MM to refresh bids
 export const MM_REFRESH_TIME = 5;
+// No routed size
+export const NO_ROUTED_SIZE = 0;

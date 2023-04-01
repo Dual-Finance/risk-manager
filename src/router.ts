@@ -18,6 +18,7 @@ import {
   RF_RATE,
   MAX_ROUTE_ATTEMPTS,
   MM_REFRESH_TIME,
+  NO_ROUTED_SIZE,
 } from './config';
 import Poller from './poller';
 import {
@@ -57,7 +58,7 @@ class Router {
 
   // Accepts a DIP Deposit and decides whether to send it to the mm_callback
   // or risk_manager_callback
-  async route(dipDeposit: DIPDeposit): Promise<number> {
+  async route(dipDeposit: DIPDeposit, routerID: number): Promise<number> {
     let routedSize = 0;
     const date = new Date(dipDeposit.expirationMs);
 
@@ -67,15 +68,15 @@ class Router {
       date.getUTCMonth() + 1
     }-${date.getUTCDate()},${dipDeposit.strikeUsdcPerToken * 1_000_000},UPSIDE,E,P`;
     console.log('++++++++++++++++++++++++++++++++++++++++++++++++++++');
-    console.log('Routing', dipDeposit.qtyTokens, symbol, new Date().toUTCString());
+    console.log('ROUTER:', routerID, 'Routing', dipDeposit.qtyTokens, symbol, new Date().toUTCString());
 
     // This happens after sending tokens to a MM. Exit early.
     if (dipDeposit.qtyTokens === 0) {
       this.dips[
         dipToString(dipDeposit.expirationMs / 1_000, dipDeposit.strikeUsdcPerToken)
       ] = dipDeposit;
-      console.log('DIP Deposit quantity zero. Rerun');
-      return routedSize;
+      console.log('ROUTER:', routerID, 'DIP Deposit quantity zero. Rerun');
+      return NO_ROUTED_SIZE;
     }
 
     await fetchMMOrder(symbol).then(async (order) => {
@@ -87,8 +88,8 @@ class Router {
             dipDeposit.strikeUsdcPerToken,
           )
         ] = dipDeposit;
-        console.log('No available MM bid', order);
-        return routedSize;
+        console.log('ROUTER:', routerID, 'No available MM bid', order);
+        return NO_ROUTED_SIZE;
       }
 
       const currentPrice = await getPythPrice(
@@ -100,31 +101,31 @@ class Router {
       ) * (1 + VOL_SPREAD + Math.random() * VOL_SPREAD);
       const thresholdPrice = blackScholes(currentPrice, dipDeposit.strikeUsdcPerToken, fractionOfYear, vol, RF_RATE, 'call');
       const { price, remainingQuantity } = order;
-      console.log('MM price:', price, 'BVE Re-Route price:', thresholdPrice);
+      console.log('ROUTER:', routerID, 'MM price:', price, 'BVE Re-Route price:', thresholdPrice);
       const userPremium = price * dipDeposit.qtyTokens;
       if (userPremium < MIN_EXECUTION_PREMIUM) {
         // If user premium is too small don't bother spamming MM
-        console.log('Not routing too small of a trade:', userPremium, MIN_EXECUTION_PREMIUM);
+        console.log('ROUTER:', routerID, 'Not routing too small of a trade:', userPremium, MIN_EXECUTION_PREMIUM);
         this.dips[
           dipToString(
             dipDeposit.expirationMs / 1_000,
             dipDeposit.strikeUsdcPerToken,
           )
         ] = dipDeposit;
-        return routedSize;
+        return NO_ROUTED_SIZE;
       }
 
       if (thresholdPrice > price || !(thresholdPrice > 0)) {
         // If the price is worse than the BVE, then do not use the MM, treat it
         // like there is no MM bid.
-        console.log('Not routing to MM due to price:', thresholdPrice, price);
+        console.log('ROUTER:', routerID, 'Not routing to MM due to price:', thresholdPrice, price);
         this.dips[
           dipToString(
             dipDeposit.expirationMs / 1_000,
             dipDeposit.strikeUsdcPerToken,
           )
         ] = dipDeposit;
-        return routedSize;
+        return NO_ROUTED_SIZE;
       }
 
       const clientOrderId = `clientOrderId${Date.now()}`;
@@ -149,7 +150,7 @@ class Router {
         signature: calculatedHash,
       };
 
-      console.log('Creating api order to sell', data);
+      console.log('ROUTER:', routerID, 'Creating api order to sell', data);
       const response = await fetch(`${DUAL_API}/orders/createorder`, {
         method: 'post',
         headers: {
@@ -161,16 +162,18 @@ class Router {
       if (!response.ok) {
         throw new Error('Failed to sell to API');
       }
-      console.log('API response', await response.json());
+      console.log('ROUTER:', routerID, 'API response', await response.json());
       routedSize = quantityTrade;
-      return routedSize;
+      return quantityTrade;
     });
     return routedSize;
   }
 
   // Reads existing DIP Deposits & new deposit and decides whether to send it to the mm_callback
   async checkMMPrices(dipDeposit?: DIPDeposit): Promise<void> {
+    const routerID = new Date().getTime();
     let openPositionCount = 0;
+    let routedQty = 0;
     let totalRoutedQty = 0;
     try {
       if (dipDeposit !== undefined) {
@@ -180,37 +183,44 @@ class Router {
             dipDeposit.strikeUsdcPerToken,
           )
         ] = dipDeposit;
+        console.log('ROUTER:', routerID, 'DIP Position Change', dipDeposit);
       }
       for (let i = 0; i < MAX_ROUTE_ATTEMPTS; i++) {
-        totalRoutedQty = 0;
+        routedQty = 0;
         for (const dip of Object.values(this.dips)) {
           if (dip.qtyTokens > 0) {
             openPositionCount++;
-            totalRoutedQty = await this.route(dip);
+            routedQty = await this.route(dip, routerID);
+            totalRoutedQty += routedQty;
           }
         }
-        if (totalRoutedQty === 0) {
-          console.log('No DIPs Routed. Do not recheck quotes. Run Risk Manager');
+        if (routedQty === 0) {
+          console.log('ROUTER:', routerID, 'Checked', openPositionCount, 'Open DIP Positions.', totalRoutedQty, 'Total Routed');
           break;
         }
-        console.log('Routed', totalRoutedQty, 'DIPs. Wait', MM_REFRESH_TIME, 'seconds to check refreshed MM Orders', i);
+        if (dipDeposit !== undefined) {
+          if (totalRoutedQty === dipDeposit.qtyTokens) {
+            console.log('ROUTER:', routerID, 'Routed All.', totalRoutedQty, 'Routed vs.', dipDeposit.qtyTokens, 'DIPs', i);
+            break;
+          }
+        }
+        console.log('ROUTER:', routerID, 'Routed', routedQty, 'DIPs. Wait', MM_REFRESH_TIME, 'seconds to check refreshed MM Orders', i);
         await sleepExact(MM_REFRESH_TIME);
         await this.refresh_dips_poller_accounts();
       }
       // Poller will immediately fire after position changes so no need to run risk manager
       if (totalRoutedQty > 0) {
+        console.log('ROUTER:', routerID, 'Sucessfully routed to MM. Use Position Change or Rerun to run Risk Manager');
         return;
       }
     } catch (err) {
-      console.log('Failed to router with error: ', err, 'proceeding to run risk manager.');
+      console.log('ROUTER:', routerID, 'Failed to route with error: ', err, 'proceeding to Run Risk Manager.');
     }
-    console.log('Checked', openPositionCount, 'DIP Positions');
     await this.refresh_dips_poller_accounts();
     if (dipDeposit !== undefined) {
       // TODO: Only run RM here if position changed from prior run
-      if (dipDeposit.qtyTokens !== 0) {
-        this.run_risk_manager();
-      }
+      console.log('ROUTER:', routerID, 'No Routing to MM. Run Risk Manager');
+      this.run_risk_manager();
     }
   }
 

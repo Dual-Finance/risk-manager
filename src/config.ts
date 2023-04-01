@@ -129,10 +129,10 @@ export const treasuryPositions: DIPDeposit[] = [({
 ({
   splTokenName: 'MNGO',
   premiumAssetName: 'USDC',
-  expirationMs: 1680350400000,
-  strikeUsdcPerToken: 0.020,
+  expirationMs: 1685620800000,
+  strikeUsdcPerToken: 0.019,
   callOrPut: CallOrPut.Put,
-  qtyTokens: 12500000,
+  qtyTokens: 5000000,
 }),
 ({
   splTokenName: 'BONK',

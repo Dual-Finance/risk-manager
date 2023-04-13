@@ -78,6 +78,7 @@ class Scalper {
   }
 
   async pickAndRunScalper(dipProduct: DIPDeposit[]): Promise<void> {
+    // TODO: Polling & parsing existing SOs maybe could just happen here
     // Add any treasury positions from Staking Options.
     for (const positions of treasuryPositions) {
       if (this.symbol === positions.splTokenName) {

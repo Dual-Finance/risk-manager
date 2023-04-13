@@ -5,6 +5,7 @@ import {
   SCALPER_WINDOW_SEC, CLUSTER, PRODUCT_STAGGER_SEC, productStatus,
 } from './config';
 import { sleepExact } from './utils';
+import { RM_PROD_PK } from './constants';
 
 async function main() {
   console.log('Risk Manager Running on', CLUSTER, new Date().toUTCString());
@@ -27,6 +28,10 @@ async function main() {
   ]));
   for (const [symbol, router] of routers) {
     if (productStatus.get(symbol)) {
+      const pollerSO = await router.refresh_so_poller_accounts();
+      // TODO: Check Option Vault instead if we don't route with a fee to RM
+      pollerSO.subscribe(RM_PROD_PK.toBase58());
+      console.log(symbol, 'POLLER SO', pollerSO);
       const [pollers, mmAccounts] = await router.refresh_dips_poller_accounts();
       console.log(`Check ${symbol} Position vs MM Quotes ${new Date().toUTCString()}`);
       await router.checkMMPrices();

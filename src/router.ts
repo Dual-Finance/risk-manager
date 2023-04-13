@@ -190,6 +190,7 @@ class Router {
         for (const dip of Object.values(this.dips)) {
           if (dip.qtyTokens > 0) {
             openPositionCount++;
+            // TODO: SOs probably don't need to check MM prices yet
             routedQty = await this.route(dip, routerID);
             totalRoutedQty += routedQty;
           }
@@ -331,6 +332,26 @@ class Router {
       }
     });
     return [pollers, mmAccounts];
+  }
+
+  async refresh_so_poller_accounts() : Promise<Poller> {
+    console.log('Refreshing Staking Options', API_URL);
+
+    // TODO: Parse SO State for expiration & strike
+    const poller: Poller = new Poller(
+      CLUSTER,
+      this.token,
+      'USDC',
+      1682683200000,
+      0.0000006,
+      CallOrPut.Call,
+      // TODO: Consider renaming OptionDeposit since usable DIPs & SO
+      (deposit: DIPDeposit) => {
+        // TOOD: Directly route to RM?
+        this.checkMMPrices(deposit);
+      },
+    );
+    return poller;
   }
 }
 

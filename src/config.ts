@@ -117,6 +117,7 @@ export const BVE_VOL_MAP = new Map<SYMBOL, number>([
   ['BTC', 0.2], ['ETH', 0.25], ['SOL', 0.3], ['MNGO', 0.35], ['BONK', 0.35], ['DUAL', 0.35],
 ]); // BVE vol keep alligned with app & contract vol
 
+// TODO: Remove real positions that will be fed by SO Polling of RM account
 // Enter any Staking Options owned and to be hedged from the treasury
 export const treasuryPositions: DIPDeposit[] = [({
   splTokenName: 'MNGO',

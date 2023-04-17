@@ -1,4 +1,4 @@
-import { Cluster } from '@solana/web3.js';
+import { Cluster, PublicKey } from '@solana/web3.js';
 import { CallOrPut, DIPDeposit, SYMBOL } from './common';
 import {
   OPB_DEVNET_PROGRAM_ID, OPB_MAINNET_PROGRAM_ID, USDC_DEVNET_PK, USDC_MAINNET_PK,
@@ -117,8 +117,12 @@ export const BVE_VOL_MAP = new Map<SYMBOL, number>([
   ['BTC', 0.2], ['ETH', 0.25], ['SOL', 0.3], ['MNGO', 0.35], ['BONK', 0.35], ['DUAL', 0.35],
 ]); // BVE vol keep alligned with app & contract vol
 
+export const SO_STATES: [string, PublicKey][] = [
+  ['GSOBONK_LOYALTY_9', new PublicKey('Fzo4RJ6KoaF34wmfvs94hbziSGvMcaumVtZkAA5vKKzi')],
+];
+
 // Enter any Staking Options owned and to be hedged from the treasury
-export const treasuryPositions: DIPDeposit[] = [({
+export const TREASURY_POSITIONS: DIPDeposit[] = [({
   splTokenName: 'MNGO',
   premiumAssetName: 'USDC',
   expirationMs: 1682942400000,

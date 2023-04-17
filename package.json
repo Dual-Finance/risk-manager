@@ -3,6 +3,7 @@
     "@blockworks-foundation/mango-v4": "^0.5.27",
     "@chainlink/solana-sdk": "^0.2.2",
     "@coral-xyz/anchor": "^0.26.0",
+    "@dual-finance/staking-options": "^0.0.21",
     "@jup-ag/core": "^4.0.0-beta.16",
     "@project-serum/anchor": "^0.25.0",
     "@project-serum/serum-dev-tools": "^1.0.5",

@@ -6,12 +6,13 @@ import {
 import { Market } from '@project-serum/serum';
 import { Jupiter } from '@jup-ag/core';
 import { AnchorProvider, BN, Wallet } from '@coral-xyz/anchor';
+import { StakingOptions } from '@dual-finance/staking-options';
 import {
   THEO_VOL_MAP, maxNotional, TWAP_INTERVAL_SEC, SCALPER_WINDOW_SEC,
   ZSCORE, MinContractSize, TickSize, IS_DEV, GAMMA_THRESHOLD,
   MAX_DELTA_HEDGES, DELTA_OFFSET,
   GAMMA_CYCLES, MinOpenBookSize, OPENBOOK_FORK_ID,
-  treasuryPositions, slippageMax, GAMMA_COMPLETE_THRESHOLD_PCT, CLUSTER,
+  slippageMax, GAMMA_COMPLETE_THRESHOLD_PCT, CLUSTER,
   MAX_ORDER_BOOK_SEARCH_DEPTH, MAX_BACK_GAMMA_MULTIPLE, API_URL, MODE_BY_SYMBOL,
   WHALE_MAX_SPREAD, ScalperMode, ORDER_SIZE_BUFFER_PCT, HedgeSide, BACK_GAMMA_SPREAD_RATIO,
   MAX_LOAD_TIME,
@@ -28,11 +29,11 @@ import {
   getSpotDelta, liquidityCheckAndNumSplices,
   tryToSettleOpenBook, setPriorityFee, waitForFill, findMaxStrike, findMinStrike,
   findNearestStrikeType, cancelOpenBookOrders,
-  findFairValue, roundPriceToTickSize, roundQtyToMinOrderStep,
+  findFairValue, roundPriceToTickSize, roundQtyToMinOrderStep, getTreasuryPositions,
 } from './scalper_utils';
 import {
-  NO_FAIR_VALUE, OPENBOOK_MKT_MAP,
-  SEC_PER_YEAR, SUFFICIENT_BOOK_DEPTH,
+  NO_FAIR_VALUE, OPENBOOK_MKT_MAP, SEC_PER_YEAR,
+  SUFFICIENT_BOOK_DEPTH,
 } from './constants';
 // eslint-disable-next-line import/no-cycle
 import { loadMangoAndPickScalper } from './mango';
@@ -51,12 +52,14 @@ class Scalper {
   openBookAccount: string;
   serumVialClient: SerumVialClient;
   provider: AnchorProvider;
+  soHelper: StakingOptions;
 
   constructor(symbol: SYMBOL) {
     this.connection = new Connection(
       API_URL,
       'processed' as Commitment,
     );
+    this.soHelper = new StakingOptions(API_URL);
     this.owner = Keypair.fromSecretKey(Uint8Array.from(readKeypair()));
     this.provider = new AnchorProvider(
       this.connection,
@@ -78,23 +81,7 @@ class Scalper {
   }
 
   async pickAndRunScalper(dipProduct: DIPDeposit[]): Promise<void> {
-    // Add any treasury positions from Staking Options.
-    for (const positions of treasuryPositions) {
-      if (this.symbol === positions.splTokenName) {
-        dipProduct.push(positions);
-      }
-    }
-    console.log(this.symbol, 'Tracking Positions', dipProduct.length);
-    for (const dip of dipProduct) {
-      console.log(
-        dip.splTokenName,
-        dip.premiumAssetName,
-        new Date(dip.expirationMs).toDateString(),
-        dip.strikeUsdcPerToken,
-        dip.callOrPut,
-        dip.qtyTokens,
-      );
-    }
+    getTreasuryPositions(this.symbol, this.connection, dipProduct, this.soHelper);
 
     console.log(this.symbol, 'Choosing market to trade');
 

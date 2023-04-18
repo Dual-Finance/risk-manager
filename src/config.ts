@@ -134,10 +134,10 @@ export const TREASURY_POSITIONS: DIPDeposit[] = [({
 ({
   splTokenName: 'MNGO',
   premiumAssetName: 'USDC',
-  expirationMs: 1680350400000,
-  strikeUsdcPerToken: 0.020,
+  expirationMs: 1685620800000,
+  strikeUsdcPerToken: 0.019,
   callOrPut: CallOrPut.Put,
-  qtyTokens: 12500000,
+  qtyTokens: 10000000,
 }),
 ({
   splTokenName: 'BTC',
@@ -221,3 +221,9 @@ export const RESOLVE_PERIOD_MS = 100;
 export const ORDER_SIZE_BUFFER_PCT = 0.99;
 // Time in secs to allow loading of price
 export const MAX_LOAD_TIME = 30;
+// Number of times to optimstically route to MM
+export const MAX_ROUTE_ATTEMPTS = 10;
+// Time to wait for MM to refresh bids
+export const MM_REFRESH_TIME = 5;
+// No routed size
+export const NO_ROUTED_SIZE = 0;

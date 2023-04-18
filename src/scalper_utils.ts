@@ -8,12 +8,15 @@ import { getAssociatedTokenAddress } from '@project-serum/associated-token';
 import fetch from 'node-fetch';
 import { Jupiter } from '@jup-ag/core';
 import JSBI from 'jsbi';
-import { DIPDeposit, RouteDetails, SYMBOL } from './common';
+import { StakingOptions } from '@dual-finance/staking-options';
+import {
+  CallOrPut, DIPDeposit, RouteDetails, SYMBOL,
+} from './common';
 import {
   JUPITER_LIQUIDITY, MAX_MKT_SPREAD_PCT_FOR_PRICING, JUPITER_SEARCH_STEPS,
   RF_RATE, slippageMax, THEO_VOL_MAP, JUPITER_SLIPPAGE_BPS, PRIORITY_FEE,
   GAMMA_CYCLES, RESOLVE_PERIOD_MS, PRICE_OVERRIDE, HedgeSide,
-  CLUSTER, MAX_LOAD_TIME, LIQUID_SYMBOLS,
+  CLUSTER, MAX_LOAD_TIME, LIQUID_SYMBOLS, SO_STATES, TREASURY_POSITIONS,
 } from './config';
 import {
   asyncCallWithTimeoutasync,
@@ -22,7 +25,7 @@ import {
 } from './utils';
 import {
   RM_PROD_PK, MS_PER_YEAR, NO_FAIR_VALUE, OPTION_VAULT_PK, RM_BACKUP_PK,
-  SUFFICIENT_BOOK_DEPTH,
+  SUFFICIENT_BOOK_DEPTH, BONK_PK,
 } from './constants';
 
 export function getDIPDelta(
@@ -558,4 +561,66 @@ export function roundPriceToTickSize(amount: number, tickSize: number) {
 
 export function roundQtyToMinOrderStep(amount: number, minSize: number) {
   return Math.round(amount * (1 / minSize)) / (1 / minSize);
+}
+
+export async function getTreasuryPositions(
+  symbol: SYMBOL,
+  connection: Connection,
+  dipProduct: DIPDeposit[],
+  soHelper: StakingOptions,
+) {
+  console.log(symbol, 'Add Treasury Positions to Hedge');
+  // TODO: Make this work for tokens other than BONK
+  if (symbol === 'BONK') {
+    for (const [name] of SO_STATES) {
+      const parsedState = await soHelper.getState(name, BONK_PK);
+      // @ts-ignore
+      const { optionExpiration, lotSize, strikes } = parsedState;
+
+      // @ts-ignore
+      for (const strike of strikes) {
+        const soMint = await soHelper.soMint(strike.toNumber(), name, BONK_PK);
+        const accountList = [RM_PROD_PK, OPTION_VAULT_PK, RM_BACKUP_PK];
+        let netBalance = 0;
+        for (const account of accountList) {
+          const soAddress = await getAssociatedTokenAddress(account, soMint);
+          try {
+            netBalance += Number(
+              (await connection.getTokenAccountBalance(soAddress)).value.amount,
+            );
+          } catch (err) {
+            // Ignore Empty Accounts
+          }
+        }
+
+        // strike is atoms of quote per lot so need to divide by USDC atoms
+        // and multiple by BONK atoms.
+        dipProduct.push({
+          splTokenName: 'BONK',
+          premiumAssetName: 'USDC',
+          expirationMs: Number(optionExpiration) * 1_000,
+          strikeUsdcPerToken: (strike.toNumber() / Number(lotSize)) / (1_000_000 / 100_000),
+          callOrPut: CallOrPut.Call,
+          qtyTokens: (netBalance * Number(lotSize)) / 100_000,
+        });
+      }
+    }
+  }
+
+  for (const positions of TREASURY_POSITIONS) {
+    if (symbol === positions.splTokenName) {
+      dipProduct.push(positions);
+    }
+  }
+  console.log(symbol, 'Tracking Positions', dipProduct.length);
+  for (const dip of dipProduct) {
+    console.log(
+      dip.splTokenName,
+      dip.premiumAssetName,
+      new Date(dip.expirationMs).toDateString(),
+      dip.strikeUsdcPerToken,
+      dip.callOrPut,
+      dip.qtyTokens,
+    );
+  }
 }

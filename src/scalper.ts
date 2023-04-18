@@ -6,17 +6,16 @@ import {
 import { Market } from '@project-serum/serum';
 import { Jupiter } from '@jup-ag/core';
 import { AnchorProvider, BN, Wallet } from '@coral-xyz/anchor';
-import { getAssociatedTokenAddress } from '@project-serum/associated-token';
 import { StakingOptions } from '@dual-finance/staking-options';
 import {
   THEO_VOL_MAP, maxNotional, TWAP_INTERVAL_SEC, SCALPER_WINDOW_SEC,
   ZSCORE, MinContractSize, TickSize, IS_DEV, GAMMA_THRESHOLD,
   MAX_DELTA_HEDGES, DELTA_OFFSET,
   GAMMA_CYCLES, MinOpenBookSize, OPENBOOK_FORK_ID,
-  TREASURY_POSITIONS, slippageMax, GAMMA_COMPLETE_THRESHOLD_PCT, CLUSTER,
+  slippageMax, GAMMA_COMPLETE_THRESHOLD_PCT, CLUSTER,
   MAX_ORDER_BOOK_SEARCH_DEPTH, MAX_BACK_GAMMA_MULTIPLE, API_URL, MODE_BY_SYMBOL,
   WHALE_MAX_SPREAD, ScalperMode, ORDER_SIZE_BUFFER_PCT, HedgeSide, BACK_GAMMA_SPREAD_RATIO,
-  MAX_LOAD_TIME, SO_STATES,
+  MAX_LOAD_TIME,
 } from './config';
 import { CallOrPut, DIPDeposit, SYMBOL } from './common';
 import {
@@ -30,10 +29,10 @@ import {
   getSpotDelta, liquidityCheckAndNumSplices,
   tryToSettleOpenBook, setPriorityFee, waitForFill, findMaxStrike, findMinStrike,
   findNearestStrikeType, cancelOpenBookOrders,
-  findFairValue, roundPriceToTickSize, roundQtyToMinOrderStep,
+  findFairValue, roundPriceToTickSize, roundQtyToMinOrderStep, getTreasuryPositions,
 } from './scalper_utils';
 import {
-  BONK_PK, NO_FAIR_VALUE, OPENBOOK_MKT_MAP, OPTION_VAULT_PK, SEC_PER_YEAR,
+  NO_FAIR_VALUE, OPENBOOK_MKT_MAP, SEC_PER_YEAR,
   SUFFICIENT_BOOK_DEPTH,
 } from './constants';
 // eslint-disable-next-line import/no-cycle
@@ -82,53 +81,7 @@ class Scalper {
   }
 
   async pickAndRunScalper(dipProduct: DIPDeposit[]): Promise<void> {
-    console.log('Running scalper');
-
-    // TODO: Make this work for tokens other than BONK
-    if (this.symbol === 'BONK') {
-      for (const [name] of SO_STATES) {
-        const parsedState = await this.soHelper.getState(name, BONK_PK);
-        // @ts-ignore
-        const { optionExpiration, lotSize, strikes } = parsedState;
-
-        // @ts-ignore
-        for (const strike of strikes) {
-          const soMint = await this.soHelper.soMint(strike.toNumber(), name, BONK_PK);
-          const soAddress = await getAssociatedTokenAddress(OPTION_VAULT_PK, soMint);
-          const balance = Number(
-            (await this.connection.getTokenAccountBalance(soAddress)).value.amount,
-          );
-
-          // strike is atoms of quote per lot so need to divide by USDC atoms
-          // and multiple by BONK atoms.
-          dipProduct.push({
-            splTokenName: 'BONK',
-            premiumAssetName: 'USDC',
-            expirationMs: Number(optionExpiration) * 1_000,
-            strikeUsdcPerToken: (strike.toNumber() / Number(lotSize)) / (1_000_000 / 100_000),
-            callOrPut: CallOrPut.Call,
-            qtyTokens: (balance * Number(lotSize)) / 100_000,
-          });
-        }
-      }
-    }
-
-    for (const positions of TREASURY_POSITIONS) {
-      if (this.symbol === positions.splTokenName) {
-        dipProduct.push(positions);
-      }
-    }
-    console.log(this.symbol, 'Tracking Positions', dipProduct.length);
-    for (const dip of dipProduct) {
-      console.log(
-        dip.splTokenName,
-        dip.premiumAssetName,
-        new Date(dip.expirationMs).toDateString(),
-        dip.strikeUsdcPerToken,
-        dip.callOrPut,
-        dip.qtyTokens,
-      );
-    }
+    getTreasuryPositions(this.symbol, this.connection, dipProduct, this.soHelper);
 
     console.log(this.symbol, 'Choosing market to trade');
 

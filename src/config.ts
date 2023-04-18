@@ -119,6 +119,7 @@ export const BVE_VOL_MAP = new Map<SYMBOL, number>([
 
 export const SO_STATES: [string, PublicKey][] = [
   ['GSOBONK_LOYALTY_9', new PublicKey('Fzo4RJ6KoaF34wmfvs94hbziSGvMcaumVtZkAA5vKKzi')],
+  ['GSOBONK_LOYALTY_8', new PublicKey('C15SjUVjqwU91mmFqNB41TCDYiR9YDPMtZrrvZMHNmVW')],
 ];
 
 // Enter any Staking Options owned and to be hedged from the treasury
@@ -138,22 +139,6 @@ export const TREASURY_POSITIONS: DIPDeposit[] = [({
   callOrPut: CallOrPut.Put,
   qtyTokens: 12500000,
 }),
-({
-  splTokenName: 'BONK',
-  premiumAssetName: 'USDC',
-  expirationMs: 1679572800000,
-  strikeUsdcPerToken: 0.0000009,
-  callOrPut: CallOrPut.Call,
-  qtyTokens: 335284600,
-}),
-({
-  splTokenName: 'BONK',
-  premiumAssetName: 'USDC',
-  expirationMs: 1680868800,
-  strikeUsdcPerToken: 0.0000006,
-  callOrPut: CallOrPut.Call,
-  qtyTokens: 81868030,
-}), // BONK GSO Position
 ({
   splTokenName: 'BTC',
   premiumAssetName: 'USDC',

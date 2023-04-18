@@ -105,7 +105,7 @@ class Scalper {
             splTokenName: 'BONK',
             premiumAssetName: 'USDC',
             expirationMs: Number(optionExpiration) * 1_000,
-            strikeUsdcPerToken: (strike.toNumber() / Number(lotSize)) / (1_000_000 * 100_000),
+            strikeUsdcPerToken: (strike.toNumber() / Number(lotSize)) / (1_000_000 / 100_000),
             callOrPut: CallOrPut.Call,
             qtyTokens: (balance * Number(lotSize)) / 100_000,
           });

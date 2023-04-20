@@ -132,7 +132,7 @@ class Scalper {
           spotMarket,
         );
       } catch (err) {
-        console.log(this.symbol, 'scalperOpenBook error', err.stack);
+        console.log(this.symbol, 'scalperOpenBook gamma error', err.stack);
       }
     }
     console.log(this.symbol, 'Scalper cycle completed', new Date().toUTCString());

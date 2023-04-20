@@ -118,6 +118,7 @@ export const BVE_VOL_MAP = new Map<SYMBOL, number>([
 ]); // BVE vol keep alligned with app & contract vol
 
 export const SO_STATES: [string, PublicKey][] = [
+  ['GSOBONK_LOYALTY_10', new PublicKey('47JR8VXLc32X74ZFHcSFwkdZLWLdrU1f3WxDtgQUBhwj')],
   ['GSOBONK_LOYALTY_9', new PublicKey('Fzo4RJ6KoaF34wmfvs94hbziSGvMcaumVtZkAA5vKKzi')],
   ['GSOBONK_LOYALTY_8', new PublicKey('C15SjUVjqwU91mmFqNB41TCDYiR9YDPMtZrrvZMHNmVW')],
 ];

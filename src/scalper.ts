@@ -19,9 +19,7 @@ import {
 } from './config';
 import { CallOrPut, DIPDeposit, SYMBOL } from './common';
 import {
-  asyncCallWithTimeoutasync,
-  getRandomNumAround,
-  readKeypair,
+  asyncCallWithTimeoutasync, getRandomNumAround, readKeypair,
 } from './utils';
 import { SerumVialClient, SerumVialTradeMessage, tradeMessageToString } from './serumVial';
 import {
@@ -32,8 +30,7 @@ import {
   findFairValue, roundPriceToTickSize, roundQtyToMinOrderStep, getTreasuryPositions,
 } from './scalper_utils';
 import {
-  NO_FAIR_VALUE, OPENBOOK_MKT_MAP, SEC_PER_YEAR,
-  SUFFICIENT_BOOK_DEPTH,
+  NO_FAIR_VALUE, OPENBOOK_MKT_MAP, SEC_PER_YEAR, SUFFICIENT_BOOK_DEPTH,
 } from './constants';
 // eslint-disable-next-line import/no-cycle
 import { loadMangoAndPickScalper } from './mango';
@@ -105,7 +102,7 @@ class Scalper {
         OPENBOOK_FORK_ID,
       );
     } catch (err) {
-      console.log(this.symbol, 'No OpenBook Market Found', err);
+      console.log(this.symbol, 'No OpenBook market found', err);
       return;
     }
 
@@ -123,7 +120,7 @@ class Scalper {
           spotMarket,
         );
       } catch (err) {
-        console.log(this.symbol, 'Normal scalping error', err.stack);
+        console.log(this.symbol, 'Normal mode scalping error', err.stack);
       }
       this.serumVialClient.removeAnyListeners();
     } else {
@@ -135,10 +132,10 @@ class Scalper {
           spotMarket,
         );
       } catch (err) {
-        console.log(this.symbol, 'Main Gamma Error', err.stack);
+        console.log(this.symbol, 'scalperOpenBook gamma error', err.stack);
       }
     }
-    console.log(this.symbol, 'Scalper Cycle completed', new Date().toUTCString());
+    console.log(this.symbol, 'Scalper cycle completed', new Date().toUTCString());
     console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~');
   }
 
@@ -167,7 +164,7 @@ class Scalper {
       [deltaID.toString()],
       (message: SerumVialTradeMessage) => {
         const side: string = message.makerClientId === deltaID.toString() ? 'Maker' : 'Taker';
-        console.log(`${this.symbol} Delta Fill ${side} ${hedgeSide} ${tradeMessageToString(message)}`);
+        console.log(`${this.symbol} Delta fill ${side} ${hedgeSide} ${tradeMessageToString(message)}`);
         const fillQty = (hedgeSide === HedgeSide.buy ? 1 : -1) * message.size;
         hedgeDeltaTotal += fillQty;
       },
@@ -183,7 +180,7 @@ class Scalper {
       TWAP_INTERVAL_SEC,
     );
     if (fairValue === NO_FAIR_VALUE) {
-      console.log(this.symbol, 'No Robust Pricing. Exiting Delta Hedge', deltaHedgeCount);
+      console.log(this.symbol, 'No robust pricing. Exiting Delta Hedge', deltaHedgeCount);
       return;
     }
 
@@ -196,7 +193,7 @@ class Scalper {
 
     console.log(
       `${this.symbol} Target Delta Hedge: ${hedgeSide} SPOT ${-hedgeDeltaTotal} DIP Δ: ${dipTotalDelta} \
-      Spot Δ: ${spotDelta} Offset Δ ${this.deltaOffset} Fair Value: ${fairValue}`,
+Spot Δ: ${spotDelta} Offset Δ ${this.deltaOffset} Fair Value: ${fairValue}`,
     );
 
     // Check whether we need to hedge.
@@ -208,7 +205,7 @@ class Scalper {
       this.minSpotSize,
     );
     if (Math.abs(hedgeDeltaTotal) < deltaThreshold) {
-      console.log(this.symbol, 'Delta Netural Within', deltaThreshold);
+      console.log(this.symbol, 'Delta netural within', deltaThreshold);
       return;
     }
     const slippageTolerance = Math.min(stdDevSpread / 2, slippageMax.get(this.symbol));
@@ -218,10 +215,10 @@ class Scalper {
     const slippageDIPDelta = getDIPDelta(dipProduct, hedgePrice, this.symbol);
     const dipDeltaDiff = slippageDIPDelta - dipTotalDelta;
     hedgeDeltaTotal += dipDeltaDiff;
-    console.log(this.symbol, 'Adjust Slippage Delta by', dipDeltaDiff, 'to', -hedgeDeltaTotal);
+    console.log(this.symbol, 'Adjust slippage delta by', dipDeltaDiff, 'to', -hedgeDeltaTotal);
 
     if (Math.abs(hedgeDeltaTotal) < deltaThreshold) {
-      console.log(this.symbol, 'Delta Netural: Slippage', deltaThreshold);
+      console.log(this.symbol, 'Delta netural: slippage', deltaThreshold);
       return;
     }
     console.log(this.symbol, 'Outside delta threshold:', Math.abs(hedgeDeltaTotal), 'vs.', deltaThreshold);
@@ -241,9 +238,9 @@ class Scalper {
     let hedgeDeltaClip = hedgeDeltaTotal;
     try {
       if (spliceFactor !== SUFFICIENT_BOOK_DEPTH) {
-        console.log(this.symbol, 'Not enough liquidity! Try Jupiter. Adjust Price', hedgePrice, 'Splice', spliceFactor);
+        console.log(this.symbol, 'Not enough liquidity! Try Jupiter. Adjusted price', hedgePrice, 'Splice', spliceFactor);
         // Check on jupiter and sweep price
-        console.log(this.symbol, 'Loading Jupiter To Trade');
+        console.log(this.symbol, 'Loading Jupiter to trade');
         const jupiter = await asyncCallWithTimeoutasync(Jupiter.load({
           connection: this.connection,
           cluster: CLUSTER,
@@ -269,11 +266,11 @@ class Scalper {
           }
           const spotDeltaUpdate = jupValues.qty;
           hedgeDeltaTotal += spotDeltaUpdate;
-          console.log(this.symbol, 'Jupiter Hedge via', jupValues.venue, 'Price', jupValues.price, 'Qty', jupValues.qty, `https://solana.fm/tx/${txid}${CLUSTER?.includes('devnet') ? '?cluster=devnet' : ''}`);
+          console.log(this.symbol, 'Jupiter Hedge via', jupValues.venue, 'price', jupValues.price, 'qty', jupValues.qty, `https://solana.fm/tx/${txid}${CLUSTER?.includes('devnet') ? '?cluster=devnet' : ''}`);
           console.log(this.symbol, 'Adjust', hedgeSide, 'Price', hedgePrice, 'to', jupValues.price, 'Remaining Qty', hedgeDeltaTotal);
           hedgePrice = jupValues.price;
         } else {
-          console.log(this.symbol, 'No Jupiter Route Found Better than', hedgePrice);
+          console.log(this.symbol, 'No Jupiter Route found better than', hedgePrice);
         }
         hedgeDeltaClip = hedgeDeltaTotal / spliceFactor;
       }
@@ -284,7 +281,7 @@ class Scalper {
         return;
       }
     } catch (err) {
-      console.log(this.symbol, 'Jupiter Route', err, err.stack);
+      console.log(this.symbol, 'Jupiter Route error', err, err.stack);
     }
 
     // Send the delta hedge order to openbook.
@@ -308,16 +305,16 @@ class Scalper {
     try {
       await sendAndConfirmTransaction(this.connection, setPriorityFee(deltaOrderTx), [this.owner]);
     } catch (err) {
-      console.log(this.symbol, 'Delta Order', err, err.stack);
+      console.log(this.symbol, 'Delta Order error', err, err.stack);
     }
     // Rest single order if the hedge should be completed in a single clip
     if (spliceFactor === 1) {
       const netHedgePeriod = TWAP_INTERVAL_SEC * MAX_DELTA_HEDGES;
-      console.log(this.symbol, 'Scan Delta Fills for ~', netHedgePeriod, 'seconds');
+      console.log(this.symbol, 'Scan delta fills for ~', netHedgePeriod, 'seconds');
 
       await waitForFill(() => (Math.abs(hedgeDeltaTotal) < deltaThreshold), TWAP_INTERVAL_SEC);
       if (Math.abs(hedgeDeltaTotal) < deltaThreshold) {
-        console.log(this.symbol, 'Delta Hedge Complete: SerumVial');
+        console.log(this.symbol, 'Delta Hedge complete: SerumVial');
         return;
       }
 
@@ -326,8 +323,8 @@ class Scalper {
       const spreadDelta = IS_BUYSIDE
         ? ((askTOB - hedgePrice) / hedgePrice) * 100
         : ((bidTOB - hedgePrice) / hedgePrice) * 100;
-      console.log(`${this.symbol} OpenBook Delta Hedge Timeout. Spread % ${spreadDelta} \
-      > Slippage % ${slippageTolerance * 100}`);
+      console.log(`${this.symbol} OpenBook Delta Hedge timeout. Spread % ${spreadDelta} \
+> slippage % ${slippageTolerance * 100}`);
       return;
     }
 
@@ -420,7 +417,7 @@ class Scalper {
     let fairValue: number;
     if (priorFillPrice > NO_FAIR_VALUE) {
       fairValue = priorFillPrice;
-      console.log(this.symbol, 'Fair Value Set to Prior Fill', fairValue);
+      console.log(this.symbol, 'Fair Value set to prior fill', fairValue);
     } else {
       fairValue = await findFairValue(
         this.connection,
@@ -431,7 +428,7 @@ class Scalper {
         TWAP_INTERVAL_SEC,
       );
       if (fairValue === NO_FAIR_VALUE) {
-        console.log(this.symbol, 'No Robust Pricing. Exiting Gamma Scalp', gammaScalpCount);
+        console.log(this.symbol, 'No robust pricing. Exiting Gamma Scalp', gammaScalpCount);
         return;
       }
     }
@@ -462,27 +459,27 @@ class Scalper {
         const isOTM = fairValue > maxStrike;
         if (isOTM) {
           gammaBid = Math.min(maxStrike * (1 - stdDevSpread - stdDevWidenedSpread), gammaBid);
-          console.log('Strike Adjusted Gamma Bid', gammaBid, maxStrike);
+          console.log('Strike adjusted Gamma Bid', gammaBid, maxStrike);
         } else {
           gammaAsk = Math.max(maxStrike * (1 + stdDevSpread + stdDevWidenedSpread), gammaAsk);
-          console.log('Strike Adjusted Gamma Ask', gammaAsk, maxStrike);
+          console.log('Strike adjusted Gamma Ask', gammaAsk, maxStrike);
         }
       } else if (nearStrikeType === CallOrPut.Call) {
         const minStrike = findMinStrike(dipProduct);
         const isOTM = (fairValue < minStrike);
         if (isOTM) {
           gammaAsk = Math.max(minStrike * (1 + stdDevSpread + stdDevWidenedSpread), gammaAsk);
-          console.log('Strike Adjusted Gamma Ask', gammaAsk, minStrike);
+          console.log('Strike adjusted Gamma Ask', gammaAsk, minStrike);
         } else {
           gammaBid = Math.min(minStrike * (1 - stdDevSpread - stdDevWidenedSpread), gammaBid);
-          console.log('Strike Adjusted Gamma Bid', gammaBid, minStrike);
+          console.log('Strike adjusted Gamma Bid', gammaBid, minStrike);
         }
       }
     }
 
     console.log(this.symbol, 'Position Gamma Γ:', netGamma, 'Fair Value', fairValue);
     if (netGamma < this.minSpotSize) {
-      console.log(this.symbol, 'Gamma Hedge Too Small');
+      console.log(this.symbol, 'Gamma Hedge too small');
       return;
     }
 
@@ -516,7 +513,7 @@ class Scalper {
       }
     }
     console.log(`${this.symbol} Dim Qty ${dimQty} Whale Bid: ${whaleBidPrice} Ask ${whaleAskPrice} \
-    Spread % ${((whaleAskPrice - whaleBidPrice) / fairValue) * 100}`);
+Spread % ${((whaleAskPrice - whaleBidPrice) / fairValue) * 100}`);
 
     amountGamma = roundQtyToMinOrderStep(Math.abs(netGamma), this.minSpotSize);
     // Reduce gamma ask if not enough inventory. Assumes we always have enough to bid
@@ -621,7 +618,7 @@ class Scalper {
       console.log(this.symbol, 'Gamma Order', err, err.stack);
     }
     console.log(`${this.symbol} Gamma Spread % ${((priceAsk - priceBid) / fairValue) * 100} \
-    Liquidity $ ${(amountGamma * 2 + backBidQty + backAskQty) * fairValue}`);
+Liquidity $ ${(amountGamma * 2 + backBidQty + backAskQty) * fairValue}`);
 
     // At the base level only, wait for the scalp to fill.
     if (gammaScalpCount === 1) {
@@ -638,7 +635,7 @@ class Scalper {
       const estTotalPnL = scalpPnL + thetaPnL;
       console.log(
         `${this.symbol} Estimated Total PnL ${estTotalPnL} Scalp PnL ${scalpPnL} \
-        Theta PnL ${thetaPnL} Total Scalps ${gammaScalpCount - 1}`,
+Theta PnL ${thetaPnL} Total Scalps ${gammaScalpCount - 1}`,
       );
     }
   }

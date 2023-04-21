@@ -337,19 +337,19 @@ export async function getJupiterPrice(
 export async function getOraclePrice(symbol: SYMBOL) {
   const chainlinkPrice = await getChainlinkPrice(new PublicKey(tokenToSplMint(symbol)));
   if (chainlinkPrice > 0) {
-    console.log(`${symbol}: Chainlink Price: ${chainlinkPrice}`);
+    console.log(`${symbol} Chainlink Price: ${chainlinkPrice}`);
     return chainlinkPrice;
   }
 
   const sbPrice = await getSwitchboardPrice(new PublicKey(tokenToSplMint(symbol)));
   if (sbPrice > 0) {
-    console.log(`${symbol}: Switchboard Price: ${sbPrice}`);
+    console.log(`${symbol} Switchboard Price: ${sbPrice}`);
     return sbPrice;
   }
 
   const pythPrice = await getPythPrice(new PublicKey(tokenToSplMint(symbol)));
   if (pythPrice > 0) {
-    console.log(`${symbol}: Pyth Price: ${pythPrice}`);
+    console.log(`${symbol} Pyth Price: ${pythPrice}`);
     return pythPrice;
   }
 

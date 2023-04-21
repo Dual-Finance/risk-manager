@@ -3,37 +3,21 @@ import fetch from 'cross-fetch';
 import { blackScholes } from 'black-scholes';
 import { getAssociatedTokenAddress } from '@project-serum/associated-token';
 import {
-  CallOrPut,
-  DIPDeposit,
-  SYMBOL,
+  CallOrPut, DIPDeposit, SYMBOL,
 } from './common';
 import {
-  API_URL,
-  CLUSTER,
-  DUAL_API,
-  usdcPk,
-  BVE_VOL_MAP,
-  MIN_EXECUTION_PREMIUM,
-  VOL_SPREAD,
-  RF_RATE,
-  MAX_ROUTE_ATTEMPTS,
-  MM_REFRESH_TIME,
-  NO_ROUTED_SIZE,
+  API_URL, CLUSTER, DUAL_API, usdcPk, BVE_VOL_MAP, MIN_EXECUTION_PREMIUM,
+  VOL_SPREAD, RF_RATE, MAX_ROUTE_ATTEMPTS, MM_REFRESH_TIME, NO_ROUTED_SIZE,
 } from './config';
 import Poller from './poller';
 import {
-  findProgramAddressWithMintAndStrikeAndExpiration,
-  getPythPrice,
-  parseDipState,
-  sleepExact,
-  splMintToToken,
-  tokenToSplMint,
+  findProgramAddressWithMintAndStrikeAndExpiration, getPythPrice, parseDipState,
+  sleepExact, splMintToToken, tokenToSplMint,
 } from './utils';
 import * as apiSecret from '../apiSecret.json';
 import {
-  DIP_STATE_LENGTH,
-  DIP_PROGRAM_ID, MS_PER_YEAR, NUM_DIP_ATOMS_PER_TOKEN, OPTION_VAULT_PK,
-  OPTION_MINT_ADDRESS_SEED, PROTCOL_API_KEY, SIX_MONTHS_IN_MS,
+  DIP_STATE_LENGTH, DIP_PROGRAM_ID, MS_PER_YEAR, NUM_DIP_ATOMS_PER_TOKEN,
+  OPTION_VAULT_PK, OPTION_MINT_ADDRESS_SEED, PROTCOL_API_KEY, SIX_MONTHS_IN_MS,
 } from './constants';
 import { dipToString, fetchMMOrder } from './router_utils';
 
@@ -68,14 +52,14 @@ class Router {
       date.getUTCMonth() + 1
     }-${date.getUTCDate()},${dipDeposit.strikeUsdcPerToken * 1_000_000},UPSIDE,E,P`;
     console.log('++++++++++++++++++++++++++++++++++++++++++++++++++++');
-    console.log('ROUTER:', routerID, 'Routing', dipDeposit.qtyTokens, symbol, new Date().toUTCString());
+    console.log('Router ID:', routerID, 'Routing', dipDeposit.qtyTokens, symbol, new Date().toUTCString());
 
     // This happens after sending tokens to a MM. Exit early.
     if (dipDeposit.qtyTokens === 0) {
       this.dips[
         dipToString(dipDeposit.expirationMs / 1_000, dipDeposit.strikeUsdcPerToken)
       ] = dipDeposit;
-      console.log('ROUTER:', routerID, 'DIP Deposit quantity zero. Rerun');
+      console.log('Router ID:', routerID, 'DIP Deposit quantity zero. Rerun');
       return NO_ROUTED_SIZE;
     }
 
@@ -88,7 +72,7 @@ class Router {
             dipDeposit.strikeUsdcPerToken,
           )
         ] = dipDeposit;
-        console.log('ROUTER:', routerID, 'No available MM bid', order);
+        console.log('Router ID:', routerID, 'No available MM bid', order);
         return NO_ROUTED_SIZE;
       }
 
@@ -101,11 +85,11 @@ class Router {
       ) * (1 + VOL_SPREAD + Math.random() * VOL_SPREAD);
       const thresholdPrice = blackScholes(currentPrice, dipDeposit.strikeUsdcPerToken, fractionOfYear, vol, RF_RATE, 'call');
       const { price, remainingQuantity } = order;
-      console.log('ROUTER:', routerID, 'MM price:', price, 'BVE Re-Route price:', thresholdPrice);
+      console.log('Router ID:', routerID, 'MM price:', price, 'BVE Re-Route price:', thresholdPrice);
       const userPremium = price * dipDeposit.qtyTokens;
       if (userPremium < MIN_EXECUTION_PREMIUM) {
         // If user premium is too small don't bother spamming MM
-        console.log('ROUTER:', routerID, 'Not routing too small of a trade:', userPremium, MIN_EXECUTION_PREMIUM);
+        console.log('Router ID:', routerID, 'Not routing too small of a trade:', userPremium, MIN_EXECUTION_PREMIUM);
         this.dips[
           dipToString(
             dipDeposit.expirationMs / 1_000,
@@ -118,7 +102,7 @@ class Router {
       if (thresholdPrice > price || !(thresholdPrice > 0)) {
         // If the price is worse than the BVE, then do not use the MM, treat it
         // like there is no MM bid.
-        console.log('ROUTER:', routerID, 'Not routing to MM due to price:', thresholdPrice, price);
+        console.log('Router ID:', routerID, 'Not routing to MM due to price:', thresholdPrice, price);
         this.dips[
           dipToString(
             dipDeposit.expirationMs / 1_000,
@@ -150,7 +134,7 @@ class Router {
         signature: calculatedHash,
       };
 
-      console.log('ROUTER:', routerID, 'Creating api order to sell', data);
+      console.log('Router ID:', routerID, 'Creating api order to sell', data);
       const response = await fetch(`${DUAL_API}/orders/createorder`, {
         method: 'post',
         headers: {
@@ -162,7 +146,7 @@ class Router {
       if (!response.ok) {
         throw new Error('Failed to sell to API');
       }
-      console.log('ROUTER:', routerID, 'API response', await response.json());
+      console.log('Router ID:', routerID, 'API response', await response.json());
       routedSize = quantityTrade;
       return quantityTrade;
     });
@@ -183,7 +167,7 @@ class Router {
             dipDeposit.strikeUsdcPerToken,
           )
         ] = dipDeposit;
-        console.log('ROUTER:', routerID, 'DIP Position Change', dipDeposit);
+        console.log('Router ID:', routerID, 'DIP Position Change', dipDeposit);
       }
       for (let i = 0; i < MAX_ROUTE_ATTEMPTS; i++) {
         routedQty = 0;
@@ -195,31 +179,31 @@ class Router {
           }
         }
         if (routedQty === 0) {
-          console.log('ROUTER:', routerID, 'Checked', openPositionCount, 'Open DIP Positions.', totalRoutedQty, 'Total Routed');
+          console.log('Router ID:', routerID, 'Checked', openPositionCount, 'Open DIP Positions.', totalRoutedQty, 'Total Routed');
           break;
         }
         if (dipDeposit !== undefined) {
           if (totalRoutedQty === dipDeposit.qtyTokens) {
-            console.log('ROUTER:', routerID, 'Routed All.', totalRoutedQty, 'Routed vs.', dipDeposit.qtyTokens, 'DIPs', i);
+            console.log('Router ID:', routerID, 'Routed All.', totalRoutedQty, 'Routed vs.', dipDeposit.qtyTokens, 'DIPs', i);
             break;
           }
         }
-        console.log('ROUTER:', routerID, 'Routed', routedQty, 'DIPs. Wait', MM_REFRESH_TIME, 'seconds to check refreshed MM Orders', i);
+        console.log('Router ID:', routerID, 'Routed', routedQty, 'DIPs. Wait', MM_REFRESH_TIME, 'seconds to check refreshed MM Orders', i);
         await sleepExact(MM_REFRESH_TIME);
         await this.refresh_dips_poller_accounts();
       }
       // Poller will immediately fire after position changes so no need to run risk manager
       if (totalRoutedQty > 0) {
-        console.log('ROUTER:', routerID, 'Sucessfully routed to MM. Use Position Change or Rerun to run Risk Manager');
+        console.log('Router ID:', routerID, 'Sucessfully routed to MM. Use Position Change or Rerun to run Risk Manager');
         return;
       }
     } catch (err) {
-      console.log('ROUTER:', routerID, 'Failed to route with error: ', err, 'proceeding to Run Risk Manager.');
+      console.log('Router ID:', routerID, 'Failed to route with error: ', err, 'proceeding to Run Risk Manager.');
     }
     await this.refresh_dips_poller_accounts();
     if (dipDeposit !== undefined) {
       // TODO: Only run RM here if position changed from prior run
-      console.log('ROUTER:', routerID, 'No Routing to MM. Run Risk Manager');
+      console.log('Router ID:', routerID, 'No Routing to MM. Run Risk Manager');
       this.run_risk_manager();
     }
   }

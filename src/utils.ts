@@ -310,7 +310,7 @@ export async function getChainlinkPrice(splMint: PublicKey) {
   }
   const feedAddress = new PublicKey(tokenToChainlinkSymbol(splMintToToken(splMint)));
   const dataFeed = await OCR2Feed.load(CHAINLINK_PROGRAM_ID, provider);
-  let listener = null;
+  let listener: number = null;
 
   let latestValue = 0;
   listener = dataFeed.onRound(feedAddress, (event) => {
@@ -334,7 +334,7 @@ export function getRandomNumAround(midValue: number, spread: number) {
 }
 
 export async function asyncCallWithTimeoutasync(asyncPromise, timeLimit) {
-  let timeoutHandle;
+  let timeoutHandle: NodeJS.Timeout;
 
   const timeoutPromise = new Promise((_resolve, reject) => {
     timeoutHandle = setTimeout(

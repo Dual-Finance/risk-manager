@@ -16,7 +16,7 @@ import {
   JUPITER_LIQUIDITY, MAX_MKT_SPREAD_PCT_FOR_PRICING, JUPITER_SEARCH_STEPS,
   RF_RATE, slippageMax, THEO_VOL_MAP, JUPITER_SLIPPAGE_BPS, PRIORITY_FEE,
   GAMMA_CYCLES, RESOLVE_PERIOD_MS, PRICE_OVERRIDE, HedgeSide,
-  CLUSTER, MAX_LOAD_TIME, LIQUID_SYMBOLS, SO_STATES, TREASURY_POSITIONS,
+  CLUSTER, MAX_LOAD_TIME, LIQUID_SYMBOLS, ELIGIBLE_SO_STATES, TREASURY_POSITIONS,
 } from './config';
 import {
   asyncCallWithTimeoutasync,
@@ -25,7 +25,7 @@ import {
 } from './utils';
 import {
   RM_PROD_PK, MS_PER_YEAR, NO_FAIR_VALUE, OPTION_VAULT_PK, RM_BACKUP_PK,
-  SUFFICIENT_BOOK_DEPTH, BONK_PK,
+  SUFFICIENT_BOOK_DEPTH,
 } from './constants';
 
 export function getDIPDelta(
@@ -570,17 +570,48 @@ export async function getTreasuryPositions(
   soHelper: StakingOptions,
 ) {
   console.log(symbol, 'Add Treasury Positions to Hedge');
-  // TODO: Make this work for tokens other than BONK
-  if (symbol === 'BONK') {
-    for (const [name] of SO_STATES) {
-      const parsedState = await soHelper.getState(name, BONK_PK);
+  const accountList = [RM_PROD_PK, OPTION_VAULT_PK, RM_BACKUP_PK];
+  for (const eligibileSO of ELIGIBLE_SO_STATES) {
+    if (eligibileSO[0] === symbol) {
+      let parsedState;
+      let optionType: CallOrPut;
+      try {
+        parsedState = await soHelper.getState(eligibileSO[1], tokenToSplMint(symbol));
+        optionType = CallOrPut.Call;
+      } catch {
+        parsedState = await soHelper.getState(eligibileSO[1], tokenToSplMint('USDC'));
+        optionType = CallOrPut.Put;
+      }
       // @ts-ignore
-      const { optionExpiration, lotSize, strikes } = parsedState;
+      const {
+        optionExpiration, lotSize, strikes, baseMint, quoteMint, baseDecimals, quoteDecimals,
+      } = parsedState;
+
+      const splTokenName = optionType === CallOrPut.Put
+      // @ts-ignore
+        ? splMintToToken(quoteMint) : splMintToToken(baseMint);
+
+      // @ts-ignore
+      const baseAtoms = 10 ** baseDecimals;
+      // @ts-ignore
+      const quoteAtoms = 10 ** quoteDecimals;
 
       // @ts-ignore
       for (const strike of strikes) {
-        const soMint = await soHelper.soMint(strike.toNumber(), name, BONK_PK);
-        const accountList = [RM_PROD_PK, OPTION_VAULT_PK, RM_BACKUP_PK];
+        let soMint: PublicKey;
+        if (optionType === CallOrPut.Call) {
+          soMint = await soHelper.soMint(
+            strike.toNumber(),
+            eligibileSO[1],
+            tokenToSplMint(symbol),
+          );
+        } else {
+          soMint = await soHelper.soMint(
+            strike.toNumber(),
+            eligibileSO[1],
+            tokenToSplMint('USDC'),
+          );
+        }
         let netBalance = 0;
         for (const account of accountList) {
           const soAddress = await getAssociatedTokenAddress(account, soMint);
@@ -589,19 +620,25 @@ export async function getTreasuryPositions(
               (await connection.getTokenAccountBalance(soAddress)).value.amount,
             );
           } catch (err) {
-            // Ignore Empty Accounts
+          // Ignore Empty Accounts
           }
         }
-
-        // strike is atoms of quote per lot so need to divide by USDC atoms
-        // and multiple by BONK atoms.
+        // strike is atoms of quote per lot so need to divide by quote atoms
+        // and multiple by base atoms.
+        const strikeUsdcPerToken = optionType === CallOrPut.Call
+          ? (strike.toNumber() / Number(lotSize)) / (quoteAtoms / baseAtoms)
+          : 1 / ((strike.toNumber() / Number(lotSize)) / (quoteAtoms / baseAtoms));
+        const qtyTokens = optionType === CallOrPut.Call
+          ? (netBalance * Number(lotSize)) / baseAtoms
+          : ((netBalance * Number(lotSize)) / baseAtoms) / strikeUsdcPerToken;
+        const expirationMs = Number(optionExpiration) * 1_000;
         dipProduct.push({
-          splTokenName: 'BONK',
+          splTokenName,
           premiumAssetName: 'USDC',
-          expirationMs: Number(optionExpiration) * 1_000,
-          strikeUsdcPerToken: (strike.toNumber() / Number(lotSize)) / (1_000_000 / 100_000),
-          callOrPut: CallOrPut.Call,
-          qtyTokens: (netBalance * Number(lotSize)) / 100_000,
+          expirationMs,
+          strikeUsdcPerToken,
+          callOrPut: optionType,
+          qtyTokens,
         });
       }
     }

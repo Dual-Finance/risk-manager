@@ -78,7 +78,7 @@ class Scalper {
   }
 
   async pickAndRunScalper(dipProduct: DIPDeposit[]): Promise<void> {
-    getTreasuryPositions(this.symbol, this.connection, dipProduct, this.soHelper);
+    await getTreasuryPositions(this.symbol, this.connection, dipProduct, this.soHelper);
 
     console.log(this.symbol, 'Choosing market to trade');
 

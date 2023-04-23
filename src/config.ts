@@ -1,4 +1,4 @@
-import { Cluster, PublicKey } from '@solana/web3.js';
+import { Cluster } from '@solana/web3.js';
 import { CallOrPut, DIPDeposit, SYMBOL } from './common';
 import {
   OPB_DEVNET_PROGRAM_ID, OPB_MAINNET_PROGRAM_ID, USDC_DEVNET_PK, USDC_MAINNET_PK,
@@ -117,30 +117,16 @@ export const BVE_VOL_MAP = new Map<SYMBOL, number>([
   ['BTC', 0.2], ['ETH', 0.25], ['SOL', 0.3], ['MNGO', 0.35], ['BONK', 0.35], ['DUAL', 0.35],
 ]); // BVE vol keep alligned with app & contract vol
 
-export const SO_STATES: [string, PublicKey][] = [
-  ['GSOBONK_LOYALTY_10', new PublicKey('47JR8VXLc32X74ZFHcSFwkdZLWLdrU1f3WxDtgQUBhwj')],
-  ['GSOBONK_LOYALTY_9', new PublicKey('Fzo4RJ6KoaF34wmfvs94hbziSGvMcaumVtZkAA5vKKzi')],
-  ['GSOBONK_LOYALTY_8', new PublicKey('C15SjUVjqwU91mmFqNB41TCDYiR9YDPMtZrrvZMHNmVW')],
+export const ELIGIBLE_SO_STATES: [SYMBOL, string][] = [
+  ['BONK', 'GSOBONK_LOYALTY_10'],
+  ['BONK', 'GSOBONK_LOYALTY_9'],
+  ['BONK', 'GSOBONK_LOYALTY_8'],
+  ['MNGO', 'MNGO Buyback 6'],
+  ['MNGO', 'MNGO Buyback 7'],
 ];
 
 // Enter any Staking Options owned and to be hedged from the treasury
 export const TREASURY_POSITIONS: DIPDeposit[] = [({
-  splTokenName: 'MNGO',
-  premiumAssetName: 'USDC',
-  expirationMs: 1682942400000,
-  strikeUsdcPerToken: 0.018,
-  callOrPut: CallOrPut.Put,
-  qtyTokens: 6944444,
-}),
-({
-  splTokenName: 'MNGO',
-  premiumAssetName: 'USDC',
-  expirationMs: 1685620800000,
-  strikeUsdcPerToken: 0.019,
-  callOrPut: CallOrPut.Put,
-  qtyTokens: 10000000,
-}),
-({
   splTokenName: 'BTC',
   premiumAssetName: 'USDC',
   expirationMs: 1680868800000,

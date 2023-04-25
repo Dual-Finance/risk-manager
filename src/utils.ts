@@ -203,7 +203,9 @@ function tokenToSBSymbol(token: SYMBOL) {
   if (token === 'BONK') {
     return '6qBqGAYmoZw2r4fda7671NSUbcDWE4XicJdJoWqK8aTe';
   }
-  // TODO: Add DUAL Switchboard
+  if (token === 'DUAL') {
+    return '7fMKXU6AnatycNu1CAMndLkKmDPtjZaPNZSJSfXR92Ez';
+  }
   return undefined;
 }
 

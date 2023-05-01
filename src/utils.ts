@@ -10,7 +10,7 @@ import SwitchboardProgram from '@switchboard-xyz/sbv2-lite';
 import * as anchor from '@project-serum/anchor';
 import { OCR2Feed } from '@chainlink/solana-sdk';
 import {
-  API_URL, IS_DEV, RANDOM_SLEEP_MULTIPLIER, usdcPk, TRADING_ACCOUNT,
+  API_URL, IS_DEV, RANDOM_SLEEP_MULTIPLIER, usdcPk, TRADING_ACCOUNT, MAX_STALENESS,
 } from './config';
 import {
   BONK_PK, CHAINLINK_PROGRAM_ID, DUAL_PK, MNGO_PK, BTC_PK, ETH_PK, WSOL_PK,
@@ -224,8 +224,8 @@ export async function getSwitchboardPrice(splMint: PublicKey) {
       return 0;
     }
 
-    // Get latest value if its been updated in the last 400 seconds
-    const latestResult = sbv2.decodeLatestAggregatorValue(accountInfo, 400);
+    // Get latest value if its been updated within max staleness
+    const latestResult = sbv2.decodeLatestAggregatorValue(accountInfo, MAX_STALENESS);
     if (latestResult === null) {
       console.log('Failed to fetch latest result for Switchboard aggregator');
       return 0;

@@ -213,3 +213,5 @@ export const MAX_ROUTE_ATTEMPTS = 10;
 export const MM_REFRESH_TIME = 5;
 // No routed size
 export const NO_ROUTED_SIZE = 0;
+// Max Staleness to Allow Oracle Updates in Seconds
+export const MAX_STALENESS = 400;

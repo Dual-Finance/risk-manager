@@ -120,7 +120,6 @@ export const BVE_VOL_MAP = new Map<SYMBOL, number>([
 export const ELIGIBLE_SO_STATES: [SYMBOL, string][] = [
   ['BONK', 'GSOBONK_LOYALTY_10'],
   ['BONK', 'GSOBONK_LOYALTY_9'],
-  ['BONK', 'GSOBONK_LOYALTY_8'],
   ['MNGO', 'MNGO Buyback 6'],
   ['MNGO', 'MNGO Buyback 7'],
 ];
@@ -214,3 +213,5 @@ export const MAX_ROUTE_ATTEMPTS = 10;
 export const MM_REFRESH_TIME = 5;
 // No routed size
 export const NO_ROUTED_SIZE = 0;
+// Max Staleness to Allow Oracle Updates in Seconds
+export const MAX_STALENESS = 400;

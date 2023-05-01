@@ -587,6 +587,12 @@ export async function getTreasuryPositions(
         optionExpiration, lotSize, strikes, baseMint, quoteMint, baseDecimals, quoteDecimals,
       } = parsedState;
 
+      // Skip expired postions if they are left in
+      const expirationMs = Number(optionExpiration) * 1_000;
+      if (expirationMs < Date.now()) {
+        continue;
+      }
+
       const splTokenName = optionType === CallOrPut.Put
       // @ts-ignore
         ? splMintToToken(quoteMint) : splMintToToken(baseMint);
@@ -631,7 +637,6 @@ export async function getTreasuryPositions(
         const qtyTokens = optionType === CallOrPut.Call
           ? (netBalance * Number(lotSize)) / baseAtoms
           : ((netBalance * Number(lotSize)) / baseAtoms) / strikeUsdcPerToken;
-        const expirationMs = Number(optionExpiration) * 1_000;
         dipProduct.push({
           splTokenName,
           premiumAssetName: 'USDC',

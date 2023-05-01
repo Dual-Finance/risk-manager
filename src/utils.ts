@@ -224,8 +224,8 @@ export async function getSwitchboardPrice(splMint: PublicKey) {
       return 0;
     }
 
-    // Get latest value if its been updated in the last 100 seconds
-    const latestResult = sbv2.decodeLatestAggregatorValue(accountInfo, 100);
+    // Get latest value if its been updated in the last 400 seconds
+    const latestResult = sbv2.decodeLatestAggregatorValue(accountInfo, 400);
     if (latestResult === null) {
       console.log('Failed to fetch latest result for Switchboard aggregator');
       return 0;

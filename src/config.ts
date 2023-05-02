@@ -121,7 +121,6 @@ export const ELIGIBLE_SO_STATES: [SYMBOL, string][] = [
   ['BONK', 'GSOBONK_LOYALTY_11'],
   ['BONK', 'GSOBONK_LOYALTY_10'],
   ['BONK', 'GSOBONK_LOYALTY_9'],
-  ['MNGO', 'MNGO Buyback 6'],
   ['MNGO', 'MNGO Buyback 7'],
   ['MNGO', 'MNGO Buyback 8'],
 ];

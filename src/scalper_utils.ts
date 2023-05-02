@@ -579,8 +579,13 @@ export async function getTreasuryPositions(
         parsedState = await soHelper.getState(eligibileSO[1], tokenToSplMint(symbol));
         optionType = CallOrPut.Call;
       } catch {
-        parsedState = await soHelper.getState(eligibileSO[1], tokenToSplMint('USDC'));
-        optionType = CallOrPut.Put;
+        try {
+          parsedState = await soHelper.getState(eligibileSO[1], tokenToSplMint('USDC'));
+          optionType = CallOrPut.Put;
+        } catch {
+          // Skip empty so states
+          continue;
+        }
       }
       // @ts-ignore
       const {

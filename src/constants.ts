@@ -43,3 +43,38 @@ export const DIP_STATE_LENGTH = 260;
 
 export const NO_FAIR_VALUE = 0;
 export const SUFFICIENT_BOOK_DEPTH = 0;
+
+export const JUPITER_EXCLUDED_AMMS = {
+  Aldrin: true,
+  Crema: true,
+  Cropper: true,
+  Cykura: true,
+  DeltaFi: true,
+  GooseFX: true,
+  Invariant: true,
+  Marinade: true,
+  Mercurial: true,
+  'Raydium CLMM': true,
+  Serum: true,
+  Penguin: true,
+  Dradex: true,
+  Balansol: true,
+  'Marco Polo': true,
+  Unknown: true,
+  // ------------//
+  Raydium: false,
+  Openbook: false,
+  Phoenix: false,
+  'Orca (Whirlpools)': false,
+  Sencha: false,
+  'Saber (Decimals)': false,
+  Saber: false,
+  Orca: false,
+  Step: false,
+  Saros: false,
+  Stepn: false,
+  Meteora: false,
+  Lifinity: false,
+  'Lifinity V2': false,
+  // -----------//
+};

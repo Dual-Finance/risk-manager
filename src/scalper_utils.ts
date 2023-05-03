@@ -26,6 +26,7 @@ import {
 import {
   RM_PROD_PK, MS_PER_YEAR, NO_FAIR_VALUE, OPTION_VAULT_PK, RM_BACKUP_PK,
   SUFFICIENT_BOOK_DEPTH,
+  JUPITER_EXCLUDED_AMMS,
 } from './constants';
 
 export function getDIPDelta(
@@ -277,16 +278,12 @@ export async function getJupiterPrice(
   base: SYMBOL,
   quote: SYMBOL,
   connection: Connection,
-  owner: Keypair,
 ) {
   console.log(base, 'Loading Jupiter For Price');
   const jupiter = await Jupiter.load({
     connection,
     cluster: CLUSTER,
-    user: owner,
-    wrapUnwrapSOL: false,
-    restrictIntermediateTokens: true,
-    shouldLoadSerumOpenOrders: false,
+    ammsToExclude: JUPITER_EXCLUDED_AMMS,
   });
   // Check asks
   const inputBuyToken = new PublicKey(tokenToSplMint(quote));
@@ -377,7 +374,6 @@ export async function getOpenBookMidPrice(
 
 export async function getFairValue(
   connection: Connection,
-  owner: Keypair,
   spotMarket: Market,
   symbol: SYMBOL,
 ) {
@@ -389,7 +385,7 @@ export async function getFairValue(
     return fairValue;
   }
   try {
-    let jupPrice : number = await asyncCallWithTimeoutasync(getJupiterPrice(symbol, 'USDC', connection, owner), MAX_LOAD_TIME);
+    let jupPrice : number = await asyncCallWithTimeoutasync(getJupiterPrice(symbol, 'USDC', connection), MAX_LOAD_TIME);
     jupPrice = jupPrice > 0 ? jupPrice : 0;
     const oracleSlippage = Math.abs(fairValue - jupPrice) / fairValue;
     if (oracleSlippage > slippageMax.get(symbol)) {
@@ -417,12 +413,12 @@ export async function findFairValue(
   if (PRICE_OVERRIDE > 0) {
     return PRICE_OVERRIDE;
   }
-  let fairValue = await getFairValue(connection, owner, spotMarket, symbol);
+  let fairValue = await getFairValue(connection, spotMarket, symbol);
   for (let i = 0; i < tries; i++) {
     if (fairValue === NO_FAIR_VALUE) {
       console.log(symbol, 'Cannot find fair value');
       await sleepExact(waitSecPerTry);
-      fairValue = await getFairValue(connection, owner, spotMarket, symbol);
+      fairValue = await getFairValue(connection, spotMarket, symbol);
     }
   }
   return fairValue;

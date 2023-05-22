@@ -42,7 +42,7 @@ export function sleepExact(period: number) {
 export function parseDipState(buf: Buffer) {
   const strikeAtomsPerToken = Number(buf.readBigUInt64LE(8));
   const expiration = Number(buf.readBigUInt64LE(16));
-  const splMint = new PublicKey(buf.slice(24, 56));
+  const baseMint = new PublicKey(buf.slice(24, 56));
   const vaultMint = new PublicKey(buf.slice(56, 88));
   const vaultMintBump = Number(buf.readUInt8(88));
   const vaultSpl = new PublicKey(buf.slice(89, 121));
@@ -51,11 +51,11 @@ export function parseDipState(buf: Buffer) {
   const optionBump = Number(buf.readUInt8(154));
   const vaultUsdc = new PublicKey(buf.slice(155, 187));
   const vaultUsdcBump = Number(buf.readUInt8(187));
-  const usdcMint = new PublicKey(buf.slice(188, 220));
+  const quoteMint = new PublicKey(buf.slice(188, 220));
   return {
     strikeAtomsPerToken,
     expiration,
-    splMint,
+    baseMint,
     vaultMint,
     vaultMintBump,
     vaultSpl,
@@ -64,7 +64,7 @@ export function parseDipState(buf: Buffer) {
     optionBump,
     vaultUsdc,
     vaultUsdcBump,
-    usdcMint,
+    quoteMint,
   };
 }
 
@@ -81,8 +81,8 @@ export async function findProgramAddressWithMintAndStrikeAndExpiration(
   seed: string,
   strikePrice: number,
   expiration: number,
-  splMint: PublicKey,
-  usdcMint: PublicKey,
+  baseMint: PublicKey,
+  quoteMint: PublicKey,
   programId: PublicKey,
 ) {
   return PublicKey.findProgramAddress(
@@ -90,8 +90,8 @@ export async function findProgramAddressWithMintAndStrikeAndExpiration(
       Buffer.from(utils.bytes.utf8.encode(seed)),
       toBytes(strikePrice),
       toBytes(expiration),
-      splMint.toBuffer(),
-      usdcMint.toBuffer(),
+      baseMint.toBuffer(),
+      quoteMint.toBuffer(),
     ],
     programId,
   );

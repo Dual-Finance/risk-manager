@@ -1,5 +1,6 @@
 import fetch from 'cross-fetch';
 import { DUAL_API } from './config';
+import { CallOrPut } from './common';
 
 export type getPriceResponse = {remainingQuantity: number, price: number };
 export async function fetchMMOrder(apiSymbol: string): Promise<getPriceResponse> {
@@ -21,6 +22,6 @@ export async function fetchMMOrder(apiSymbol: string): Promise<getPriceResponse>
   }
 }
 
-export function dipToString(expirationSec: number, strike: number): string {
-  return `Expiration:${expirationSec}_Strike:${strike}`;
+export function dipToString(expirationSec: number, strike: number, callOrPut: CallOrPut): string {
+  return `Expiration:${expirationSec}_Strike:${strike}_Type:${callOrPut}`;
 }

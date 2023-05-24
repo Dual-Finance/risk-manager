@@ -47,10 +47,10 @@ class Router {
     const date = new Date(dipDeposit.expirationMs);
 
     // TODO: Update this for other types of assets
-
+    const upOrDown = dipDeposit.callOrPut === CallOrPut.Call ? 'UPSIDE' : 'DOWNSIDE';
     const symbol = `${dipDeposit.splTokenName},USDC,${date.getUTCFullYear()}-${
       date.getUTCMonth() + 1
-    }-${date.getUTCDate()},${dipDeposit.strikeUsdcPerToken * 1_000_000},${dipDeposit.callOrPut},E,P`;
+    }-${date.getUTCDate()},${dipDeposit.strikeUsdcPerToken * 1_000_000},${upOrDown},E,P`;
     console.log('++++++++++++++++++++++++++++++++++++++++++++++++++++');
     console.log('Router ID:', routerID, 'Routing', dipDeposit.qtyTokens, symbol, new Date().toUTCString());
 

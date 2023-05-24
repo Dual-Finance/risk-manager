@@ -50,7 +50,7 @@ class Router {
     const upOrDown = dipDeposit.callOrPut === CallOrPut.Call ? 'UPSIDE' : 'DOWNSIDE';
     const symbol = `${dipDeposit.splTokenName},USDC,${date.getUTCFullYear()}-${
       date.getUTCMonth() + 1
-    }-${date.getUTCDate()},${dipDeposit.strikeUsdcPerToken * 1_000_000},${upOrDown},E,P`;
+    }-${date.getUTCDate()},${Number((dipDeposit.strikeUsdcPerToken * 1000000).toPrecision(6))},${upOrDown},E,P`;
     console.log('++++++++++++++++++++++++++++++++++++++++++++++++++++');
     console.log('Router ID:', routerID, 'Routing', dipDeposit.qtyTokens, symbol, new Date().toUTCString());
 
@@ -250,7 +250,7 @@ class Router {
     const quoteAtoms = 10 ** decimalsBaseSPL(splMintToToken(quoteMint));
     const strikeUsdcPerToken = callOrPut === CallOrPut.Call
       ? strike / quoteAtoms
-      : ((1 / strike) * quoteAtoms);
+      : Number(((1 / strike) * quoteAtoms).toPrecision(6));
     const balance = await connection.getTokenAccountBalance(mmOptionAccount);
     const splTokenName = callOrPut === CallOrPut.Call
       ? splMintToToken(baseMint)
@@ -259,8 +259,9 @@ class Router {
       ? splMintToToken(quoteMint)
       : splMintToToken(baseMint);
     const tokenQty = callOrPut === CallOrPut.Call
-      ? Number(balance.value.uiAmount) : Number(balance.value.uiAmount) / strikeUsdcPerToken;
-    this.dips[dipToString(expirationSec, strike, callOrPut)] = {
+      ? Number(balance.value.uiAmount)
+      : Number((Number(balance.value.uiAmount) / strikeUsdcPerToken).toPrecision(6));
+    this.dips[dipToString(expirationSec, strikeUsdcPerToken, callOrPut)] = {
       splTokenName,
       premiumAssetName,
       expirationMs: expirationSec * 1_000,

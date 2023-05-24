@@ -46,7 +46,6 @@ class Router {
     let routedSize = 0;
     const date = new Date(dipDeposit.expirationMs);
 
-    // TODO: Update this for other types of assets
     const upOrDown = dipDeposit.callOrPut === CallOrPut.Call ? 'UPSIDE' : 'DOWNSIDE';
     const symbol = `${dipDeposit.splTokenName},USDC,${date.getUTCFullYear()}-${
       date.getUTCMonth() + 1
@@ -229,7 +228,7 @@ class Router {
 
   async add_dip(
     expirationSec: number,
-    strike: number,
+    strikeAtoms: number,
     baseMint: PublicKey,
     quoteMint: PublicKey,
     callOrPut: CallOrPut,
@@ -237,7 +236,7 @@ class Router {
   ): Promise<void> {
     const [optionMint] = await findProgramAddressWithMintAndStrikeAndExpiration(
       OPTION_MINT_ADDRESS_SEED,
-      strike,
+      strikeAtoms,
       expirationSec,
       baseMint,
       quoteMint,
@@ -249,8 +248,8 @@ class Router {
     );
     const quoteAtoms = 10 ** decimalsBaseSPL(splMintToToken(quoteMint));
     const strikeUsdcPerToken = callOrPut === CallOrPut.Call
-      ? strike / quoteAtoms
-      : Number(((1 / strike) * quoteAtoms).toPrecision(6));
+      ? strikeAtoms / quoteAtoms
+      : Number(((1 / strikeAtoms) * quoteAtoms).toPrecision(6));
     const balance = await connection.getTokenAccountBalance(mmOptionAccount);
     const splTokenName = callOrPut === CallOrPut.Call
       ? splMintToToken(baseMint)
@@ -296,13 +295,17 @@ class Router {
         } = dipState;
         if (splMintToToken(baseMint) === this.token || splMintToToken(quoteMint) === this.token) {
           const quoteAtoms = 10 ** decimalsBaseSPL(splMintToToken(quoteMint));
-          let type = CallOrPut.Call;
+          let optionType = CallOrPut.Call;
           let strikeTokensPerToken: number = strikeAtomsPerToken / quoteAtoms;
           if (splMintToToken(quoteMint) === this.token) {
-            type = CallOrPut.Put;
+            optionType = CallOrPut.Put;
             strikeTokensPerToken = ((1 / strikeAtomsPerToken) * quoteAtoms);
           }
-          const alreadyPolled = dipToString(expirationSec, strikeTokensPerToken, type) in this.dips;
+          const alreadyPolled = dipToString(
+            expirationSec,
+            strikeTokensPerToken,
+            optionType,
+          ) in this.dips;
 
           // Always run add_dip since it refreshes the values if the subscribe
           // fails. Can fail in devnet because some incorrectly defined DIPs.
@@ -312,7 +315,7 @@ class Router {
               strikeAtomsPerToken,
               baseMint,
               quoteMint,
-              type,
+              optionType,
               connection,
             );
           } catch (err) {
@@ -344,7 +347,7 @@ class Router {
             'USDC',
             expirationSec,
             strikeTokensPerToken,
-            type,
+            optionType,
             // TODO: Need to add a delay to Poller or check on a timer
             (deposit: DIPDeposit) => {
               this.checkMMPrices(deposit);

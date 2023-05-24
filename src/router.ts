@@ -258,13 +258,15 @@ class Router {
     const premiumAssetName = callOrPut === CallOrPut.Call
       ? splMintToToken(quoteMint)
       : splMintToToken(baseMint);
+    const tokenQty = callOrPut === CallOrPut.Call
+      ? Number(balance.value.uiAmount) : Number(balance.value.uiAmount) / strikeUsdcPerToken;
     this.dips[dipToString(expirationSec, strike, callOrPut)] = {
       splTokenName,
       premiumAssetName,
       expirationMs: expirationSec * 1_000,
       strikeUsdcPerToken,
       callOrPut,
-      qtyTokens: Number(balance.value.uiAmount),
+      qtyTokens: tokenQty,
     };
   }
 

@@ -51,13 +51,19 @@ class Poller {
         AccountLayout.decode(accountInfo.data).amount,
       );
 
+      const tokenQty = this.callOrPut === CallOrPut.Call
+        ? newAmountAtoms / NUM_DIP_ATOMS_PER_TOKEN
+        : (newAmountAtoms / NUM_DIP_ATOMS_PER_TOKEN) / this.strikeTokens;
+      const strikeUsdcPerToken = this.callOrPut === CallOrPut.Call
+        ? this.strikeTokens
+        : Number((this.strikeTokens).toPrecision(6));
       const dipDeposit: DIPDeposit = {
         splTokenName: this.splTokenName,
         premiumAssetName: this.premiumAssetName,
         expirationMs: this.expirationSec * 1_000,
-        strikeUsdcPerToken: this.strikeTokens,
+        strikeUsdcPerToken,
         callOrPut: this.callOrPut,
-        qtyTokens: newAmountAtoms / NUM_DIP_ATOMS_PER_TOKEN,
+        qtyTokens: tokenQty,
       };
       this.callback(dipDeposit);
     };

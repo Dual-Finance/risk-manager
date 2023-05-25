@@ -6,17 +6,17 @@ import {
   CallOrPut, DIPDeposit, SYMBOL,
 } from './common';
 import {
-  API_URL, CLUSTER, DUAL_API, usdcPk, BVE_VOL_MAP, MIN_EXECUTION_PREMIUM,
+  API_URL, CLUSTER, DUAL_API, BVE_VOL_MAP, MIN_EXECUTION_PREMIUM,
   VOL_SPREAD, RF_RATE, MAX_ROUTE_ATTEMPTS, MM_REFRESH_TIME, NO_ROUTED_SIZE,
 } from './config';
 import Poller from './poller';
 import {
   findProgramAddressWithMintAndStrikeAndExpiration, getPythPrice, parseDipState,
-  sleepExact, splMintToToken, tokenToSplMint,
+  sleepExact, splMintToToken, tokenToSplMint, decimalsBaseSPL,
 } from './utils';
 import * as apiSecret from '../apiSecret.json';
 import {
-  DIP_STATE_LENGTH, DIP_PROGRAM_ID, MS_PER_YEAR, NUM_DIP_ATOMS_PER_TOKEN,
+  DIP_STATE_LENGTH, DIP_PROGRAM_ID, MS_PER_YEAR,
   OPTION_VAULT_PK, OPTION_MINT_ADDRESS_SEED, PROTCOL_API_KEY, SIX_MONTHS_IN_MS,
 } from './constants';
 import { dipToString, fetchMMOrder } from './router_utils';
@@ -46,18 +46,21 @@ class Router {
     let routedSize = 0;
     const date = new Date(dipDeposit.expirationMs);
 
-    // TODO: Update this for other types of assets
-
+    const upOrDown = dipDeposit.callOrPut === CallOrPut.Call ? 'UPSIDE' : 'DOWNSIDE';
     const symbol = `${dipDeposit.splTokenName},USDC,${date.getUTCFullYear()}-${
       date.getUTCMonth() + 1
-    }-${date.getUTCDate()},${dipDeposit.strikeUsdcPerToken * 1_000_000},UPSIDE,E,P`;
+    }-${date.getUTCDate()},${Number((dipDeposit.strikeUsdcPerToken * 1000000).toPrecision(6))},${upOrDown},E,P`;
     console.log('++++++++++++++++++++++++++++++++++++++++++++++++++++');
     console.log('Router ID:', routerID, 'Routing', dipDeposit.qtyTokens, symbol, new Date().toUTCString());
 
     // This happens after sending tokens to a MM. Exit early.
     if (dipDeposit.qtyTokens === 0) {
       this.dips[
-        dipToString(dipDeposit.expirationMs / 1_000, dipDeposit.strikeUsdcPerToken)
+        dipToString(
+          dipDeposit.expirationMs / 1_000,
+          dipDeposit.strikeUsdcPerToken,
+          dipDeposit.callOrPut,
+        )
       ] = dipDeposit;
       console.log('Router ID:', routerID, 'DIP Deposit quantity zero. Rerun');
       return NO_ROUTED_SIZE;
@@ -70,6 +73,7 @@ class Router {
           dipToString(
             dipDeposit.expirationMs / 1_000,
             dipDeposit.strikeUsdcPerToken,
+            dipDeposit.callOrPut,
           )
         ] = dipDeposit;
         console.log('Router ID:', routerID, 'No available MM bid', order);
@@ -83,7 +87,14 @@ class Router {
       const vol = BVE_VOL_MAP.get(
         dipDeposit.splTokenName,
       ) * (1 + VOL_SPREAD + Math.random() * VOL_SPREAD);
-      const thresholdPrice = blackScholes(currentPrice, dipDeposit.strikeUsdcPerToken, fractionOfYear, vol, RF_RATE, 'call');
+      const thresholdPrice = blackScholes(
+        currentPrice,
+        dipDeposit.strikeUsdcPerToken,
+        fractionOfYear,
+        vol,
+        RF_RATE,
+        dipDeposit.callOrPut,
+      );
       const { price, remainingQuantity } = order;
       console.log('Router ID:', routerID, 'MM price:', price, 'BVE Re-Route price:', thresholdPrice);
       const userPremium = price * dipDeposit.qtyTokens;
@@ -94,6 +105,7 @@ class Router {
           dipToString(
             dipDeposit.expirationMs / 1_000,
             dipDeposit.strikeUsdcPerToken,
+            dipDeposit.callOrPut,
           )
         ] = dipDeposit;
         return NO_ROUTED_SIZE;
@@ -107,6 +119,7 @@ class Router {
           dipToString(
             dipDeposit.expirationMs / 1_000,
             dipDeposit.strikeUsdcPerToken,
+            dipDeposit.callOrPut,
           )
         ] = dipDeposit;
         return NO_ROUTED_SIZE;
@@ -165,6 +178,7 @@ class Router {
           dipToString(
             dipDeposit.expirationMs / 1_000,
             dipDeposit.strikeUsdcPerToken,
+            dipDeposit.callOrPut,
           )
         ] = dipDeposit;
         console.log('Router ID:', routerID, 'DIP Position Change', dipDeposit);
@@ -214,31 +228,45 @@ class Router {
 
   async add_dip(
     expirationSec: number,
-    strike: number,
-    splMint: PublicKey,
+    strikeAtoms: number,
+    baseMint: PublicKey,
+    quoteMint: PublicKey,
+    callOrPut: CallOrPut,
     connection: Connection,
   ): Promise<void> {
     const [optionMint] = await findProgramAddressWithMintAndStrikeAndExpiration(
       OPTION_MINT_ADDRESS_SEED,
-      strike * NUM_DIP_ATOMS_PER_TOKEN,
+      strikeAtoms,
       expirationSec,
-      splMint,
-      usdcPk,
+      baseMint,
+      quoteMint,
       DIP_PROGRAM_ID,
     );
     const mmOptionAccount = await getAssociatedTokenAddress(
       OPTION_VAULT_PK,
       optionMint,
     );
+    const quoteAtoms = 10 ** decimalsBaseSPL(splMintToToken(quoteMint));
+    const strikeUsdcPerToken = callOrPut === CallOrPut.Call
+      ? strikeAtoms / quoteAtoms
+      : Number(((1 / strikeAtoms) * quoteAtoms).toPrecision(6));
     const balance = await connection.getTokenAccountBalance(mmOptionAccount);
-
-    this.dips[dipToString(expirationSec, strike)] = {
-      splTokenName: splMintToToken(splMint),
-      premiumAssetName: 'USDC',
+    const splTokenName = callOrPut === CallOrPut.Call
+      ? splMintToToken(baseMint)
+      : splMintToToken(quoteMint);
+    const premiumAssetName = callOrPut === CallOrPut.Call
+      ? splMintToToken(quoteMint)
+      : splMintToToken(baseMint);
+    const tokenQty = callOrPut === CallOrPut.Call
+      ? Number(balance.value.uiAmount)
+      : Number((Number(balance.value.uiAmount) / strikeUsdcPerToken).toPrecision(6));
+    this.dips[dipToString(expirationSec, strikeUsdcPerToken, callOrPut)] = {
+      splTokenName,
+      premiumAssetName,
       expirationMs: expirationSec * 1_000,
-      strikeUsdcPerToken: strike,
-      callOrPut: CallOrPut.Call,
-      qtyTokens: Number(balance.value.uiAmount),
+      strikeUsdcPerToken,
+      callOrPut,
+      qtyTokens: tokenQty,
     };
   }
 
@@ -256,23 +284,40 @@ class Router {
         }
         const dipState = parseDipState(programAccount.account.data);
 
-        const strikeTokensPerToken: number = dipState.strikeAtomsPerToken / NUM_DIP_ATOMS_PER_TOKEN;
-        const { expiration } = dipState;
-        const expirationSec = expiration;
-        const { splMint } = dipState;
+        const expirationSec = dipState.expiration;
 
         const durationMs = expirationSec * 1_000 - Date.now();
         if (durationMs < 0 || durationMs > SIX_MONTHS_IN_MS) {
           continue;
         }
-
-        if (splMintToToken(splMint) === this.token) {
-          const alreadyPolled = dipToString(expirationSec, strikeTokensPerToken) in this.dips;
+        const {
+          baseMint, quoteMint, expiration, strikeAtomsPerToken,
+        } = dipState;
+        if (splMintToToken(baseMint) === this.token || splMintToToken(quoteMint) === this.token) {
+          const quoteAtoms = 10 ** decimalsBaseSPL(splMintToToken(quoteMint));
+          let optionType = CallOrPut.Call;
+          let strikeTokensPerToken: number = strikeAtomsPerToken / quoteAtoms;
+          if (splMintToToken(quoteMint) === this.token) {
+            optionType = CallOrPut.Put;
+            strikeTokensPerToken = ((1 / strikeAtomsPerToken) * quoteAtoms);
+          }
+          const alreadyPolled = dipToString(
+            expirationSec,
+            strikeTokensPerToken,
+            optionType,
+          ) in this.dips;
 
           // Always run add_dip since it refreshes the values if the subscribe
           // fails. Can fail in devnet because some incorrectly defined DIPs.
           try {
-            await this.add_dip(expirationSec, strikeTokensPerToken, splMint, connection);
+            await this.add_dip(
+              expirationSec,
+              strikeAtomsPerToken,
+              baseMint,
+              quoteMint,
+              optionType,
+              connection,
+            );
           } catch (err) {
             console.log('Failed to add dip');
             continue;
@@ -284,10 +329,10 @@ class Router {
 
           const [optionMint] = await findProgramAddressWithMintAndStrikeAndExpiration(
             OPTION_MINT_ADDRESS_SEED,
-            strikeTokensPerToken * NUM_DIP_ATOMS_PER_TOKEN,
+            strikeAtomsPerToken,
             expiration,
-            splMint,
-            usdcPk,
+            baseMint,
+            quoteMint,
             DIP_PROGRAM_ID,
           );
           const mmOptionAccount = await getAssociatedTokenAddress(
@@ -302,7 +347,7 @@ class Router {
             'USDC',
             expirationSec,
             strikeTokensPerToken,
-            CallOrPut.Call,
+            optionType,
             // TODO: Need to add a delay to Poller or check on a timer
             (deposit: DIPDeposit) => {
               this.checkMMPrices(deposit);

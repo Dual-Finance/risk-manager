@@ -128,7 +128,9 @@ class Router {
       const clientOrderId = `clientOrderId${Date.now()}`;
       const side = 'SELL';
       const quantityDIP = dipDeposit.qtyTokens;
-      const quantityTrade = Math.min(quantityDIP, remainingQuantity);
+      const quantityTrade = dipDeposit.callOrPut === CallOrPut.Call
+        ? Math.min(quantityDIP, remainingQuantity)
+        : Math.min(quantityDIP, remainingQuantity) * dipDeposit.strikeUsdcPerToken;
       // @ts-ignore
       const secret = apiSecret.default;
 

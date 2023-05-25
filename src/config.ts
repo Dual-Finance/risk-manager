@@ -118,9 +118,9 @@ export const BVE_VOL_MAP = new Map<SYMBOL, number>([
 ]); // BVE vol keep alligned with app & contract vol
 
 export const ELIGIBLE_SO_STATES: [SYMBOL, string][] = [
+  ['BONK', 'GSOBONK_LOYALTY_12'],
   ['BONK', 'GSOBONK_LOYALTY_11'],
   ['BONK', 'GSOBONK_LOYALTY_10'],
-  ['BONK', 'GSOBONK_LOYALTY_9'],
   ['MNGO', 'MNGO Buyback 7'],
   ['MNGO', 'MNGO Buyback 8'],
 ];

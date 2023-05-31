@@ -17,6 +17,7 @@ import {
   RF_RATE, slippageMax, THEO_VOL_MAP, JUPITER_SLIPPAGE_BPS, PRIORITY_FEE,
   GAMMA_CYCLES, RESOLVE_PERIOD_MS, PRICE_OVERRIDE, HedgeSide,
   CLUSTER, MAX_LOAD_TIME, LIQUID_SYMBOLS, ELIGIBLE_SO_STATES, TREASURY_POSITIONS,
+  INFLATION_MAP, STAKE_RATE_MAP, STORAGE_RATE_MAP,
 } from './config';
 import {
   asyncCallWithTimeoutasync,
@@ -25,9 +26,25 @@ import {
 } from './utils';
 import {
   RM_PROD_PK, MS_PER_YEAR, NO_FAIR_VALUE, OPTION_VAULT_PK, RM_BACKUP_PK,
-  SUFFICIENT_BOOK_DEPTH,
-  JUPITER_EXCLUDED_AMMS,
+  SUFFICIENT_BOOK_DEPTH, JUPITER_EXCLUDED_AMMS,
 } from './constants';
+
+export function calcForwardPrice(symbol: SYMBOL, currentPrice: number, yearsUntilMaturity: number) {
+  // Forward = Spot * e^(Cost of Carry x Years)
+  // Cost of Carry  = Real Risk-Free Rate - Real Convience Yield
+  // Real Risk-Free Rate = Risk-Free Rate - Inflation Rate - $ Storage Cost
+  // Real Convience Yield = Stake Rate - Token Inflation Rate - Token Storage Cost
+  // Cost of Carry = Quote Real Rate - Base Real Rate
+  const baseRealRate = STAKE_RATE_MAP.get(symbol) - INFLATION_MAP.get(symbol)
+    - STORAGE_RATE_MAP.get(symbol);
+  const quoteRealRate = STAKE_RATE_MAP.get('USDC') - INFLATION_MAP.get('USDC')
+    - STORAGE_RATE_MAP.get('USDC');
+  // Example: SOL Cost of Carry = 5% - 4.4% - 0% - 7% + 6.325% + 0.05% = -0.025%
+  const costOfCarry = quoteRealRate - baseRealRate;
+  // Example SOL = $20, 30d fwd = $19.9996
+  const forwardPrice = currentPrice * Math.exp(costOfCarry * yearsUntilMaturity);
+  return forwardPrice;
+}
 
 export function getDIPDelta(
   dipProduct: DIPDeposit[],
@@ -38,8 +55,9 @@ export function getDIPDelta(
   let deltaSum = 0;
   for (const dip of dipProduct) {
     const yearsUntilMaturity = (dip.expirationMs - Date.now()) / MS_PER_YEAR;
+    const fwdPrice = calcForwardPrice(symbol, fairValue, yearsUntilMaturity);
     deltaSum += greeks.getDelta(
-      fairValue,
+      fwdPrice,
       dip.strikeUsdcPerToken,
       yearsUntilMaturity,
       impliedVol,
@@ -60,8 +78,9 @@ export function getDIPGamma(
   let gammaSum = 0;
   for (const dip of dipProduct) {
     const yearsUntilMaturity = (dip.expirationMs - Date.now()) / MS_PER_YEAR;
+    const fwdPrice = calcForwardPrice(symbol, fairValue, yearsUntilMaturity);
     gammaSum += greeks.getGamma(
-      fairValue,
+      fwdPrice,
       dip.strikeUsdcPerToken,
       yearsUntilMaturity,
       impliedVol,
@@ -82,8 +101,9 @@ export function getDIPTheta(
   let thetaSum = 0;
   for (const dip of dipProduct) {
     const yearsUntilMaturity = (dip.expirationMs - Date.now()) / MS_PER_YEAR;
+    const fwdPrice = calcForwardPrice(symbol, fairValue, yearsUntilMaturity);
     thetaSum += greeks.getTheta(
-      fairValue,
+      fwdPrice,
       dip.strikeUsdcPerToken,
       yearsUntilMaturity,
       impliedVol,

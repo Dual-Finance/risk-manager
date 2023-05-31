@@ -117,6 +117,22 @@ export const BVE_VOL_MAP = new Map<SYMBOL, number>([
   ['BTC', 0.2], ['ETH', 0.25], ['SOL', 0.3], ['MNGO', 0.35], ['BONK', 0.35], ['DUAL', 0.35],
 ]); // BVE vol keep alligned with app & contract vol
 
+// TODO: Pull all these rates from an external source
+// Risk Free Rate of Return ~ 3mo T-Bill Rate
+export const RF_RATE = 0.05;
+
+export const STAKE_RATE_MAP = new Map<SYMBOL, number>([
+  ['BTC', 0], ['ETH', 0.045], ['SOL', 0.07], ['MNGO', 0], ['BONK', 0], ['DUAL', 0], ['USDC', RF_RATE],
+]); // Staking Rate can be considered the risk-free rate for each token
+
+export const INFLATION_MAP = new Map<SYMBOL, number>([
+  ['BTC', 0.017], ['ETH', 0.008], ['SOL', 0.06325], ['MNGO', 0.1], ['BONK', 0.1], ['DUAL', 0.15], ['USDC', 0.04],
+]); // Estimated rates of inflation for each token
+
+export const STORAGE_RATE_MAP = new Map<SYMBOL, number>([
+  ['BTC', 0.0005], ['ETH', 0.0005], ['SOL', 0.0005], ['MNGO', 0.0005], ['BONK', 0.0005], ['DUAL', 0.0005], ['USDC', 0],
+]); // Storage cost factors in hardware wallet or custody provider fees and zero bank fee USDC = USD
+
 export const ELIGIBLE_SO_STATES: [SYMBOL, string][] = [
   ['BONK', 'GSOBONK_LOYALTY_12'],
   ['BONK', 'GSOBONK_LOYALTY_11'],
@@ -162,8 +178,6 @@ export const TREASURY_POSITIONS: DIPDeposit[] = [({
 
 // Amount to vary the sleep on a random sleep.
 export const RANDOM_SLEEP_MULTIPLIER = 0.05;
-// Risk Free Rate of Return ~ T-Bill Rate
-export const RF_RATE = 0.03;
 // Number of seconds to space spliced delta orders across
 export const TWAP_INTERVAL_SEC = 15;
 // Number of seconds for each gamma scalping window

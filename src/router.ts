@@ -88,8 +88,7 @@ class Router {
       const vol = BVE_VOL_MAP.get(
         dipDeposit.splTokenName,
       ) * (1 + VOL_SPREAD + Math.random() * VOL_SPREAD);
-      const tokenSymbol: SYMBOL = symbol as SYMBOL;
-      const fwdPrice = calcForwardPrice(tokenSymbol, currentPrice, fractionOfYear);
+      const fwdPrice = calcForwardPrice(dipDeposit.splTokenName, currentPrice, fractionOfYear);
       const thresholdPrice = blackScholes(
         fwdPrice,
         dipDeposit.strikeUsdcPerToken,

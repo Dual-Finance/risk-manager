@@ -16,7 +16,7 @@ import {
 } from './utils';
 import * as apiSecret from '../apiSecret.json';
 import {
-  DIP_STATE_LENGTH, DIP_PROGRAM_ID, MS_PER_YEAR,
+  DIP_STATE_LENGTH, DIP_PROGRAM_ID, MS_PER_YEAR, NUM_DIP_ATOMS_PER_TOKEN,
   OPTION_VAULT_PK, OPTION_MINT_ADDRESS_SEED, PROTCOL_API_KEY, SIX_MONTHS_IN_MS,
 } from './constants';
 import { dipToString, fetchMMOrder } from './router_utils';
@@ -128,9 +128,7 @@ class Router {
       const clientOrderId = `clientOrderId${Date.now()}`;
       const side = 'SELL';
       const quantityDIP = dipDeposit.qtyTokens;
-      const quantityTrade = dipDeposit.callOrPut === CallOrPut.Call
-        ? Math.min(quantityDIP, remainingQuantity)
-        : Math.min(quantityDIP, remainingQuantity) * dipDeposit.strikeUsdcPerToken;
+      const quantityTrade = Math.min(quantityDIP, remainingQuantity);
       // @ts-ignore
       const secret = apiSecret.default;
 
@@ -261,7 +259,8 @@ class Router {
       : splMintToToken(baseMint);
     const tokenQty = callOrPut === CallOrPut.Call
       ? Number(balance.value.uiAmount)
-      : Number((Number(balance.value.uiAmount) / strikeUsdcPerToken).toPrecision(6));
+      : Math.floor((Number(balance.value.uiAmount) / strikeUsdcPerToken)
+        * NUM_DIP_ATOMS_PER_TOKEN) / NUM_DIP_ATOMS_PER_TOKEN;
     this.dips[dipToString(expirationSec, strikeUsdcPerToken, callOrPut)] = {
       splTokenName,
       premiumAssetName,

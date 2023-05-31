@@ -53,7 +53,7 @@ class Poller {
 
       const tokenQty = this.callOrPut === CallOrPut.Call
         ? newAmountAtoms / NUM_DIP_ATOMS_PER_TOKEN
-        : (newAmountAtoms / NUM_DIP_ATOMS_PER_TOKEN) / this.strikeTokens;
+        : Math.floor(newAmountAtoms / this.strikeTokens) / NUM_DIP_ATOMS_PER_TOKEN;
       const strikeUsdcPerToken = this.callOrPut === CallOrPut.Call
         ? this.strikeTokens
         : Number((this.strikeTokens).toPrecision(6));

@@ -20,6 +20,7 @@ import {
   OPTION_VAULT_PK, OPTION_MINT_ADDRESS_SEED, PROTCOL_API_KEY, SIX_MONTHS_IN_MS,
 } from './constants';
 import { dipToString, fetchMMOrder } from './router_utils';
+import { calcForwardPrice } from './scalper_utils';
 
 const crypto = require('crypto');
 
@@ -87,8 +88,10 @@ class Router {
       const vol = BVE_VOL_MAP.get(
         dipDeposit.splTokenName,
       ) * (1 + VOL_SPREAD + Math.random() * VOL_SPREAD);
+      const tokenSymbol: SYMBOL = symbol as SYMBOL;
+      const fwdPrice = calcForwardPrice(tokenSymbol, currentPrice, fractionOfYear);
       const thresholdPrice = blackScholes(
-        currentPrice,
+        fwdPrice,
         dipDeposit.strikeUsdcPerToken,
         fractionOfYear,
         vol,

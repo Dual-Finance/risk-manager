@@ -303,7 +303,7 @@ class Router {
           let strikeTokensPerToken: number = strikeAtomsPerToken / quoteAtoms;
           if (splMintToToken(quoteMint) === this.token) {
             optionType = CallOrPut.Put;
-            strikeTokensPerToken = ((1 / strikeAtomsPerToken) * quoteAtoms);
+            strikeTokensPerToken = Number(((1 / strikeAtomsPerToken) * quoteAtoms).toPrecision(6));
           }
           const alreadyPolled = dipToString(
             expirationSec,

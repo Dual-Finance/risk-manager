@@ -23,5 +23,6 @@ export async function fetchMMOrder(apiSymbol: string): Promise<getPriceResponse>
 }
 
 export function dipToString(expirationSec: number, strike: number, callOrPut: CallOrPut): string {
-  return `Expiration:${expirationSec}_Strike:${strike}_Type:${callOrPut}`;
+  const precisionStrike = Number(strike.toPrecision(6));
+  return `Expiration:${expirationSec}_Strike:${precisionStrike}_Type:${callOrPut}`;
 }

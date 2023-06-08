@@ -150,8 +150,21 @@ export async function deltaHedgeMango(
   // Determine spot or perp order based on funding rate.
   const bidSide = await perpMarket.loadBids(mangoClient);
   const askSide = await perpMarket.loadAsks(mangoClient);
-  const fundingRate = HOURS_PER_YEAR
-    * perpMarket.getCurrentFundingRate(bidSide, askSide);
+
+  // perpMarket.getCurrentFundingRate(bidSide, askSide) is the instantaneous
+  // funding rate, instead, we want the last hour average.
+  const fundingRateUrl = `https://api.mngo.cloud/data/v4/one-hour-funding-rate?mango-group=${MANGO_MAINNET_GROUP}`;
+  const fundingRatesJson = await (await fetch(fundingRateUrl)).json();
+  // Response looks like this
+  // [{"mango_group":"78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX","market_index":0,"name":"BTC-PERP","start_of_period":"2023-06-08T20:46:35.000Z","end_of_period":"2023-06-08T21:46:35.000Z","earliest_block_datetime":"2023-06-08T20:46:35.000Z","latest_block_datetime":"2023-06-08T21:46:00.000Z","funding_rate_hourly":6.883314925418046e-05},{"mango_group":"78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX","market_index":1,"name":"MNGO-PERP","start_of_period":"2023-06-08T20:46:35.000Z","end_of_period":"2023-06-08T21:46:35.000Z","earliest_block_datetime":"2023-04-25T05:45:56.000Z","latest_block_datetime":"2023-04-25T05:45:56.000Z","funding_rate_hourly":0},{"mango_group":"78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX","market_index":2,"name":"SOL-PERP","start_of_period":"2023-06-08T20:46:35.000Z","end_of_period":"2023-06-08T21:46:35.000Z","earliest_block_datetime":"2023-06-08T20:46:35.000Z","latest_block_datetime":"2023-06-08T21:46:00.000Z","funding_rate_hourly":7.405662253039057e-05},{"mango_group":"78b8f4cGCwmZ9ysPFMWLaLTkkaYnUjwMJYStWe5RTSSX","market_index":3,"name":"ETH-PERP","start_of_period":"2023-06-08T20:46:35.000Z","end_of_period":"2023-06-08T21:46:35.000Z","earliest_block_datetime":"2023-06-08T20:46:33.000Z","latest_block_datetime":"2023-06-08T21:46:00.000Z","funding_rate_hourly":1.7017825133088e-05}]
+  const currentFundingRate = HOURS_PER_YEAR * perpMarket.getCurrentFundingRate(bidSide, askSide);
+  let fundingRate = currentFundingRate;
+  for (const rate of fundingRatesJson) {
+    if (rate.name == `${scalper.symbol}-PERP`) {
+      fundingRate = rate.funding_rate_hourly;
+    }
+  }
+  
   const buySpot = fundingRate > PERP_FUNDING_RATE_THRESHOLD;
   const sellSpot = -fundingRate < PERP_FUNDING_RATE_THRESHOLD;
   let hedgeProduct = getMangoHedgeProduct(hedgeSide, buySpot, sellSpot);

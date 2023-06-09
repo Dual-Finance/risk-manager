@@ -161,7 +161,7 @@ export async function deltaHedgeMango(
   let fundingRate = currentFundingRate;
   for (const rate of fundingRatesJson) {
     if (rate.name == `${scalper.symbol}-PERP`) {
-      fundingRate = rate.funding_rate_hourly;
+      fundingRate = Number(rate.funding_rate_hourly);
     }
   }
   

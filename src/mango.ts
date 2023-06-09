@@ -191,7 +191,10 @@ export async function deltaHedgeMango(
       takerClientOrderId, makerClientOrderId, quantity, price,
     } = parsedEvent.event;
     if (takerClientOrderId === deltaOrderId || makerClientOrderId === deltaOrderId) {
-      const fillQty = (hedgeSide === HedgeSide.buy ? 1 : -1) * quantity;
+      let fillQty = (hedgeSide === HedgeSide.buy ? 1 : -1) * quantity;
+      if (parsedEvent.status == "revoke") {
+        fillQty *= -1;
+      }
       hedgeDeltaTotal += fillQty;
       console.log(`${scalper.symbol} Delta Filled ${hedgeSide} ${hedgeProduct} Qty ${fillQty} \
           Price ${price} Remaining ${hedgeDeltaTotal} ID ${deltaOrderId} ${new Date().toUTCString()}`);
@@ -337,7 +340,11 @@ export async function gammaScalpMango(
       return;
     }
     if (makerClientOrderId === gammaBidID || makerClientOrderId === gammaAskID) {
-      gammaFillQty += Math.abs(quantity);
+      if (parsedEvent.status == "revoke") {
+        gammaFillQty -= Math.abs(quantity);
+      } else {
+        gammaFillQty += Math.abs(quantity);
+      }
       // Once the gamma fills have crossed the threshold, reset the orders.
       if (gammaFillQty > gammaOrderQty * GAMMA_COMPLETE_THRESHOLD_PCT) {
         console.log(

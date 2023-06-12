@@ -19,7 +19,7 @@ import {
 } from './config';
 import { CallOrPut, DIPDeposit, SYMBOL } from './common';
 import {
-  asyncCallWithTimeoutasync, getRandomNumAround, readKeypair,
+  asyncCallWithTimeout, getRandomNumAround, readKeypair,
 } from './utils';
 import { SerumVialClient, SerumVialTradeMessage, tradeMessageToString } from './serumVial';
 import {
@@ -173,7 +173,6 @@ class Scalper {
     console.log(this.symbol, 'Loading Fair Value');
     const fairValue = await findFairValue(
       this.connection,
-      this.owner,
       spotMarket,
       this.symbol,
       MAX_DELTA_HEDGES,
@@ -241,7 +240,7 @@ Spot Δ: ${spotDelta} Offset Δ ${this.deltaOffset} Fair Value: ${fairValue}`,
         console.log(this.symbol, 'Not enough liquidity! Try Jupiter. Adjusted price', hedgePrice, 'Splice', spliceFactor);
         // Check on jupiter and sweep price
         console.log(this.symbol, 'Loading Jupiter to trade');
-        const jupiter = await asyncCallWithTimeoutasync(Jupiter.load({
+        const jupiter = await asyncCallWithTimeout(Jupiter.load({
           connection: this.connection,
           cluster: CLUSTER,
           user: this.owner,
@@ -421,7 +420,6 @@ Spot Δ: ${spotDelta} Offset Δ ${this.deltaOffset} Fair Value: ${fairValue}`,
     } else {
       fairValue = await findFairValue(
         this.connection,
-        this.owner,
         spotMarket,
         this.symbol,
         GAMMA_CYCLES,

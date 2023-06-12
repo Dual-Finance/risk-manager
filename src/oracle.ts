@@ -12,9 +12,7 @@ import { OCR2Feed } from "@chainlink/solana-sdk";
 import { CHAINLINK_PROGRAM_ID, NO_ORACLE_PRICE } from "./constants";
 import * as anchor from "@project-serum/anchor";
 
-export async function getPythPrice(
-  splMint: PublicKey
-): Promise<number | undefined> {
+export async function getPythPrice(splMint: PublicKey): Promise<number> {
   const connection: Connection = new Connection(API_URL);
   const pythPublicKey = getPythProgramKeyForCluster(
     IS_DEV ? "devnet" : "mainnet-beta"
@@ -33,7 +31,7 @@ export async function getPythPrice(
   return NO_ORACLE_PRICE;
 }
 
-export async function getSwitchboardPrice(splMint: PublicKey) {
+export async function getSwitchboardPrice(splMint: PublicKey): Promise<number> {
   try {
     const sbv2 = await SwitchboardProgram.loadMainnet();
     const assetAggregator = new PublicKey(
@@ -66,7 +64,7 @@ export async function getSwitchboardPrice(splMint: PublicKey) {
   }
 }
 
-export async function getChainlinkPrice(splMint: PublicKey) {
+export async function getChainlinkPrice(splMint: PublicKey): Promise<number> {
   process.env.ANCHOR_PROVIDER_URL = API_URL;
   process.env.ANCHOR_WALLET = `${os.homedir()}/mango-explorer/id.json`;
   const provider = anchor.AnchorProvider.env();

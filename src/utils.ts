@@ -1,18 +1,11 @@
 import * as os from 'os';
 import * as fs from 'fs';
-import { Connection, PublicKey } from '@solana/web3.js';
+import { PublicKey } from '@solana/web3.js';
 import {
-  PythHttpClient,
-  getPythProgramKeyForCluster,
-} from '@pythnetwork/client';
-import SwitchboardProgram from '@switchboard-xyz/sbv2-lite';
-import * as anchor from '@project-serum/anchor';
-import { OCR2Feed } from '@chainlink/solana-sdk';
-import {
-  API_URL, IS_DEV, RANDOM_SLEEP_MULTIPLIER, usdcPk, TRADING_ACCOUNT, MAX_STALENESS,
+  RANDOM_SLEEP_MULTIPLIER, usdcPk, TRADING_ACCOUNT,
 } from './config';
 import {
-  BONK_PK, CHAINLINK_PROGRAM_ID, DUAL_PK, MNGO_PK, BTC_PK, ETH_PK, WSOL_PK,
+  BONK_PK, DUAL_PK, MNGO_PK, BTC_PK, ETH_PK, WSOL_PK,
 } from './constants';
 import { SYMBOL } from './common';
 
@@ -89,119 +82,6 @@ export function tokenToSplMint(token: SYMBOL) {
   return undefined;
 }
 
-export function tokenToPythSymbol(token: SYMBOL) {
-  if (token === 'SOL') {
-    return 'Crypto.SOL/USD';
-  }
-  if (token === 'BTC') {
-    return 'Crypto.BTC/USD';
-  }
-  if (token === 'ETH') {
-    return 'Crypto.ETH/USD';
-  }
-  if (token === 'MNGO') {
-    return 'Crypto.MNGO/USD';
-  }
-  if (token === 'BONK') {
-    return 'Crypto.BONK/USD';
-  }
-  // TODO: Add DUAL Pyth
-  return undefined;
-}
-
-export async function getPythPrice(splMint: PublicKey): Promise<number | undefined> {
-  const connection: Connection = new Connection(API_URL);
-  const pythPublicKey = getPythProgramKeyForCluster(
-    IS_DEV ? 'devnet' : 'mainnet-beta',
-  );
-  const pythClient = new PythHttpClient(connection, pythPublicKey);
-  const data = await pythClient.getData();
-  for (const symbol of data.symbols) {
-    const price = data.productPrice.get(symbol)!;
-    if (tokenToPythSymbol(splMintToToken(splMint)) === symbol) {
-      if (price === undefined) {
-        return undefined;
-      }
-      return price.price;
-    }
-  }
-  return 0;
-}
-
-function tokenToSBSymbol(token: SYMBOL) {
-  if (token === 'SOL') {
-    return 'GvDMxPzN1sCj7L26YDK2HnMRXEQmQ2aemov8YBtPS7vR';
-  }
-  if (token === 'BTC') {
-    return '8SXvChNYFhRq4EZuZvnhjrB3jJRQCv4k3P4W6hesH3Ee';
-  }
-  if (token === 'ETH') {
-    return 'HNStfhaLnqwF2ZtJUizaA9uHDAVB976r2AgTUx9LrdEo';
-  }
-  if (token === 'MNGO') {
-    return 'AmQunu75SLZjDQS9KkRNjAUWHp2ReSzfNiWVDURzeZTi';
-  }
-  if (token === 'BONK') {
-    return '6qBqGAYmoZw2r4fda7671NSUbcDWE4XicJdJoWqK8aTe';
-  }
-  if (token === 'DUAL') {
-    return '7fMKXU6AnatycNu1CAMndLkKmDPtjZaPNZSJSfXR92Ez';
-  }
-  return undefined;
-}
-
-export async function getSwitchboardPrice(splMint: PublicKey) {
-  try {
-    const sbv2 = await SwitchboardProgram.loadMainnet();
-    const assetAggregator = new PublicKey(
-      tokenToSBSymbol(splMintToToken(splMint)),
-    );
-
-    const accountInfo = await sbv2.program.provider.connection.getAccountInfo(
-      assetAggregator,
-    );
-    if (!accountInfo) {
-      console.log('Failed to fetch Switchboard account info');
-      return 0;
-    }
-
-    // Get latest value if its been updated within max staleness
-    const latestResult = sbv2.decodeLatestAggregatorValue(accountInfo, MAX_STALENESS);
-    if (latestResult === null) {
-      console.log('Failed to fetch latest result for Switchboard aggregator');
-      return 0;
-    }
-    const sbPrice = latestResult.toNumber();
-
-    return sbPrice;
-  } catch (err) {
-    console.log('Switchboard Price Error', err);
-    return 0;
-  }
-}
-
-function tokenToChainlinkSymbol(token: SYMBOL) {
-  if (token === 'SOL') {
-    return 'B4vR6BW4WpLh1mFs6LL6iqL4nydbmE5Uzaz2LLsoAXqk';
-  }
-  if (token === 'BTC') {
-    return '4NSNfkSgEdAtD8AKyyiu7QsavyR3GSXLXecwDEFbZCZ3';
-  }
-  if (token === 'ETH') {
-    return 'Aadkg8sVWV6BS5XNTt2mK6Q8FhYWECLdkDuqDHvdnoVT';
-  }
-  if (token === 'MNGO') {
-    return '';
-  }
-  if (token === 'BONK') {
-    return '';
-  }
-  if (token === 'DUAL') {
-    return '';
-  }
-  return undefined;
-}
-
 export function decimalsBaseSPL(token: SYMBOL) {
   switch (token) {
     case 'SOL': {
@@ -229,45 +109,6 @@ export function decimalsBaseSPL(token: SYMBOL) {
       return undefined;
     }
   }
-}
-
-// TODO: Fail after a few tries if chainlink is stuck
-function waitFor(conditionFunction) {
-  const poll = (resolve) => {
-    if (conditionFunction()) {
-      resolve();
-    } else {
-      setTimeout((_: any) => poll(resolve), 400);
-    }
-  };
-  return new Promise(poll);
-}
-
-export async function getChainlinkPrice(splMint: PublicKey) {
-  process.env.ANCHOR_PROVIDER_URL = API_URL;
-  process.env.ANCHOR_WALLET = `${os.homedir()}/mango-explorer/id.json`;
-  const provider = anchor.AnchorProvider.env();
-  anchor.setProvider(provider);
-  if (tokenToChainlinkSymbol(splMintToToken(splMint)) === '') {
-    return 0;
-  }
-  const feedAddress = new PublicKey(tokenToChainlinkSymbol(splMintToToken(splMint)));
-  const dataFeed = await OCR2Feed.load(CHAINLINK_PROGRAM_ID, provider);
-  let listener: number = null;
-
-  let latestValue = 0;
-  listener = dataFeed.onRound(feedAddress, (event) => {
-    latestValue = event.answer.toNumber();
-    dataFeed.removeListener(listener);
-  });
-
-  await waitFor(() => latestValue !== 0);
-  const prettyLatestValue = latestValue / 10 ** decimalsBaseSPL(splMintToToken(splMint));
-  // Chainlink SOL off by a factor of 10
-  if (splMintToToken(splMint) === 'SOL') {
-    return prettyLatestValue * 10;
-  }
-  return prettyLatestValue;
 }
 
 export function getRandomNumAround(midValue: number, spread: number) {

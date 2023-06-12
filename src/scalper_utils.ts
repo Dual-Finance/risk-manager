@@ -20,14 +20,14 @@ import {
   INFLATION_MAP, STAKE_RATE_MAP, STORAGE_RATE_MAP,
 } from './config';
 import {
-  asyncCallWithTimeoutasync,
-  decimalsBaseSPL, getChainlinkPrice, getPythPrice, getSwitchboardPrice,
-  sleepExact, splMintToToken, tokenToSplMint,
+  asyncCallWithTimeoutasync, decimalsBaseSPL, sleepExact, splMintToToken,
+  tokenToSplMint,
 } from './utils';
 import {
   RM_PROD_PK, MS_PER_YEAR, NO_FAIR_VALUE, OPTION_VAULT_PK, RM_BACKUP_PK,
-  SUFFICIENT_BOOK_DEPTH, JUPITER_EXCLUDED_AMMS,
+  SUFFICIENT_BOOK_DEPTH, JUPITER_EXCLUDED_AMMS, NO_ORACLE_PRICE,
 } from './constants';
+import { getChainlinkPrice, getPythPrice, getSwitchboardPrice } from './oracle';
 
 export function calcForwardPrice(symbol: SYMBOL, currentPrice: number, yearsUntilMaturity: number) {
   // Forward = Spot * e^(Cost of Carry x Years)
@@ -353,19 +353,19 @@ export async function getJupiterPrice(
 // Check oracles in order of preference and then use openbook midpoint if all fail.
 export async function getOraclePrice(symbol: SYMBOL) {
   const chainlinkPrice = await getChainlinkPrice(new PublicKey(tokenToSplMint(symbol)));
-  if (chainlinkPrice > 0) {
+  if (chainlinkPrice !== NO_ORACLE_PRICE) {
     console.log(`${symbol} Chainlink Price: ${chainlinkPrice}`);
     return chainlinkPrice;
   }
 
   const sbPrice = await getSwitchboardPrice(new PublicKey(tokenToSplMint(symbol)));
-  if (sbPrice > 0) {
+  if (sbPrice !== NO_ORACLE_PRICE) {
     console.log(`${symbol} Switchboard Price: ${sbPrice}`);
     return sbPrice;
   }
 
   const pythPrice = await getPythPrice(new PublicKey(tokenToSplMint(symbol)));
-  if (pythPrice > 0) {
+  if (pythPrice !== NO_ORACLE_PRICE) {
     console.log(`${symbol} Pyth Price: ${pythPrice}`);
     return pythPrice;
   }

@@ -11,7 +11,7 @@ import {
 } from './config';
 import Poller from './poller';
 import {
-  getPythPrice, sleepExact, splMintToToken, tokenToSplMint, decimalsBaseSPL,
+  sleepExact, splMintToToken, tokenToSplMint, decimalsBaseSPL,
 } from './utils';
 import { parseDipState, optionMintAddress } from '@dual-finance/dip';
 import * as apiSecret from '../apiSecret.json';
@@ -21,6 +21,7 @@ import {
 } from './constants';
 import { dipToString, fetchMMOrder } from './router_utils';
 import { calcForwardPrice } from './scalper_utils';
+import { getPythPrice } from './oracle';
 
 const crypto = require('crypto');
 

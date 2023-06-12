@@ -128,9 +128,6 @@ export function tokenToPythSymbol(token: SYMBOL) {
     case "BONK": {
       return "Crypto.BONK/USD";
     }
-    case "RNDR": {
-      return "Crypto.RNDR/USD";
-    }
     default: {
       return undefined;
     }

@@ -1,7 +1,6 @@
 import * as os from 'os';
 import * as fs from 'fs';
 import { Connection, PublicKey } from '@solana/web3.js';
-import { utils } from '@project-serum/anchor';
 import {
   PythHttpClient,
   getPythProgramKeyForCluster,
@@ -37,64 +36,6 @@ export function sleepExact(period: number) {
   return new Promise((resolve) => {
     setTimeout(resolve, period * 1_000);
   });
-}
-
-export function parseDipState(buf: Buffer) {
-  const strikeAtomsPerToken = Number(buf.readBigUInt64LE(8));
-  const expiration = Number(buf.readBigUInt64LE(16));
-  const baseMint = new PublicKey(buf.slice(24, 56));
-  const vaultMint = new PublicKey(buf.slice(56, 88));
-  const vaultMintBump = Number(buf.readUInt8(88));
-  const vaultSpl = new PublicKey(buf.slice(89, 121));
-  const vaultSplBump = Number(buf.readUInt8(121));
-  const optionMint = new PublicKey(buf.slice(122, 154));
-  const optionBump = Number(buf.readUInt8(154));
-  const vaultUsdc = new PublicKey(buf.slice(155, 187));
-  const vaultUsdcBump = Number(buf.readUInt8(187));
-  const quoteMint = new PublicKey(buf.slice(188, 220));
-  return {
-    strikeAtomsPerToken,
-    expiration,
-    baseMint,
-    vaultMint,
-    vaultMintBump,
-    vaultSpl,
-    vaultSplBump,
-    optionMint,
-    optionBump,
-    vaultUsdc,
-    vaultUsdcBump,
-    quoteMint,
-  };
-}
-
-function toBytes(x: number): Uint8Array {
-  const y = Math.floor(x / 2 ** 32);
-  return Uint8Array.from(
-    [y, y << 8, y << 16, y << 24, x, x << 8, x << 16, x << 24].map(
-      (z) => z >>> 24,
-    ),
-  );
-}
-
-export async function findProgramAddressWithMintAndStrikeAndExpiration(
-  seed: string,
-  strikePrice: number,
-  expiration: number,
-  baseMint: PublicKey,
-  quoteMint: PublicKey,
-  programId: PublicKey,
-) {
-  return PublicKey.findProgramAddress(
-    [
-      Buffer.from(utils.bytes.utf8.encode(seed)),
-      toBytes(strikePrice),
-      toBytes(expiration),
-      baseMint.toBuffer(),
-      quoteMint.toBuffer(),
-    ],
-    programId,
-  );
 }
 
 export function splMintToToken(splMint: PublicKey): SYMBOL {

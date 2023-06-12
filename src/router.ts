@@ -11,13 +11,13 @@ import {
 } from './config';
 import Poller from './poller';
 import {
-  findProgramAddressWithMintAndStrikeAndExpiration, getPythPrice, parseDipState,
-  sleepExact, splMintToToken, tokenToSplMint, decimalsBaseSPL,
+  getPythPrice, sleepExact, splMintToToken, tokenToSplMint, decimalsBaseSPL,
 } from './utils';
+import { parseDipState, optionMintAddress } from '@dual-finance/dip';
 import * as apiSecret from '../apiSecret.json';
 import {
   DIP_STATE_LENGTH, DIP_PROGRAM_ID, MS_PER_YEAR, NUM_DIP_ATOMS_PER_TOKEN,
-  OPTION_VAULT_PK, OPTION_MINT_ADDRESS_SEED, PROTCOL_API_KEY, SIX_MONTHS_IN_MS,
+  OPTION_VAULT_PK, PROTCOL_API_KEY, SIX_MONTHS_IN_MS,
 } from './constants';
 import { dipToString, fetchMMOrder } from './router_utils';
 import { calcForwardPrice } from './scalper_utils';
@@ -236,13 +236,11 @@ class Router {
     callOrPut: CallOrPut,
     connection: Connection,
   ): Promise<void> {
-    const [optionMint] = await findProgramAddressWithMintAndStrikeAndExpiration(
-      OPTION_MINT_ADDRESS_SEED,
+    const optionMint = optionMintAddress(
       strikeAtoms,
       expirationSec,
       baseMint,
       quoteMint,
-      DIP_PROGRAM_ID,
     );
     const mmOptionAccount = await getAssociatedTokenAddress(
       OPTION_VAULT_PK,
@@ -294,15 +292,15 @@ class Router {
           continue;
         }
         const {
-          baseMint, quoteMint, expiration, strikeAtomsPerToken,
+          baseMint, quoteMint, expiration, strike,
         } = dipState;
         if (splMintToToken(baseMint) === this.token || splMintToToken(quoteMint) === this.token) {
           const quoteAtoms = 10 ** decimalsBaseSPL(splMintToToken(quoteMint));
           let optionType = CallOrPut.Call;
-          let strikeTokensPerToken: number = strikeAtomsPerToken / quoteAtoms;
+          let strikeTokensPerToken: number = strike / quoteAtoms;
           if (splMintToToken(quoteMint) === this.token) {
             optionType = CallOrPut.Put;
-            strikeTokensPerToken = Number(((1 / strikeAtomsPerToken) * quoteAtoms).toPrecision(6));
+            strikeTokensPerToken = Number(((1 / strike) * quoteAtoms).toPrecision(6));
           }
           const alreadyPolled = dipToString(
             expirationSec,
@@ -315,7 +313,7 @@ class Router {
           try {
             await this.add_dip(
               expirationSec,
-              strikeAtomsPerToken,
+              strike,
               baseMint,
               quoteMint,
               optionType,
@@ -330,13 +328,11 @@ class Router {
             continue;
           }
 
-          const [optionMint] = await findProgramAddressWithMintAndStrikeAndExpiration(
-            OPTION_MINT_ADDRESS_SEED,
-            strikeAtomsPerToken,
+          const optionMint = optionMintAddress(
+            strike,
             expiration,
             baseMint,
             quoteMint,
-            DIP_PROGRAM_ID,
           );
           const mmOptionAccount = await getAssociatedTokenAddress(
             OPTION_VAULT_PK,

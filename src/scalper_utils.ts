@@ -120,7 +120,7 @@ export function liquidityCheckAndNumSplices(
   qty: number,
   price: number,
   notionalMax: number,
-  hedgeSide: string,
+  hedgeSide: HedgeSide,
   bids,
   asks,
 ) {

@@ -41,6 +41,7 @@ export const DAYS_PER_YEAR = 365;
 export const DIP_STATE_LENGTH = 260;
 
 export const NO_FAIR_VALUE = 0;
+export const NO_ORACLE_PRICE = 0;
 export const SUFFICIENT_BOOK_DEPTH = 0;
 
 export const JUPITER_EXCLUDED_AMMS = {

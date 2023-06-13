@@ -10,12 +10,11 @@ import { StakingOptions } from '@dual-finance/staking-options';
 import {
   THEO_VOL_MAP, maxNotional, TWAP_INTERVAL_SEC, SCALPER_WINDOW_SEC,
   ZSCORE, MinContractSize, TickSize, IS_DEV, GAMMA_THRESHOLD,
-  MAX_DELTA_HEDGES, DELTA_OFFSET,
-  GAMMA_CYCLES, MinOpenBookSize, OPENBOOK_FORK_ID,
-  slippageMax, GAMMA_COMPLETE_THRESHOLD_PCT, CLUSTER,
+  MAX_DELTA_HEDGES, DELTA_OFFSET, GAMMA_CYCLES, MinOpenBookSize,
+  OPENBOOK_FORK_ID, GAMMA_COMPLETE_THRESHOLD_PCT, CLUSTER,
   MAX_ORDER_BOOK_SEARCH_DEPTH, MAX_BACK_GAMMA_MULTIPLE, API_URL, MODE_BY_SYMBOL,
-  WHALE_MAX_SPREAD, ScalperMode, ORDER_SIZE_BUFFER_PCT, HedgeSide, BACK_GAMMA_SPREAD_RATIO,
-  MAX_LOAD_TIME,
+  WHALE_MAX_SPREAD, ScalperMode, ORDER_SIZE_BUFFER_PCT, HedgeSide,
+  BACK_GAMMA_SPREAD_RATIO, MAX_LOAD_TIME, SLIPPAGE_MAX,
 } from './config';
 import { CallOrPut, DIPDeposit, SYMBOL } from './common';
 import {
@@ -23,10 +22,10 @@ import {
 } from './utils';
 import { SerumVialClient, SerumVialTradeMessage, tradeMessageToString } from './serumVial';
 import {
-  jupiterHedge, getDIPDelta, getDIPGamma, getDIPTheta, getPayerAccount,
+  getDIPDelta, getDIPGamma, getDIPTheta, getPayerAccount,
   getWalletAndOpenbookSpotDelta, openBookLiquidityCheckAndNumSplices,
-  tryToSettleOpenBook, setPriorityFee, waitForFill, findMaxStrike, findMinStrike,
-  findNearestStrikeType, cancelOpenBookOrders,
+  tryToSettleOpenBook, setPriorityFee, waitForFill, findMaxStrike,
+  findMinStrike, findNearestStrikeType, cancelOpenBookOrders,
   findFairValue, roundPriceToTickSize, roundQtyToMinOrderStep, getTreasuryPositions,
 } from './scalper_utils';
 import {
@@ -34,6 +33,7 @@ import {
 } from './constants';
 // eslint-disable-next-line import/no-cycle
 import { loadMangoAndPickScalper } from './mango';
+import { jupiterHedge } from './jupiter';
 
 class Scalper {
   connection: Connection;
@@ -207,7 +207,7 @@ Spot Δ: ${spotDelta} Offset Δ ${this.deltaOffset} Fair Value: ${fairValue}`,
       console.log(this.symbol, 'Delta netural within', deltaThreshold);
       return;
     }
-    const slippageTolerance = Math.min(stdDevSpread / 2, slippageMax.get(this.symbol));
+    const slippageTolerance = Math.min(stdDevSpread / 2, SLIPPAGE_MAX.get(this.symbol));
     let hedgePrice = IS_BUYSIDE
       ? fairValue * (1 + slippageTolerance)
       : fairValue * (1 - slippageTolerance);
@@ -238,8 +238,6 @@ Spot Δ: ${spotDelta} Offset Δ ${this.deltaOffset} Fair Value: ${fairValue}`,
     try {
       if (spliceFactor !== SUFFICIENT_BOOK_DEPTH) {
         console.log(this.symbol, 'Not enough liquidity! Try Jupiter. Adjusted price', hedgePrice, 'Splice', spliceFactor);
-        // Check on jupiter and sweep price
-        console.log(this.symbol, 'Loading Jupiter to trade');
         const jupiter = await asyncCallWithTimeout(Jupiter.load({
           connection: this.connection,
           cluster: CLUSTER,
@@ -248,39 +246,28 @@ Spot Δ: ${spotDelta} Offset Δ ${this.deltaOffset} Fair Value: ${fairValue}`,
           restrictIntermediateTokens: true,
           shouldLoadSerumOpenOrders: false,
         }), MAX_LOAD_TIME);
-        const jupValues = await jupiterHedge(hedgeSide, this.symbol, 'USDC', hedgeDeltaTotal, hedgePrice, jupiter);
-        if (jupValues !== undefined) {
-          const { swapTransaction } = jupValues;
-          let txid: string;
-          if (swapTransaction instanceof Transaction) {
-            txid = await sendAndConfirmTransaction(
-              this.connection,
-              swapTransaction,
-              [this.owner],
-            );
-          } else {
-            swapTransaction.sign([this.owner]);
-            const rawTx = swapTransaction.serialize();
-            txid = await this.connection.sendRawTransaction(rawTx);
-          }
-          const spotDeltaUpdate = jupValues.qty;
-          hedgeDeltaTotal += spotDeltaUpdate;
-          console.log(this.symbol, 'Jupiter Hedge via', jupValues.venue, 'price', jupValues.price, 'qty', jupValues.qty, `https://solana.fm/tx/${txid}${CLUSTER?.includes('devnet') ? '?cluster=devnet' : ''}`);
-          console.log(this.symbol, 'Adjust', hedgeSide, 'Price', hedgePrice, 'to', jupValues.price, 'Remaining Qty', hedgeDeltaTotal);
-          hedgePrice = jupValues.price;
+        const jupRouteDetails = await jupiterHedge(
+          hedgeSide, this.symbol, 'USDC', hedgeDeltaTotal, hedgePrice, jupiter, this.connection, this.owner
+        );
+        if (jupRouteDetails !== undefined) {
+          hedgeDeltaTotal += jupRouteDetails.qty;
+          console.log(this.symbol, 'Adjust', hedgeSide, 'price', hedgePrice, 'to', jupRouteDetails.price, 'remaining qty', hedgeDeltaTotal);
+          hedgePrice = jupRouteDetails.price;
         } else {
           console.log(this.symbol, 'No Jupiter Route found better than', hedgePrice);
         }
+
+        // TODO: Re-evaluate the splice factor after jupiter routing
         hedgeDeltaClip = hedgeDeltaTotal / spliceFactor;
       }
 
       // Return early if jupiter sweeping got within the threshold.
       if (Math.abs(hedgeDeltaTotal) < deltaThreshold) {
-        console.log(this.symbol, 'Delta Netural: Jupiter Hedge');
+        console.log(this.symbol, 'Delta netural: Jupiter hedge');
         return;
       }
     } catch (err) {
-      console.log(this.symbol, 'Jupiter Route error', err, err.stack);
+      console.log(this.symbol, 'Jupiter route error', err, err.stack);
     }
 
     // Send the delta hedge order to openbook.

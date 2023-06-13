@@ -109,7 +109,7 @@ export const maxNotional = new Map<SYMBOL, number>([
   ['BTC', 20000], ['ETH', 10000], ['SOL', 10000], ['MNGO', 2500], ['BONK', 100], ['DUAL', 1000],
 ]); // Max hedging $ notional sizes
 
-export const slippageMax = new Map<SYMBOL, number>([
+export const SLIPPAGE_MAX = new Map<SYMBOL, number>([
   ['BTC', 0.0005], ['ETH', 0.0005], ['SOL', 0.0010], ['MNGO', 0.0015], ['BONK', 0.0005], ['DUAL', 0.0015],
 ]); // Max Allowed xbps above/below FMV on limit orders
 

@@ -13,7 +13,7 @@ import {
   FILLS_URL, IS_DEV, GAMMA_THRESHOLD,
   MAX_DELTA_HEDGES, MANGO_DOWNTIME_THRESHOLD_MIN,
   PERP_FUNDING_RATE_THRESHOLD, GAMMA_CYCLES, OPENBOOK_FORK_ID,
-  slippageMax, GAMMA_COMPLETE_THRESHOLD_PCT, CLUSTER,
+  SLIPPAGE_MAX, GAMMA_COMPLETE_THRESHOLD_PCT, CLUSTER,
   HedgeProduct, HedgeSide, ScalperMode, PRIORITY_FEE,
 } from './config';
 import { DIPDeposit } from './common';
@@ -130,7 +130,7 @@ export async function deltaHedgeMango(
   }
 
   // Check what the delta is including slipapge. Avoids over trading
-  const slippageTolerance = Math.min(stdDevSpread / 2, slippageMax.get(scalper.symbol));
+  const slippageTolerance = Math.min(stdDevSpread / 2, SLIPPAGE_MAX.get(scalper.symbol));
   const IS_BUYSIDE = hedgeDeltaTotal < 0;
   let hedgePrice = IS_BUYSIDE
     ? fairValue * (1 + slippageTolerance)

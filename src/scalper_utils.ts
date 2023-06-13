@@ -17,7 +17,7 @@ import {
   INFLATION_MAP, STAKE_RATE_MAP, STORAGE_RATE_MAP,
 } from './config';
 import {
-  asyncCallWithTimeoutasync, decimalsBaseSPL, sleepExact, splMintToToken,
+  asyncCallWithTimeout, decimalsBaseSPL, sleepExact, splMintToToken,
   tokenToSplMint,
 } from './utils';
 import {
@@ -406,7 +406,7 @@ export async function getFairValue(
     return fairValue;
   }
   try {
-    let jupPrice: number = await asyncCallWithTimeoutasync(getJupiterPrice(symbol, 'USDC', connection), MAX_LOAD_TIME);
+    let jupPrice: number = await asyncCallWithTimeout(getJupiterPrice(symbol, 'USDC', connection), MAX_LOAD_TIME);
     jupPrice = jupPrice > 0 ? jupPrice : 0;
     const oracleSlippage = Math.abs(fairValue - jupPrice) / fairValue;
     if (oracleSlippage > slippageMax.get(symbol)) {
@@ -455,7 +455,7 @@ export async function jupiterHedge(
   let inputToken: PublicKey;
   let outputToken: PublicKey;
   let hedgeAmount: number;
-  if (hedgeSide === 'sell') {
+  if (hedgeSide === HedgeSide.sell) {
     inputToken = new PublicKey(tokenToSplMint(base));
     outputToken = new PublicKey(tokenToSplMint(quote));
     hedgeAmount = Math.abs(hedgeDelta);
@@ -488,11 +488,11 @@ export async function jupiterHedge(
     const inQty = JSBI.toNumber(bestRoute.marketInfos[0].inAmount) / inAtomsPerToken;
     const outQty = JSBI.toNumber(bestRoute.marketInfos[numRoutes - 1].outAmount) / outAtomsPerToken;
 
-    const netPrice = hedgeSide === 'sell' ? outQty / inQty : inQty / outQty;
+    const netPrice = hedgeSide === HedgeSide.sell ? outQty / inQty : inQty / outQty;
     const venue = bestRoute.marketInfos[numRoutes - 1].amm.label;
     const { swapTransaction } = await jupiter.exchange({ routeInfo: routes.routesInfos[0] });
 
-    if (hedgeSide === 'sell') {
+    if (hedgeSide === HedgeSide.sell) {
       if (netPrice > hedgePrice) {
         const swapQty = -searchQty / inAtomsPerToken;
         routeDetails = {

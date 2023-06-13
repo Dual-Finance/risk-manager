@@ -19,7 +19,7 @@ import {
 } from './config';
 import { CallOrPut, DIPDeposit, SYMBOL } from './common';
 import {
-  asyncCallWithTimeoutasync, getRandomNumAround, readKeypair,
+  asyncCallWithTimeout, getRandomNumAround, readKeypair,
 } from './utils';
 import { SerumVialClient, SerumVialTradeMessage, tradeMessageToString } from './serumVial';
 import {
@@ -240,7 +240,7 @@ Spot Δ: ${spotDelta} Offset Δ ${this.deltaOffset} Fair Value: ${fairValue}`,
         console.log(this.symbol, 'Not enough liquidity! Try Jupiter. Adjusted price', hedgePrice, 'Splice', spliceFactor);
         // Check on jupiter and sweep price
         console.log(this.symbol, 'Loading Jupiter to trade');
-        const jupiter = await asyncCallWithTimeoutasync(Jupiter.load({
+        const jupiter = await asyncCallWithTimeout(Jupiter.load({
           connection: this.connection,
           cluster: CLUSTER,
           user: this.owner,

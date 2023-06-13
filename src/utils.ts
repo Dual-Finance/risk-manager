@@ -117,7 +117,7 @@ export function getRandomNumAround(midValue: number, spread: number) {
   return Math.random() * (max - min) + min;
 }
 
-export async function asyncCallWithTimeoutasync(asyncPromise, timeLimit) {
+export async function asyncCallWithTimeout(asyncPromise: Promise<any>, timeLimit: number) {
   let timeoutHandle: NodeJS.Timeout;
 
   const timeoutPromise = new Promise((_resolve, reject) => {

@@ -1,7 +1,5 @@
 import WebSocket from 'ws';
-import {
-  BookSide, MangoClient, PerpMarket, PerpOrderSide,
-} from '@blockworks-foundation/mango-v4';
+import { BookSide, PerpMarket, PerpOrderSide } from '@blockworks-foundation/mango-v4';
 import { HedgeProduct } from './config';
 
 export function getMangoHedgeProduct(hedgeSide: PerpOrderSide, buySpot: boolean, sellSpot: boolean):
@@ -40,35 +38,6 @@ export function orderSpliceMango(
   }
   console.log(`Splice factor: ${spliceFactor}`);
   return spliceFactor;
-}
-
-// Fill Size from any perp orders
-export async function mangoRecentFillSizeV3(
-  perpMarket: PerpMarket,
-  orderID: number,
-  mangoClient: MangoClient,
-) {
-  let filledQty = 0;
-  const recentFills = await perpMarket.loadFills(mangoClient);
-  for (const fill of recentFills) {
-    const { eventType } = fill;
-    const {
-      makerClientOrderId, takerClientOrderId, takerSide, quantity,
-    } = eventType[1];
-    if (eventType) {
-      if (
-        makerClientOrderId.toString() === orderID.toString()
-      || takerClientOrderId.toString() === orderID.toString()
-      ) {
-        if (takerSide === 'buy') {
-          filledQty += quantity;
-        } else if (takerSide === 'sell') {
-          filledQty -= quantity;
-        }
-      }
-    }
-  }
-  return filledQty;
 }
 
 export function connectMangoFillListener(fillFeed: WebSocket, perpMarket: PerpMarket) {

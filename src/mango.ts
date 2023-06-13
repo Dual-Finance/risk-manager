@@ -21,7 +21,7 @@ import {
   sleepExact, tokenToSplMint,
 } from './utils';
 import {
-  getDIPDelta, getDIPGamma, getSpotDelta, waitForFill,
+  getDIPDelta, getDIPGamma, getWalletAndOpenbookSpotDelta, waitForFill,
   roundPriceToTickSize, roundQtyToMinOrderStep, getOraclePrice,
 } from './scalper_utils';
 import {
@@ -105,8 +105,7 @@ export async function deltaHedgeMango(
     console.log(scalper.symbol, 'No Mango Token Balance Possible');
   }
 
-  // Get all spot positions Option Vault, Risk Manager, Mango Tester
-  const spotDelta = await getSpotDelta(
+  const spotDelta = await getWalletAndOpenbookSpotDelta(
     scalper.connection,
     scalper.symbol,
     scalper.owner,

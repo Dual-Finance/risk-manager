@@ -24,7 +24,7 @@ import {
 import { SerumVialClient, SerumVialTradeMessage, tradeMessageToString } from './serumVial';
 import {
   jupiterHedge, getDIPDelta, getDIPGamma, getDIPTheta, getPayerAccount,
-  getSpotDelta, liquidityCheckAndNumSplices,
+  getWalletAndOpenbookSpotDelta, openBookLiquidityCheckAndNumSplices,
   tryToSettleOpenBook, setPriorityFee, waitForFill, findMaxStrike, findMinStrike,
   findNearestStrikeType, cancelOpenBookOrders,
   findFairValue, roundPriceToTickSize, roundQtyToMinOrderStep, getTreasuryPositions,
@@ -185,7 +185,7 @@ class Scalper {
 
     // Get total delta position to hedge
     const dipTotalDelta = getDIPDelta(dipProduct, fairValue, this.symbol);
-    const spotDelta = await getSpotDelta(this.connection, this.symbol, this.owner, spotMarket);
+    const spotDelta = await getWalletAndOpenbookSpotDelta(this.connection, this.symbol, this.owner, spotMarket);
     hedgeDeltaTotal = IS_DEV ? 0.1 : dipTotalDelta + spotDelta + this.deltaOffset;
     const IS_BUYSIDE = hedgeDeltaTotal < 0;
     hedgeSide = IS_BUYSIDE ? HedgeSide.buy : HedgeSide.sell;
@@ -225,7 +225,7 @@ Spot Δ: ${spotDelta} Offset Δ ${this.deltaOffset} Fair Value: ${fairValue}`,
     // Load order book data to determine splicing.
     const bids = await spotMarket.loadBids(this.connection);
     const asks = await spotMarket.loadAsks(this.connection);
-    const spliceFactor = liquidityCheckAndNumSplices(
+    const spliceFactor = openBookLiquidityCheckAndNumSplices(
       hedgeDeltaTotal,
       hedgePrice,
       maxNotional.get(this.symbol),
@@ -443,7 +443,7 @@ Spot Δ: ${spotDelta} Offset Δ ${this.deltaOffset} Fair Value: ${fairValue}`,
     let gammaBid = fairValue * (1 - stdDevSpread - stdDevWidenedSpread);
     let gammaAsk = fairValue * (1 + stdDevSpread + stdDevWidenedSpread);
 
-    const spotDelta = await getSpotDelta(this.connection, this.symbol, this.owner, spotMarket);
+    const spotDelta = await getWalletAndOpenbookSpotDelta(this.connection, this.symbol, this.owner, spotMarket);
 
     if (this.mode === ScalperMode.GammaBackStrikeAdjustment) {
       const dipTotalDelta = getDIPDelta(dipProduct, fairValue, this.symbol);

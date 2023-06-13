@@ -82,7 +82,7 @@ export function tokenToSplMint(token: SYMBOL) {
   return undefined;
 }
 
-export function decimalsBaseSPL(token: SYMBOL) {
+export function decimalsBaseSPL(token: SYMBOL): number {
   switch (token) {
     case 'SOL': {
       return 9;
@@ -105,7 +105,7 @@ export function decimalsBaseSPL(token: SYMBOL) {
     case 'USDC': {
       return 6;
     }
-    default: {
+    case 'UNKNOWN_TOKEN': {
       return undefined;
     }
   }

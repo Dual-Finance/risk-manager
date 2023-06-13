@@ -3,15 +3,12 @@ import {
   ComputeBudgetProgram, Connection, Keypair, LAMPORTS_PER_SOL, PublicKey,
   sendAndConfirmTransaction, Transaction,
 } from '@solana/web3.js';
-import { Market } from '@project-serum/serum';
+import { Market, Orderbook } from '@project-serum/serum';
 import { getAssociatedTokenAddress } from '@project-serum/associated-token';
-import fetch from 'node-fetch';
 import { Jupiter } from '@jup-ag/core';
 import JSBI from 'jsbi';
 import { StakingOptions } from '@dual-finance/staking-options';
-import {
-  CallOrPut, DIPDeposit, RouteDetails, SYMBOL,
-} from './common';
+import { CallOrPut, DIPDeposit, RouteDetails, SYMBOL } from './common';
 import {
   JUPITER_LIQUIDITY, MAX_MKT_SPREAD_PCT_FOR_PRICING, JUPITER_SEARCH_STEPS,
   RF_RATE, slippageMax, THEO_VOL_MAP, JUPITER_SLIPPAGE_BPS, PRIORITY_FEE,
@@ -115,14 +112,14 @@ export function getDIPTheta(
   return thetaSum;
 }
 
-// Check if liquidity is supportive & splice order
-export function liquidityCheckAndNumSplices(
+// Check if there is more than SUFFICIENT_BOOK_DEPTH and split if needed.
+export function openBookLiquidityCheckAndNumSplices(
   qty: number,
   price: number,
   notionalMax: number,
   hedgeSide: HedgeSide,
-  bids,
-  asks,
+  bids: Orderbook,
+  asks: Orderbook,
 ) {
   let depth = 0;
   if (hedgeSide === 'sell') {
@@ -144,23 +141,27 @@ export function liquidityCheckAndNumSplices(
   return Math.max((Math.abs(qty) * price) / notionalMax, 1);
 }
 
-// TODO: Update this to also take into account the openbook position
-// Get Spot Balance
-export async function getSpotDelta(
+// This assumes that openbook has been settled. Any position yet to be settled
+// is not considered. This is just in the wallet and openbook open orders. Does
+// not consider mango or anywhere else.
+export async function getWalletAndOpenbookSpotDelta(
   connection: Connection,
   symbol: SYMBOL,
   owner: Keypair,
   market: Market,
 ) {
-  let mainDelta = 0;
+  let accountDelta = 0;
   let tokenDelta = 0;
   let spotDelta = 0;
-  let tokenDecimals = 1;
-  let openOrderQty = 0;
+
+  let tokenDecimals = decimalsBaseSPL(symbol);
+
   const accountList = [RM_PROD_PK, OPTION_VAULT_PK, RM_BACKUP_PK];
   for (const account of accountList) {
+    // SOL is unique because we need to consider the sol that is not in a token
+    // account.
     if (symbol === 'SOL') {
-      mainDelta = (await connection.getBalance(account)) / LAMPORTS_PER_SOL;
+      accountDelta = (await connection.getBalance(account)) / LAMPORTS_PER_SOL;
     }
     try {
       const tokenAccount = await getAssociatedTokenAddress(
@@ -169,13 +170,14 @@ export async function getSpotDelta(
       );
       const balance = await connection.getTokenAccountBalance(tokenAccount);
       const tokenBalance = Number(balance.value.amount);
-      tokenDecimals = balance.value.decimals;
       tokenDelta = tokenBalance / 10 ** tokenDecimals;
     } catch (err) {
       tokenDelta = 0;
     }
-    spotDelta = mainDelta + tokenDelta + spotDelta;
+    spotDelta += accountDelta + tokenDelta;
   }
+
+  let openOrderQty = 0;
   if (market !== undefined) {
     const openBookOO = await market.findOpenOrdersAccountsForOwner(
       connection,
@@ -258,18 +260,17 @@ export async function getPayerAccount(
   quote: SYMBOL,
   owner: Keypair,
 ) {
-  const baseTokenAccount = await getAssociatedTokenAddress(
-    owner.publicKey,
-    tokenToSplMint(base),
-  );
-  const quoteTokenAccount = await getAssociatedTokenAddress(
-    owner.publicKey,
-    tokenToSplMint(quote),
-  );
   if (hedgeSide === 'buy') {
-    return quoteTokenAccount;
+    return await getAssociatedTokenAddress(
+      owner.publicKey,
+      tokenToSplMint(quote),
+    );
+  } else {
+    return await getAssociatedTokenAddress(
+      owner.publicKey,
+      tokenToSplMint(base),
+    );
   }
-  return baseTokenAccount;
 }
 
 export async function cancelOpenBookOrders(
@@ -277,7 +278,7 @@ export async function cancelOpenBookOrders(
   owner: Keypair,
   spotMarket: Market,
   symbol: SYMBOL,
-):Promise<void> {
+): Promise<void> {
   const myOrders = await spotMarket.loadOrdersForOwner(connection, owner.publicKey);
   if (myOrders.length === 0) {
     return;
@@ -373,7 +374,7 @@ export async function getOraclePrice(symbol: SYMBOL) {
   return NO_FAIR_VALUE;
 }
 
-export async function getOpenBookMidPrice(
+async function getOpenBookMidPrice(
   symbol: SYMBOL,
   spotMarket:Market,
   connection: Connection,
@@ -397,9 +398,9 @@ export async function getFairValue(
   spotMarket: Market,
   symbol: SYMBOL,
 ) {
-  const fairValue = await getOraclePrice(symbol);
+  let fairValue = await getOraclePrice(symbol);
   if (fairValue === NO_FAIR_VALUE) {
-    getOpenBookMidPrice(symbol, spotMarket, connection);
+    fairValue = await getOpenBookMidPrice(symbol, spotMarket, connection);
   }
   if (LIQUID_SYMBOLS.includes(symbol)) {
     return fairValue;
@@ -426,14 +427,14 @@ export async function findFairValue(
   connection: Connection,
   spotMarket: Market,
   symbol: SYMBOL,
-  tries: number,
+  maxTries: number,
   waitSecPerTry: number,
 ) {
   if (PRICE_OVERRIDE > 0) {
     return PRICE_OVERRIDE;
   }
   let fairValue = await getFairValue(connection, spotMarket, symbol);
-  for (let i = 0; i < tries; i++) {
+  for (let i = 0; i < maxTries; i++) {
     if (fairValue === NO_FAIR_VALUE) {
       console.log(symbol, 'Cannot find fair value');
       await sleepExact(waitSecPerTry);
@@ -516,13 +517,6 @@ export async function jupiterHedge(
   return routeDetails;
 }
 
-export async function getJupPriceAPI(baseMint: PublicKey): Promise<number> {
-  const url = `https://quote-api.jup.ag/v3/price?ids=${baseMint}`;
-  const { data } = await (await fetch(url)).json();
-  const { price } = data[baseMint.toBase58()];
-  return price;
-}
-
 export function waitForFill(conditionFunction, cycleDurationSec: number) {
   let pollCount = 0;
   const poll = (resolve) => {
@@ -542,7 +536,7 @@ export function waitForFill(conditionFunction, cycleDurationSec: number) {
 export function findMaxStrike(dipProduct: DIPDeposit[]) {
   let strikeMax = dipProduct[0].strikeUsdcPerToken;
   for (const dip of dipProduct) {
-    if (dip.strikeUsdcPerToken > strikeMax) { strikeMax = dip.strikeUsdcPerToken; }
+    strikeMax = Math.max(strikeMax, dip.strikeUsdcPerToken);
   }
   return strikeMax;
 }
@@ -551,7 +545,7 @@ export function findMaxStrike(dipProduct: DIPDeposit[]) {
 export function findMinStrike(dipProduct: DIPDeposit[]) {
   let strikeMin = dipProduct[0].strikeUsdcPerToken;
   for (const dip of dipProduct) {
-    if (dip.strikeUsdcPerToken < strikeMin) { strikeMin = dip.strikeUsdcPerToken; }
+    strikeMin = Math.min(strikeMin, dip.strikeUsdcPerToken);
   }
   return strikeMin;
 }
@@ -586,6 +580,7 @@ export async function getTreasuryPositions(
   console.log(symbol, 'Add Treasury Positions to Hedge');
   const accountList = [RM_PROD_PK, OPTION_VAULT_PK, RM_BACKUP_PK];
   for (const eligibileSO of ELIGIBLE_SO_STATES) {
+    // TODO: Reconfigure this to be explicitly named params, not just known by array position.
     if (eligibileSO[0] === symbol) {
       let parsedState;
       let optionType: CallOrPut;
@@ -601,27 +596,21 @@ export async function getTreasuryPositions(
           continue;
         }
       }
-      // @ts-ignore
       const {
         optionExpiration, lotSize, strikes, baseMint, quoteMint, baseDecimals, quoteDecimals,
       } = parsedState;
 
-      // Skip expired postions if they are left in
+      // Skip expired postions if they are left in.
       const expirationMs = Number(optionExpiration) * 1_000;
       if (expirationMs < Date.now()) {
         continue;
       }
 
-      const splTokenName = optionType === CallOrPut.Put
-      // @ts-ignore
-        ? splMintToToken(quoteMint) : splMintToToken(baseMint);
+      const splTokenName: SYMBOL = optionType === CallOrPut.Put ? splMintToToken(quoteMint) : splMintToToken(baseMint);
 
-      // @ts-ignore
-      const baseAtoms = 10 ** baseDecimals;
-      // @ts-ignore
-      const quoteAtoms = 10 ** quoteDecimals;
+      const baseAtomsPerToken = 10 ** baseDecimals;
+      const quoteAtomsPerToken = 10 ** quoteDecimals;
 
-      // @ts-ignore
       for (const strike of strikes) {
         let soMint: PublicKey;
         if (optionType === CallOrPut.Call) {
@@ -648,14 +637,14 @@ export async function getTreasuryPositions(
           // Ignore Empty Accounts
           }
         }
-        // strike is atoms of quote per lot so need to divide by quote atoms
+        // Strike is atoms of quote per lot so need to divide by quote atoms
         // and multiple by base atoms.
         const strikeUsdcPerToken = optionType === CallOrPut.Call
-          ? (strike.toNumber() / Number(lotSize)) / (quoteAtoms / baseAtoms)
-          : 1 / ((strike.toNumber() / Number(lotSize)) / (quoteAtoms / baseAtoms));
+          ? (strike.toNumber() / Number(lotSize)) / (quoteAtomsPerToken / baseAtomsPerToken)
+          : 1 / ((strike.toNumber() / Number(lotSize)) / (quoteAtomsPerToken / baseAtomsPerToken));
         const qtyTokens = optionType === CallOrPut.Call
-          ? (netBalance * Number(lotSize)) / baseAtoms
-          : ((netBalance * Number(lotSize)) / baseAtoms) / strikeUsdcPerToken;
+          ? (netBalance * Number(lotSize)) / baseAtomsPerToken
+          : ((netBalance * Number(lotSize)) / baseAtomsPerToken) / strikeUsdcPerToken;
         dipProduct.push({
           splTokenName,
           premiumAssetName: 'USDC',
@@ -673,15 +662,11 @@ export async function getTreasuryPositions(
       dipProduct.push(positions);
     }
   }
-  console.log(symbol, 'Tracking Positions', dipProduct.length);
+  console.log(`${symbol} tracking ${dipProduct.length} positions`);
   for (const dip of dipProduct) {
+    const dateString = new Date(dip.expirationMs).toDateString();
     console.log(
-      dip.splTokenName,
-      dip.premiumAssetName,
-      new Date(dip.expirationMs).toDateString(),
-      dip.strikeUsdcPerToken,
-      dip.callOrPut,
-      dip.qtyTokens,
+      `${dip.splTokenName} ${dip.premiumAssetName} ${dateString} $${dip.strikeUsdcPerToken} ${dip.callOrPut} ${dip.qtyTokens}`
     );
   }
 }

@@ -380,7 +380,8 @@ export async function gammaScalpMango(
           fillFeed,
           gammaScalpCount + 1,
           price,
-        );
+        ).then()
+        .catch((err) => console.error(err));
       } else {
         console.log('Gamma Partially Filled', gammaFillQty, 'of', gammaOrderQty);
       }

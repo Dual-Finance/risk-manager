@@ -50,16 +50,24 @@ export async function cancelStaleMangoOrders(
   if (openOrders.length === 0) {
     return;
   }
+  let foundPerpMarket = false;
   for (const order of openOrders) {
     if (order.perpMarketIndex === perpMarket.perpMarketIndex) {
-      console.log(scalper.symbol, 'Canceling All Orders');
+      foundPerpMarket = true;
+    }
+  }
+  if (foundPerpMarket) {
+    console.log(scalper.symbol, 'Canceling All Orders');
+    try {
       await mangoClient.perpCancelAllOrders(
         mangoGroup,
         mangoAccount,
         perpMarket.perpMarketIndex,
         10, /* Max number of order cancelations */
       );
-      break;
+    } catch (err) {
+      console.log('Failed to cancel all perp orders');
+      console.log(err);
     }
   }
 }

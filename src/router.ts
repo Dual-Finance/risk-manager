@@ -2,6 +2,7 @@ import { Commitment, Connection, PublicKey } from '@solana/web3.js';
 import fetch from 'cross-fetch';
 import { blackScholes } from 'black-scholes';
 import { getAssociatedTokenAddress } from '@project-serum/associated-token';
+import { parseDipState, optionMintAddress } from '@dual-finance/dip';
 import {
   CallOrPut, DIPDeposit, SYMBOL,
 } from './common';
@@ -13,7 +14,6 @@ import Poller from './poller';
 import {
   sleepExact, splMintToToken, tokenToSplMint, decimalsBaseSPL,
 } from './utils';
-import { parseDipState, optionMintAddress } from '@dual-finance/dip';
 import * as apiSecret from '../apiSecret.json';
 import {
   DIP_STATE_LENGTH, DIP_PROGRAM_ID, MS_PER_YEAR, NUM_DIP_ATOMS_PER_TOKEN,

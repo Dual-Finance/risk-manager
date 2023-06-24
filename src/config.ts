@@ -134,9 +134,8 @@ export const STORAGE_RATE_MAP = new Map<SYMBOL, number>([
 ]); // Storage cost factors in hardware wallet or custody provider fees and zero bank fee USDC = USD
 
 export const ELIGIBLE_SO_STATES: [SYMBOL, string][] = [
+  ['BONK', 'GSOBONK_LOYALTY_13'],
   ['BONK', 'GSOBONK_LOYALTY_12'],
-  ['BONK', 'GSOBONK_LOYALTY_11'],
-  ['BONK', 'GSOBONK_LOYALTY_10'],
   ['MNGO', 'MNGO Buyback 8'],
   ['MNGO', 'MNGO Buyback 9'],
 ];

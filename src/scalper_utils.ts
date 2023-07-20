@@ -6,12 +6,12 @@ import {
 import { Market, Orderbook } from '@project-serum/serum';
 import { getAssociatedTokenAddress } from '@project-serum/associated-token';
 import { StakingOptions } from '@dual-finance/staking-options';
-import { CallOrPut, DIPDeposit, SYMBOL } from './common';
+import { CallOrPut, DIPDeposit, HedgeSide, SYMBOL } from './common';
 import {
-  MAX_MKT_SPREAD_PCT_FOR_PRICING, RF_RATE, THEO_VOL_MAP, PRIORITY_FEE,
-  GAMMA_CYCLES, RESOLVE_PERIOD_MS, PRICE_OVERRIDE, HedgeSide, MAX_LOAD_TIME,
-  LIQUID_SYMBOLS, ELIGIBLE_SO_STATES, TREASURY_POSITIONS, INFLATION_MAP,
-  STAKE_RATE_MAP, STORAGE_RATE_MAP, SLIPPAGE_MAX,
+  MAX_MKT_SPREAD_PCT_FOR_PRICING, RF_RATE, PRIORITY_FEE, GAMMA_CYCLES,
+  RESOLVE_PERIOD_MS, PRICE_OVERRIDE, MAX_LOAD_TIME, LIQUID_SYMBOLS,
+  ELIGIBLE_SO_STATES, TREASURY_POSITIONS, INFLATION_MAP, STAKE_RATE_MAP,
+  STORAGE_RATE_MAP, SLIPPAGE_MAX, THEO_VOL,
 } from './config';
 import {
   asyncCallWithTimeout, decimalsBaseSPL, sleepExact, splMintToToken,
@@ -46,7 +46,7 @@ export function getDIPDelta(
   fairValue: number,
   symbol: SYMBOL,
 ) {
-  const impliedVol = THEO_VOL_MAP.get(symbol);
+  const impliedVol = THEO_VOL;
   let deltaSum = 0;
   for (const dip of dipProduct) {
     const yearsUntilMaturity = (dip.expirationMs - Date.now()) / MS_PER_YEAR;
@@ -69,7 +69,7 @@ export function getDIPGamma(
   fairValue: number,
   symbol: SYMBOL,
 ) {
-  const impliedVol = THEO_VOL_MAP.get(symbol);
+  const impliedVol = THEO_VOL;
   let gammaSum = 0;
   for (const dip of dipProduct) {
     const yearsUntilMaturity = (dip.expirationMs - Date.now()) / MS_PER_YEAR;
@@ -92,7 +92,7 @@ export function getDIPTheta(
   fairValue: number,
   symbol: SYMBOL,
 ) {
-  const impliedVol = THEO_VOL_MAP.get(symbol);
+  const impliedVol = THEO_VOL;
   let thetaSum = 0;
   for (const dip of dipProduct) {
     const yearsUntilMaturity = (dip.expirationMs - Date.now()) / MS_PER_YEAR;

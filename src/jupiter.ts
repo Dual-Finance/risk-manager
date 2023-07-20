@@ -1,9 +1,9 @@
 import { Connection, Keypair, PublicKey, Transaction, sendAndConfirmTransaction } from "@solana/web3.js";
-import { RouteDetails, SYMBOL } from "./common";
+import { HedgeSide, RouteDetails, SYMBOL } from "./common";
 import { Jupiter } from "@jup-ag/core";
 import {
-  CLUSTER, HedgeSide, JUPITER_LIQUIDITY, JUPITER_SEARCH_STEPS,
-  JUPITER_SLIPPAGE_BPS, SLIPPAGE_MAX,
+  CLUSTER, JUPITER_LIQUIDITY, JUPITER_SEARCH_STEPS, JUPITER_SLIPPAGE_BPS,
+  SLIPPAGE_MAX,
 } from "./config";
 import { JUPITER_EXCLUDED_AMMS } from "./constants";
 import { decimalsBaseSPL, splMintToToken, tokenToSplMint } from "./utils";

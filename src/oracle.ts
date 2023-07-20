@@ -1,15 +1,14 @@
-import * as os from "os";
 import {
   PythHttpClient,
   getPythProgramKeyForCluster,
 } from "@pythnetwork/client";
 import { Connection, PublicKey } from "@solana/web3.js";
-import { API_URL, IS_DEV, MAX_STALENESS } from "./config";
+import { API_URL, IS_DEV, MAX_STALENESS, TRADING_ACCOUNT } from "./config";
 import { decimalsBaseSPL, splMintToToken } from "./utils";
 import SwitchboardProgram from "@switchboard-xyz/sbv2-lite";
 import { SYMBOL } from "./common";
 import { OCR2Feed } from "@chainlink/solana-sdk";
-import { CHAINLINK_PROGRAM_ID, NO_ORACLE_PRICE } from "./constants";
+import { CHAINLINK_BTC_PK, CHAINLINK_ETH_PK, CHAINLINK_PROGRAM_ID, CHAINLINK_SOL_PK, NO_ORACLE_PRICE, SB_BONK_PK, SB_BTC_PK, SB_DUAL_PK, SB_MNGO_PK, SB_SOL_PK } from "./constants";
 import * as anchor from "@project-serum/anchor";
 
 export async function getPythPrice(splMint: PublicKey): Promise<number> {
@@ -35,7 +34,7 @@ export async function getSwitchboardPrice(splMint: PublicKey): Promise<number> {
   try {
     const sbv2 = await SwitchboardProgram.loadMainnet();
     const assetAggregator = new PublicKey(
-      tokenToSBSymbol(splMintToToken(splMint))
+      tokenToSBPk(splMintToToken(splMint))
     );
 
     const accountInfo = await sbv2.program.provider.connection.getAccountInfo(
@@ -66,7 +65,7 @@ export async function getSwitchboardPrice(splMint: PublicKey): Promise<number> {
 
 export async function getChainlinkPrice(splMint: PublicKey): Promise<number> {
   process.env.ANCHOR_PROVIDER_URL = API_URL;
-  process.env.ANCHOR_WALLET = `${os.homedir()}/mango-explorer/id.json`;
+  process.env.ANCHOR_WALLET = TRADING_ACCOUNT;
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
   if (tokenToChainlinkSymbol(splMintToToken(splMint)) === undefined) {
@@ -97,13 +96,13 @@ export async function getChainlinkPrice(splMint: PublicKey): Promise<number> {
 function tokenToChainlinkSymbol(token: SYMBOL) {
   switch (token) {
     case "SOL": {
-      return "B4vR6BW4WpLh1mFs6LL6iqL4nydbmE5Uzaz2LLsoAXqk";
+      return CHAINLINK_SOL_PK;
     }
     case "BTC": {
-      return "4NSNfkSgEdAtD8AKyyiu7QsavyR3GSXLXecwDEFbZCZ3";
+      return CHAINLINK_BTC_PK;
     }
     case "ETH": {
-      return "Aadkg8sVWV6BS5XNTt2mK6Q8FhYWECLdkDuqDHvdnoVT";
+      return CHAINLINK_ETH_PK;
     }
     default: {
       return undefined;
@@ -134,25 +133,25 @@ export function tokenToPythSymbol(token: SYMBOL) {
   }
 }
 
-function tokenToSBSymbol(token: SYMBOL) {
+function tokenToSBPk(token: SYMBOL) {
   switch (token) {
     case "SOL": {
-      return "GvDMxPzN1sCj7L26YDK2HnMRXEQmQ2aemov8YBtPS7vR";
+      return SB_SOL_PK;
     }
     case "BTC": {
-      return "8SXvChNYFhRq4EZuZvnhjrB3jJRQCv4k3P4W6hesH3Ee";
+      return SB_BTC_PK;
     }
     case "ETH": {
-      return "HNStfhaLnqwF2ZtJUizaA9uHDAVB976r2AgTUx9LrdEo";
+      return SB_BTC_PK;
     }
     case "MNGO": {
-      return "HNStfhaLnqwF2ZtJUizaA9uHDAVB976r2AgTUx9LrdEo";
+      return SB_MNGO_PK;
     }
     case "BONK": {
-      return "6qBqGAYmoZw2r4fda7671NSUbcDWE4XicJdJoWqK8aTe";
+      return SB_BONK_PK;
     }
     case "DUAL": {
-      return "7fMKXU6AnatycNu1CAMndLkKmDPtjZaPNZSJSfXR92Ez";
+      return SB_DUAL_PK;
     }
     default: {
       return undefined;

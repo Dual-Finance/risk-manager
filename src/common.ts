@@ -22,3 +22,22 @@ export interface RouteDetails {
   venue: string;
   swapTransaction: Transaction | VersionedTransaction,
 }
+
+export enum ScalperMode {
+  Normal,
+  GammaBack,
+  GammaBackStrikeAdjustment,
+  BackOnly,
+  Perp,
+  PerpGamma,
+}
+
+export enum HedgeProduct {
+  Spot = '-SPOT',
+  Perp = '-PERP',
+}
+
+export enum HedgeSide {
+  buy = 'buy',
+  sell = 'sell',
+}

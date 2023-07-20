@@ -1,5 +1,5 @@
 import { Cluster } from '@solana/web3.js';
-import { CallOrPut, DIPDeposit, SYMBOL } from './common';
+import { CallOrPut, DIPDeposit, SYMBOL, ScalperMode } from './common';
 import {
   OPB_DEVNET_PROGRAM_ID, OPB_MAINNET_PROGRAM_ID, USDC_DEVNET_PK, USDC_MAINNET_PK,
 } from './constants';
@@ -10,78 +10,26 @@ export const TRADING_ACCOUNT = process.env.WALLET;
 export const PRICE_OVERRIDE = Number(process.env.PRICE);
 // Priority Fee to use for all txs in micro lamports
 export const PRIORITY_FEE = process.env.FEE ? parseInt(process.env.FEE, 10) : 1;
-const solVars = process.env.SOL ? process.env.SOL.split(',') : [null, null, null, null];
-const btcVars = process.env.BTC ? process.env.BTC.split(',') : [null, null, null, null];
-const ethVars = process.env.ETH ? process.env.ETH.split(',') : [null, null, null, null];
-const mngoVars = process.env.MNGO ? process.env.MNGO.split(',') : [null, null, null, null];
-const bonkVars = process.env.BONK ? process.env.BONK.split(',') : [null, null, null, null];
-const dualVars = process.env.DUAL ? process.env.DUAL.split(',') : [null, null, null, null];
 
-export const productStatus = new Map<SYMBOL, boolean>([
-  ['BTC', btcVars[0] === 'ON'],
-  ['ETH', ethVars[0] === 'ON'],
-  ['SOL', solVars[0] === 'ON'],
-  ['MNGO', mngoVars[0] === 'ON'],
-  ['BONK', bonkVars[0] === 'ON'],
-  ['DUAL', dualVars[0] === 'ON'],
-]);
-// Adjust delta hedges for loans, negative values allow positive spot balances in mango
-// CAUTION! Turn off scalper, send funds to mango & update value before running!
-export const DELTA_OFFSET = new Map<SYMBOL, number>([
-  ['BTC', btcVars[1] == null ? 0 : parseFloat(btcVars[1])],
-  ['ETH', ethVars[1] == null ? 0 : parseFloat(ethVars[1])],
-  ['SOL', solVars[1] == null ? 0 : parseFloat(solVars[1])],
-  ['MNGO', mngoVars[1] == null ? 0 : parseFloat(mngoVars[1])],
-  ['BONK', bonkVars[1] == null ? 0 : parseFloat(bonkVars[1])],
-  ['DUAL', dualVars[1] == null ? 0 : parseFloat(dualVars[1])],
-]);
+export const CURRENT_SYMBOL = process.env.SYMBOL as SYMBOL;
 
-export const THEO_VOL_MAP = new Map<SYMBOL, number>([
-  ['BTC', parseFloat(btcVars[2]) > 0 ? parseFloat(btcVars[2]) : 0.3],
-  ['ETH', parseFloat(ethVars[2]) > 0 ? parseFloat(ethVars[2]) : 0.4],
-  ['SOL', parseFloat(solVars[2]) > 0 ? parseFloat(solVars[2]) : 0.5],
-  ['MNGO', parseFloat(mngoVars[2]) > 0 ? parseFloat(mngoVars[2]) : 0.6],
-  ['BONK', parseFloat(bonkVars[2]) > 0 ? parseFloat(bonkVars[2]) : 1],
-  ['DUAL', parseFloat(dualVars[2]) > 0 ? parseFloat(dualVars[2]) : 0.8],
-]); // Defaults to system wide BVE, should be run at realistic IV estimate for best hedging
+const DEFAULT_PARAMS = {
+  BTC: {symbol: 'BTC', deltaOffset: 0, theoVol: 0.3, zScore: 1.282, mode: ScalperMode.Normal},
+  ETH: {symbol: 'ETH', deltaOffset: 0, theoVol: 0.4, zScore: 1.282, mode: ScalperMode.Normal},
+  SOL: {symbol: 'SOL', deltaOffset: 0, theoVol: 0.5, zScore: 1.282, mode: ScalperMode.Normal},
+  MNGO: {symbol: 'MNGO', deltaOffset: 0, theoVol: 0.6, zScore: 1.282, mode: ScalperMode.Normal},
+  BONK: {symbol: 'BONK', deltaOffset: 0, theoVol: 1.0, zScore: 2.58, mode: ScalperMode.Normal},
+  DUAL: {symbol: 'DUAL', deltaOffset: 0, theoVol: 0.8, zScore: 1.282, mode: ScalperMode.Normal},
+};
 
-export const ZSCORE = new Map<SYMBOL, number>([
-  ['BTC', parseFloat(btcVars[3]) > 0 ? parseFloat(btcVars[3]) : 1.282],
-  ['ETH', parseFloat(ethVars[3]) > 0 ? parseFloat(ethVars[3]) : 1.282],
-  ['SOL', parseFloat(solVars[3]) > 0 ? parseFloat(solVars[3]) : 1.282],
-  ['MNGO', parseFloat(mngoVars[3]) > 0 ? parseFloat(mngoVars[3]) : 1.282],
-  ['BONK', parseFloat(bonkVars[3]) > 0 ? parseFloat(bonkVars[3]) : 2.58],
-  ['DUAL', parseFloat(dualVars[3]) > 0 ? parseFloat(dualVars[3]) : 1.282],
-]); // Corresponds to 80% CI by default
-
-export enum ScalperMode {
-  Normal,
-  GammaBack,
-  GammaBackStrikeAdjustment,
-  BackOnly,
-  Perp,
-  PerpGamma,
+if (!Object.keys(DEFAULT_PARAMS).includes(CURRENT_SYMBOL)) {
+  throw new Error("Invalid symbol");
 }
 
-export enum HedgeProduct {
-  Spot = '-SPOT',
-  Perp = '-PERP',
-}
-
-export enum HedgeSide {
-  buy = 'buy',
-  sell = 'sell',
-}
-
-// TODO: Use named arguments and better input variable management
-export const MODE_BY_SYMBOL = new Map<SYMBOL, ScalperMode>([
-  ['BTC', parseFloat(btcVars[4]) > 0 && parseFloat(btcVars[4]) < 6 ? parseFloat(btcVars[4]) : ScalperMode.Normal],
-  ['ETH', parseFloat(ethVars[4]) > 0 && parseFloat(ethVars[4]) < 6 ? parseFloat(ethVars[4]) : ScalperMode.Normal],
-  ['SOL', parseFloat(solVars[4]) > 0 && parseFloat(solVars[4]) < 6 ? parseFloat(solVars[4]) : ScalperMode.Normal],
-  ['MNGO', parseFloat(mngoVars[4]) > 0 && parseFloat(mngoVars[4]) < 6 ? parseFloat(mngoVars[4]) : ScalperMode.Normal],
-  ['BONK', parseFloat(bonkVars[4]) > 0 && parseFloat(bonkVars[4]) < 6 ? parseFloat(bonkVars[4]) : ScalperMode.Normal],
-  ['DUAL', parseFloat(dualVars[4]) > 0 && parseFloat(dualVars[4]) < 6 ? parseFloat(dualVars[4]) : ScalperMode.Normal],
-]);
+export const DELTA_OFFSET = process.env.DELTA_OFFSET ? parseFloat(process.env.DELTA_OFFSET) : DEFAULT_PARAMS[CURRENT_SYMBOL].deltaOffset;
+export const THEO_VOL = process.env.THEO_VOL ? parseFloat(process.env.THEO_VOL) : DEFAULT_PARAMS[CURRENT_SYMBOL].theoVol;
+export const Z_SCORE = process.env.Z_SCORE ? parseFloat(process.env.Z_SCORE) : DEFAULT_PARAMS[CURRENT_SYMBOL].zScore;
+export const SCALPER_MODE = process.env.SCALPER_MODE ? parseInt(process.env.SCALPER_MODE) as ScalperMode: DEFAULT_PARAMS[CURRENT_SYMBOL].SCALPER_MODE;
 
 export const CLUSTER: Cluster = IS_DEV ? 'devnet' : 'mainnet-beta';
 export const DUAL_API = IS_DEV ? 'https://dev.api.dual.finance' : 'https://api.dual.finance';
@@ -134,8 +82,9 @@ export const STORAGE_RATE_MAP = new Map<SYMBOL, number>([
 ]); // Storage cost factors in hardware wallet or custody provider fees and zero bank fee USDC = USD
 
 export const ELIGIBLE_SO_STATES: [SYMBOL, string][] = [
-  ['BONK', 'GSOBONK_LOYALTY_13'],
   ['BONK', 'GSOBONK_LOYALTY_12'],
+  ['BONK', 'GSOBONK_LOYALTY_11'],
+  ['BONK', 'GSOBONK_LOYALTY_10'],
   ['MNGO', 'MNGO Buyback 8'],
   ['MNGO', 'MNGO Buyback 9'],
 ];

@@ -1,6 +1,6 @@
 import WebSocket from 'ws';
 import { BookSide, PerpMarket, PerpOrderSide } from '@blockworks-foundation/mango-v4';
-import { HedgeProduct } from './config';
+import { HedgeProduct } from './common';
 
 export function getMangoHedgeProduct(hedgeSide: PerpOrderSide, buySpot: boolean, sellSpot: boolean):
   HedgeProduct.Spot | HedgeProduct.Perp {

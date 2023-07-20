@@ -88,6 +88,7 @@ export const ELIGIBLE_SO_STATES: [SYMBOL, string][] = [
   ['MNGO', 'MNGO Buyback 9'],
 ];
 
+// TODO: Include these in an env file
 // Enter any Staking Options owned and to be hedged from the treasury
 export const TREASURY_POSITIONS: DIPDeposit[] = [({
   splTokenName: 'BTC',

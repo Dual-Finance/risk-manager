@@ -122,6 +122,9 @@ export function tokenToPythSymbol(token: SYMBOL) {
     case "ETH": {
       return "Crypto.ETH/USD";
     }
+    case "mSOL": {
+      return "Crypto.MSOL/USD";
+    }
     case "MNGO": {
       return "Crypto.MNGO/USD";
     }

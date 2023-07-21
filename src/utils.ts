@@ -5,7 +5,7 @@ import {
   RANDOM_SLEEP_MULTIPLIER, usdcPk, TRADING_ACCOUNT,
 } from './config';
 import {
-  BONK_PK, DUAL_PK, MNGO_PK, BTC_PK, ETH_PK, WSOL_PK,
+  BONK_PK, DUAL_PK, MNGO_PK, BTC_PK, ETH_PK, WSOL_PK, MSOL_PK,
 } from './constants';
 import { SYMBOL } from './common';
 
@@ -41,6 +41,9 @@ export function splMintToToken(splMint: PublicKey): SYMBOL {
   if (splMint.toBase58() === ETH_PK.toBase58()) {
     return 'ETH';
   }
+  if (splMint.toBase58() === MSOL_PK.toBase58()) {
+    return 'mSOL';
+  }
   if (splMint.toBase58() === MNGO_PK.toBase58()) {
     return 'MNGO';
   }
@@ -67,6 +70,9 @@ export function tokenToSplMint(token: SYMBOL) {
   if (token === 'ETH') {
     return ETH_PK;
   }
+  if (token === 'mSOL') {
+    return MSOL_PK;
+  }
   if (token === 'MNGO') {
     return MNGO_PK;
   }
@@ -92,6 +98,9 @@ export function decimalsBaseSPL(token: SYMBOL): number {
     }
     case 'ETH': {
       return 8;
+    }
+    case 'mSOL': {
+      return 9;
     }
     case 'MNGO': {
       return 6;

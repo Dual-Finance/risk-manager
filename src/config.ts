@@ -13,6 +13,7 @@ export const PRIORITY_FEE = process.env.FEE ? parseInt(process.env.FEE, 10) : 1;
 const solVars = process.env.SOL ? process.env.SOL.split(',') : [null, null, null, null];
 const btcVars = process.env.BTC ? process.env.BTC.split(',') : [null, null, null, null];
 const ethVars = process.env.ETH ? process.env.ETH.split(',') : [null, null, null, null];
+const mSolVars = process.env.mSOL ? process.env.mSOL.split(',') : [null, null, null, null];
 const mngoVars = process.env.MNGO ? process.env.MNGO.split(',') : [null, null, null, null];
 const bonkVars = process.env.BONK ? process.env.BONK.split(',') : [null, null, null, null];
 const dualVars = process.env.DUAL ? process.env.DUAL.split(',') : [null, null, null, null];
@@ -20,6 +21,7 @@ const dualVars = process.env.DUAL ? process.env.DUAL.split(',') : [null, null, n
 export const productStatus = new Map<SYMBOL, boolean>([
   ['BTC', btcVars[0] === 'ON'],
   ['ETH', ethVars[0] === 'ON'],
+  ['mSOL', mSolVars[0] === 'ON'],
   ['SOL', solVars[0] === 'ON'],
   ['MNGO', mngoVars[0] === 'ON'],
   ['BONK', bonkVars[0] === 'ON'],
@@ -30,6 +32,7 @@ export const productStatus = new Map<SYMBOL, boolean>([
 export const DELTA_OFFSET = new Map<SYMBOL, number>([
   ['BTC', btcVars[1] == null ? 0 : parseFloat(btcVars[1])],
   ['ETH', ethVars[1] == null ? 0 : parseFloat(ethVars[1])],
+  ['mSOL', mSolVars[1] == null ? 0 : parseFloat(mSolVars[1])],
   ['SOL', solVars[1] == null ? 0 : parseFloat(solVars[1])],
   ['MNGO', mngoVars[1] == null ? 0 : parseFloat(mngoVars[1])],
   ['BONK', bonkVars[1] == null ? 0 : parseFloat(bonkVars[1])],
@@ -39,6 +42,7 @@ export const DELTA_OFFSET = new Map<SYMBOL, number>([
 export const THEO_VOL_MAP = new Map<SYMBOL, number>([
   ['BTC', parseFloat(btcVars[2]) > 0 ? parseFloat(btcVars[2]) : 0.3],
   ['ETH', parseFloat(ethVars[2]) > 0 ? parseFloat(ethVars[2]) : 0.4],
+  ['mSOL', parseFloat(mSolVars[2]) > 0 ? parseFloat(mSolVars[2]) : 0.5],
   ['SOL', parseFloat(solVars[2]) > 0 ? parseFloat(solVars[2]) : 0.5],
   ['MNGO', parseFloat(mngoVars[2]) > 0 ? parseFloat(mngoVars[2]) : 0.6],
   ['BONK', parseFloat(bonkVars[2]) > 0 ? parseFloat(bonkVars[2]) : 1],
@@ -48,6 +52,7 @@ export const THEO_VOL_MAP = new Map<SYMBOL, number>([
 export const ZSCORE = new Map<SYMBOL, number>([
   ['BTC', parseFloat(btcVars[3]) > 0 ? parseFloat(btcVars[3]) : 1.282],
   ['ETH', parseFloat(ethVars[3]) > 0 ? parseFloat(ethVars[3]) : 1.282],
+  ['mSOL', parseFloat(mSolVars[3]) > 0 ? parseFloat(mSolVars[3]) : 1.282],
   ['SOL', parseFloat(solVars[3]) > 0 ? parseFloat(solVars[3]) : 1.282],
   ['MNGO', parseFloat(mngoVars[3]) > 0 ? parseFloat(mngoVars[3]) : 1.282],
   ['BONK', parseFloat(bonkVars[3]) > 0 ? parseFloat(bonkVars[3]) : 2.58],
@@ -77,6 +82,7 @@ export enum HedgeSide {
 export const MODE_BY_SYMBOL = new Map<SYMBOL, ScalperMode>([
   ['BTC', parseFloat(btcVars[4]) > 0 && parseFloat(btcVars[4]) < 6 ? parseFloat(btcVars[4]) : ScalperMode.Normal],
   ['ETH', parseFloat(ethVars[4]) > 0 && parseFloat(ethVars[4]) < 6 ? parseFloat(ethVars[4]) : ScalperMode.Normal],
+  ['mSOL', parseFloat(mSolVars[4]) > 0 && parseFloat(mSolVars[4]) < 6 ? parseFloat(mSolVars[4]) : ScalperMode.Normal],
   ['SOL', parseFloat(solVars[4]) > 0 && parseFloat(solVars[4]) < 6 ? parseFloat(solVars[4]) : ScalperMode.Normal],
   ['MNGO', parseFloat(mngoVars[4]) > 0 && parseFloat(mngoVars[4]) < 6 ? parseFloat(mngoVars[4]) : ScalperMode.Normal],
   ['BONK', parseFloat(bonkVars[4]) > 0 && parseFloat(bonkVars[4]) < 6 ? parseFloat(bonkVars[4]) : ScalperMode.Normal],
@@ -94,27 +100,27 @@ export const OPENBOOK_FORK_ID = IS_DEV ? OPB_DEVNET_PROGRAM_ID : OPB_MAINNET_PRO
 export const LIQUID_SYMBOLS = ['SOL', 'ETH', 'BTC'];
 
 export const MinContractSize = new Map<SYMBOL, number>([
-  ['BTC', 0.0001], ['ETH', 0.001], ['SOL', 0.01], ['MNGO', 0.01], ['BONK', 1000], ['DUAL', 0.01],
+  ['BTC', 0.0001], ['ETH', 0.001], ['mSOL', 0.01], ['SOL', 0.01], ['MNGO', 0.01], ['BONK', 1000], ['DUAL', 0.01],
 ]);
 
 export const MinOpenBookSize = new Map<SYMBOL, number>([
-  ['BTC', 0.0001], ['ETH', 0.001], ['SOL', 0.001], ['MNGO', 10], ['BONK', 1000], ['DUAL', 1],
+  ['BTC', 0.0001], ['ETH', 0.001], ['mSOL', 0.001], ['SOL', 0.001], ['MNGO', 10], ['BONK', 1000], ['DUAL', 1],
 ]);
 
 export const TickSize = new Map<SYMBOL, number>([
-  ['BTC', 0.1], ['ETH', 0.1], ['SOL', 0.001], ['MNGO', 0.000001], ['BONK', 0.000000001], ['DUAL', 0.000001],
+  ['BTC', 0.1], ['ETH', 0.1], ['mSOL', 0.001], ['SOL', 0.001], ['MNGO', 0.000001], ['BONK', 0.000000001], ['DUAL', 0.000001],
 ]);
 
 export const maxNotional = new Map<SYMBOL, number>([
-  ['BTC', 20000], ['ETH', 10000], ['SOL', 10000], ['MNGO', 2500], ['BONK', 100], ['DUAL', 1000],
+  ['BTC', 20000], ['ETH', 10000], ['mSOL', 5000], ['SOL', 10000], ['MNGO', 2500], ['BONK', 100], ['DUAL', 1000],
 ]); // Max hedging $ notional sizes
 
 export const SLIPPAGE_MAX = new Map<SYMBOL, number>([
-  ['BTC', 0.0005], ['ETH', 0.0005], ['SOL', 0.0010], ['MNGO', 0.0015], ['BONK', 0.0005], ['DUAL', 0.0015],
+  ['BTC', 0.0005], ['ETH', 0.0005], ['mSOL', 0.0015], ['SOL', 0.0010], ['MNGO', 0.0015], ['BONK', 0.0005], ['DUAL', 0.0015],
 ]); // Max Allowed xbps above/below FMV on limit orders
 
 export const BVE_VOL_MAP = new Map<SYMBOL, number>([
-  ['BTC', 0.2], ['ETH', 0.25], ['SOL', 0.3], ['MNGO', 0.35], ['BONK', 0.35], ['DUAL', 0.35],
+  ['BTC', 0.2], ['ETH', 0.25], ['mSOL', 0], ['SOL', 0.3], ['MNGO', 0.35], ['BONK', 0.35], ['DUAL', 0.35],
 ]); // BVE vol keep alligned with app & contract vol
 
 // TODO: Pull all these rates from an external source
@@ -122,15 +128,15 @@ export const BVE_VOL_MAP = new Map<SYMBOL, number>([
 export const RF_RATE = 0.05;
 
 export const STAKE_RATE_MAP = new Map<SYMBOL, number>([
-  ['BTC', 0], ['ETH', 0.045], ['SOL', 0.07], ['MNGO', 0], ['BONK', 0], ['DUAL', 0], ['USDC', RF_RATE],
+  ['BTC', 0], ['ETH', 0.045], ['mSOL', 0], ['SOL', 0.07], ['MNGO', 0], ['BONK', 0], ['DUAL', 0], ['USDC', RF_RATE],
 ]); // Staking Rate can be considered the risk-free rate for each token
 
 export const INFLATION_MAP = new Map<SYMBOL, number>([
-  ['BTC', 0.017], ['ETH', 0.008], ['SOL', 0.06325], ['MNGO', 0.1], ['BONK', 0.1], ['DUAL', 0.15], ['USDC', 0.04],
+  ['BTC', 0.017], ['ETH', 0.008], ['mSOL', 0], ['SOL', 0.06325], ['MNGO', 0.1], ['BONK', 0.1], ['DUAL', 0.15], ['USDC', 0.04],
 ]); // Estimated rates of inflation for each token
 
 export const STORAGE_RATE_MAP = new Map<SYMBOL, number>([
-  ['BTC', 0.0005], ['ETH', 0.0005], ['SOL', 0.0005], ['MNGO', 0.0005], ['BONK', 0.0005], ['DUAL', 0.0005], ['USDC', 0],
+  ['BTC', 0.0005], ['ETH', 0.0005], ['mSOL', 0.0005], ['SOL', 0.0005], ['MNGO', 0.0005], ['BONK', 0.0005], ['DUAL', 0.0005], ['USDC', 0],
 ]); // Storage cost factors in hardware wallet or custody provider fees and zero bank fee USDC = USD
 
 export const ELIGIBLE_SO_STATES: [SYMBOL, string][] = [

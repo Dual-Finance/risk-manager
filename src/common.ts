@@ -1,6 +1,6 @@
 import { Transaction, VersionedTransaction } from '@solana/web3.js';
 
-export type SYMBOL = 'BTC' | 'ETH' | 'SOL' | 'MNGO' | 'BONK' | 'DUAL' | 'USDC' | 'UNKNOWN_TOKEN';
+export type SYMBOL = 'BTC' | 'ETH' | 'mSOL' |'SOL' | 'MNGO' | 'BONK' | 'DUAL' | 'USDC' | 'UNKNOWN_TOKEN';
 
 export enum CallOrPut {
   Call = 'call',

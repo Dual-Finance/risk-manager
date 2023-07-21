@@ -24,3 +24,5 @@ lib
 *keypair.json
 **/*Secret.json
 *Secret.json
+*prod.env
+*py.env

@@ -114,7 +114,7 @@ class Router {
         return NO_ROUTED_SIZE;
       }
 
-      if (thresholdPrice > price || !(thresholdPrice > 0)) {
+      if (thresholdPrice > price) {
         // If the price is worse than the BVE, then do not use the MM, treat it
         // like there is no MM bid.
         console.log('Router ID:', routerID, 'Not routing to MM due to price:', thresholdPrice, price);

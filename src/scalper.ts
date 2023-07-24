@@ -80,7 +80,7 @@ class Scalper {
   async pickAndRunScalper(dipProduct: DIPDeposit[]): Promise<void> {
     await getTreasuryPositions(this.symbol, this.connection, dipProduct, this.soHelper);
 
-    console.log(this.symbol, 'Choosing market to trade');
+    console.log(this.symbol, 'Choosing market to trade for', this.owner.publicKey.toBase58());
 
     if (this.mode === ScalperMode.Perp || this.mode === ScalperMode.PerpGamma) {
       await loadMangoAndPickScalper(dipProduct, this);

@@ -91,39 +91,7 @@ export const ELIGIBLE_SO_STATES: [SYMBOL, string][] = [
 
 // TODO: Include these in an env file
 // Enter any Staking Options owned and to be hedged from the treasury
-export const TREASURY_POSITIONS: DIPDeposit[] = [({
-  splTokenName: 'BTC',
-  premiumAssetName: 'USDC',
-  expirationMs: 1680868800000,
-  strikeUsdcPerToken: 29000,
-  callOrPut: CallOrPut.Call,
-  qtyTokens: 0.01,
-}),
-({
-  splTokenName: 'BTC',
-  premiumAssetName: 'USDC',
-  expirationMs: 1680868800000,
-  strikeUsdcPerToken: 26000,
-  callOrPut: CallOrPut.Put,
-  qtyTokens: 0.01,
-}), // Test for Mango Perps
-({
-  splTokenName: 'DUAL',
-  premiumAssetName: 'USDC',
-  expirationMs: 1685793600000,
-  strikeUsdcPerToken: 0.032,
-  callOrPut: CallOrPut.Call,
-  qtyTokens: 246710,
-}),
-({
-  splTokenName: 'DUAL',
-  premiumAssetName: 'USDC',
-  expirationMs: 1685793600000,
-  strikeUsdcPerToken: 0.032,
-  callOrPut: CallOrPut.Put,
-  qtyTokens: 246710,
-}), // MM around DUAL Straddle
-];
+export const TREASURY_POSITIONS: DIPDeposit[] = [];
 
 // Amount to vary the sleep on a random sleep.
 export const RANDOM_SLEEP_MULTIPLIER = 0.05;

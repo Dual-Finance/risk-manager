@@ -9,11 +9,10 @@ import {
 } from '@solana/web3.js';
 import { Market } from '@project-serum/serum';
 import {
-  maxNotional, TWAP_INTERVAL_SEC, SCALPER_WINDOW_SEC,
-  FILLS_URL, IS_DEV, GAMMA_THRESHOLD,
-  MAX_DELTA_HEDGES, MANGO_DOWNTIME_THRESHOLD_MIN,
-  PERP_FUNDING_RATE_THRESHOLD, GAMMA_CYCLES, OPENBOOK_FORK_ID,
-  SLIPPAGE_MAX, GAMMA_COMPLETE_THRESHOLD_PCT, CLUSTER, PRIORITY_FEE,
+  maxNotional, TWAP_INTERVAL_SEC, SCALPER_WINDOW_SEC, FILLS_URL,
+  GAMMA_THRESHOLD, MAX_DELTA_HEDGES, MANGO_DOWNTIME_THRESHOLD_MIN,
+  PERP_FUNDING_RATE_THRESHOLD, GAMMA_CYCLES, OPENBOOK_FORK_ID, SLIPPAGE_MAX,
+  GAMMA_COMPLETE_THRESHOLD_PCT, CLUSTER, PRIORITY_FEE, IS_DEV,
 } from './config';
 import { DIPDeposit, HedgeProduct, HedgeSide, ScalperMode } from './common';
 import {
@@ -331,9 +330,7 @@ export async function gammaScalpMango(
   const stdDevSpread = (scalper.impliedVol
     / Math.sqrt(SEC_PER_YEAR / SCALPER_WINDOW_SEC))
     * scalper.zScore;
-  const netGamma = IS_DEV
-    ? Math.max(0.01, dipTotalGamma * stdDevSpread * fairValue)
-    : dipTotalGamma * stdDevSpread * fairValue;
+  const netGamma = dipTotalGamma * stdDevSpread * fairValue;
 
   const gammaOrderQty = roundQtyToMinOrderStep(netGamma, scalper.minSize);
   if (gammaOrderQty < scalper.minSize) {

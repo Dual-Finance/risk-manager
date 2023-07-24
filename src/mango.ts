@@ -13,10 +13,9 @@ import {
   FILLS_URL, IS_DEV, GAMMA_THRESHOLD,
   MAX_DELTA_HEDGES, MANGO_DOWNTIME_THRESHOLD_MIN,
   PERP_FUNDING_RATE_THRESHOLD, GAMMA_CYCLES, OPENBOOK_FORK_ID,
-  SLIPPAGE_MAX, GAMMA_COMPLETE_THRESHOLD_PCT, CLUSTER,
-  HedgeProduct, HedgeSide, ScalperMode, PRIORITY_FEE,
+  SLIPPAGE_MAX, GAMMA_COMPLETE_THRESHOLD_PCT, CLUSTER, PRIORITY_FEE,
 } from './config';
-import { DIPDeposit } from './common';
+import { DIPDeposit, HedgeProduct, HedgeSide, ScalperMode } from './common';
 import {
   sleepExact, tokenToSplMint,
 } from './utils';

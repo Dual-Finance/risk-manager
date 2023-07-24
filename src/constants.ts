@@ -5,9 +5,12 @@ export const PROTCOL_API_KEY = '033000e0a1c3a87a4ec58c9ecbc0e41da02fd517e313ec60
 export const NUM_DIP_ATOMS_PER_TOKEN = 10 ** 6;
 
 export const OPENBOOK_MKT_MAP = new Map<string, string>([
-  ['BTC', '3BAKsQd3RuhZKES2DGysMhjBdwjZYKYmxRqnSMtZ4KSN'], ['ETH', 'BbJgE7HZMaDp5NTYvRh5jZSkQPVDTU8ubPFtpogUkEj4'],
-  ['SOL', '8BnEgHoWFysVcuFFX7QztDmzuH8r5ZFvyP3sYwn1XTh6'], ['MNGO', '3NnxQvDcZXputNMxaxsGvqiKpqgPfSYXpNigZNFcknmD'],
-  ['BONK', '8PhnCfgqpgFM7ZJvttGdBVMXHuU4Q23ACxCvWkbs1M71'], ['mSOL', '9Lyhks5bQQxb9EyyX55NtgKQzpM4WK7JCmeaWuQ5MoXD'],
+  ['BTC', '3BAKsQd3RuhZKES2DGysMhjBdwjZYKYmxRqnSMtZ4KSN'],
+  ['ETH', 'BbJgE7HZMaDp5NTYvRh5jZSkQPVDTU8ubPFtpogUkEj4'],
+  ['SOL', '8BnEgHoWFysVcuFFX7QztDmzuH8r5ZFvyP3sYwn1XTh6'],
+  ['MNGO', '3NnxQvDcZXputNMxaxsGvqiKpqgPfSYXpNigZNFcknmD'],
+  ['BONK', '8PhnCfgqpgFM7ZJvttGdBVMXHuU4Q23ACxCvWkbs1M71'],
+  ['mSOL', '9Lyhks5bQQxb9EyyX55NtgKQzpM4WK7JCmeaWuQ5MoXD'],
   ['DUAL', 'H6rrYK3SUHF2eguZCyJxnSBMJqjXhUtuaki6PHiutvum'],
 ]);
 
@@ -28,6 +31,17 @@ export const DIP_PROGRAM_ID = new PublicKey('DiPbvUUJkDhV9jFtQsDFnMEMRJyjW5iS6NM
 export const OPB_DEVNET_PROGRAM_ID = new PublicKey('EoTcMgcDRTJVZDMZWBoU6rhYHZfkNTVEAfz3uUJRcYGj');
 export const OPB_MAINNET_PROGRAM_ID = new PublicKey('srmqPvymJeFKQ4zGQed1GFppgkRHL9kaELCbyksJtPX');
 export const CHAINLINK_PROGRAM_ID = new PublicKey('cjg3oHmg9uuPsP8D6g29NWvhySJkdYdAo9D25PRbKXJ');
+
+export const CHAINLINK_SOL_PK = new PublicKey('B4vR6BW4WpLh1mFs6LL6iqL4nydbmE5Uzaz2LLsoAXqk');
+export const CHAINLINK_BTC_PK = new PublicKey('4NSNfkSgEdAtD8AKyyiu7QsavyR3GSXLXecwDEFbZCZ3');
+export const CHAINLINK_ETH_PK = new PublicKey('Aadkg8sVWV6BS5XNTt2mK6Q8FhYWECLdkDuqDHvdnoVT');
+
+export const SB_SOL_PK = new PublicKey('GvDMxPzN1sCj7L26YDK2HnMRXEQmQ2aemov8YBtPS7vR');
+export const SB_BTC_PK = new PublicKey('8SXvChNYFhRq4EZuZvnhjrB3jJRQCv4k3P4W6hesH3Ee');
+export const SB_ETH_PK = new PublicKey('HNStfhaLnqwF2ZtJUizaA9uHDAVB976r2AgTUx9LrdEo');
+export const SB_MNGO_PK = new PublicKey('5xUoyPG9PeowJvfai5jD985LiRvo58isaHrmmcBohi3Y');
+export const SB_BONK_PK = new PublicKey('6qBqGAYmoZw2r4fda7671NSUbcDWE4XicJdJoWqK8aTe');
+export const SB_DUAL_PK = new PublicKey('7fMKXU6AnatycNu1CAMndLkKmDPtjZaPNZSJSfXR92Ez');
 
 export const OPTION_VAULT_PK = new PublicKey('9SgZKdeTMaNuEZnhccK2crHxi1grXRmZKQCvNSKgVrCQ');
 export const RM_BACKUP_PK = new PublicKey('FCsXUii28gmnKQCZV1vGMZPqF2LCRCr3pqErQcskgr8W');

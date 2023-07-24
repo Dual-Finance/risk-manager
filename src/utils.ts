@@ -1,4 +1,3 @@
-import * as os from 'os';
 import * as fs from 'fs';
 import { PublicKey } from '@solana/web3.js';
 import {
@@ -10,9 +9,6 @@ import {
 import { SYMBOL } from './common';
 
 export function readKeypair() {
-  if (TRADING_ACCOUNT === undefined) {
-    return JSON.parse(fs.readFileSync(`${os.homedir()}/mango-explorer/id.json`, 'utf-8'));
-  }
   return JSON.parse(fs.readFileSync(TRADING_ACCOUNT, 'utf-8'));
 }
 

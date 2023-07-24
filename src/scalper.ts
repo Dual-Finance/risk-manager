@@ -8,15 +8,15 @@ import { Jupiter } from '@jup-ag/core';
 import { AnchorProvider, BN, Wallet } from '@coral-xyz/anchor';
 import { StakingOptions } from '@dual-finance/staking-options';
 import {
-  THEO_VOL_MAP, maxNotional, TWAP_INTERVAL_SEC, SCALPER_WINDOW_SEC,
-  ZSCORE, MinContractSize, TickSize, IS_DEV, GAMMA_THRESHOLD,
+  maxNotional, TWAP_INTERVAL_SEC, SCALPER_WINDOW_SEC,
+  Z_SCORE, MinContractSize, TickSize, IS_DEV, GAMMA_THRESHOLD,
   MAX_DELTA_HEDGES, DELTA_OFFSET, GAMMA_CYCLES, MinOpenBookSize,
   OPENBOOK_FORK_ID, GAMMA_COMPLETE_THRESHOLD_PCT, CLUSTER,
-  MAX_ORDER_BOOK_SEARCH_DEPTH, MAX_BACK_GAMMA_MULTIPLE, API_URL, MODE_BY_SYMBOL,
-  WHALE_MAX_SPREAD, ScalperMode, ORDER_SIZE_BUFFER_PCT, HedgeSide,
-  BACK_GAMMA_SPREAD_RATIO, MAX_LOAD_TIME, SLIPPAGE_MAX,
+  MAX_ORDER_BOOK_SEARCH_DEPTH, MAX_BACK_GAMMA_MULTIPLE, API_URL, SCALPER_MODE,
+  WHALE_MAX_SPREAD, ORDER_SIZE_BUFFER_PCT, BACK_GAMMA_SPREAD_RATIO,
+  MAX_LOAD_TIME, SLIPPAGE_MAX, THEO_VOL, 
 } from './config';
-import { CallOrPut, DIPDeposit, SYMBOL } from './common';
+import { CallOrPut, DIPDeposit, HedgeSide, SYMBOL, ScalperMode } from './common';
 import {
   asyncCallWithTimeout, getRandomNumAround, readKeypair,
 } from './utils';
@@ -65,13 +65,13 @@ class Scalper {
     );
 
     this.symbol = symbol;
-    this.impliedVol = THEO_VOL_MAP.get(symbol);
+    this.impliedVol = THEO_VOL;
     this.minSize = MinContractSize.get(symbol);
     this.minSpotSize = MinOpenBookSize.get(symbol);
     this.tickSize = TickSize.get(symbol);
-    this.deltaOffset = DELTA_OFFSET.get(symbol);
-    this.zScore = ZSCORE.get(symbol);
-    this.mode = MODE_BY_SYMBOL.get(symbol);
+    this.deltaOffset = DELTA_OFFSET;
+    this.zScore = Z_SCORE;
+    this.mode = SCALPER_MODE;
 
     this.serumVialClient = new SerumVialClient();
     this.serumVialClient.openSerumVial();

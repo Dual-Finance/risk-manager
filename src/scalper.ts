@@ -9,12 +9,12 @@ import { AnchorProvider, BN, Wallet } from '@coral-xyz/anchor';
 import { StakingOptions } from '@dual-finance/staking-options';
 import {
   maxNotional, TWAP_INTERVAL_SEC, SCALPER_WINDOW_SEC,
-  Z_SCORE, MinContractSize, TickSize, IS_DEV, GAMMA_THRESHOLD,
-  MAX_DELTA_HEDGES, DELTA_OFFSET, GAMMA_CYCLES, MinOpenBookSize,
-  OPENBOOK_FORK_ID, GAMMA_COMPLETE_THRESHOLD_PCT, CLUSTER,
-  MAX_ORDER_BOOK_SEARCH_DEPTH, MAX_BACK_GAMMA_MULTIPLE, API_URL, SCALPER_MODE,
-  WHALE_MAX_SPREAD, ORDER_SIZE_BUFFER_PCT, BACK_GAMMA_SPREAD_RATIO,
-  MAX_LOAD_TIME, SLIPPAGE_MAX, THEO_VOL, 
+  Z_SCORE, MinContractSize, TickSize, GAMMA_THRESHOLD, MAX_DELTA_HEDGES,
+  DELTA_OFFSET, GAMMA_CYCLES, MinOpenBookSize, OPENBOOK_FORK_ID,
+  GAMMA_COMPLETE_THRESHOLD_PCT, CLUSTER, MAX_ORDER_BOOK_SEARCH_DEPTH,
+  MAX_BACK_GAMMA_MULTIPLE, API_URL, SCALPER_MODE, WHALE_MAX_SPREAD,
+  ORDER_SIZE_BUFFER_PCT, BACK_GAMMA_SPREAD_RATIO, MAX_LOAD_TIME, SLIPPAGE_MAX,
+  THEO_VOL, 
 } from './config';
 import { CallOrPut, DIPDeposit, HedgeSide, SYMBOL, ScalperMode } from './common';
 import {
@@ -186,7 +186,7 @@ class Scalper {
     // Get total delta position to hedge
     const dipTotalDelta = getDIPDelta(dipProduct, fairValue, this.symbol);
     const spotDelta = await getWalletAndOpenbookSpotDelta(this.connection, this.symbol, this.owner, spotMarket);
-    hedgeDeltaTotal = IS_DEV ? 0.1 : dipTotalDelta + spotDelta + this.deltaOffset;
+    hedgeDeltaTotal = dipTotalDelta + spotDelta + this.deltaOffset;
     const IS_BUYSIDE = hedgeDeltaTotal < 0;
     hedgeSide = IS_BUYSIDE ? HedgeSide.buy : HedgeSide.sell;
 
@@ -422,9 +422,7 @@ Spot Δ: ${spotDelta} Offset Δ ${this.deltaOffset} Fair Value: ${fairValue}`,
     // Calc scalperWindow std deviation spread from zScore & IV for gamma levels.
     const stdDevSpread = (this.impliedVol / Math.sqrt(SEC_PER_YEAR / SCALPER_WINDOW_SEC))
     * this.zScore;
-    const netGamma = IS_DEV
-      ? Math.max(0.01, dipTotalGamma * stdDevSpread * fairValue)
-      : dipTotalGamma * stdDevSpread * fairValue;
+    const netGamma = dipTotalGamma * stdDevSpread * fairValue;
 
     const stdDevWidenedSpread = ((gammaScalpCount - 1) / GAMMA_CYCLES) * stdDevSpread;
     let gammaBid = fairValue * (1 - stdDevSpread - stdDevWidenedSpread);

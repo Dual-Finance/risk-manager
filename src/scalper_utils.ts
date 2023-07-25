@@ -193,7 +193,7 @@ export function setPriorityFee(
   tx: Transaction,
 ) {
   const modifyComputeUnits = ComputeBudgetProgram.setComputeUnitLimit({
-    units: 1_000_000,
+    units: 200_000,
   });
   const addPriorityFee = ComputeBudgetProgram.setComputeUnitPrice({
     microLamports: PRIORITY_FEE,
@@ -449,24 +449,23 @@ export function roundQtyToMinOrderStep(amount: number, minSize: number) {
 }
 
 export async function getTreasuryPositions(
-  symbol: SYMBOL,
+  symbolToSearch: SYMBOL,
   connection: Connection,
   dipProduct: DIPDeposit[],
   soHelper: StakingOptions,
 ) {
-  console.log(symbol, 'Add Treasury Positions to Hedge');
+  console.log(symbolToSearch, 'Add Treasury Positions to Hedge');
   const accountList = [RM_PROD_PK, OPTION_VAULT_PK, RM_BACKUP_PK];
-  for (const eligibileSO of ELIGIBLE_SO_STATES) {
-    // TODO: Reconfigure this to be explicitly named params, not just known by array position.
-    if (eligibileSO[0] === symbol) {
+  for (const eligibleSO of ELIGIBLE_SO_STATES) {
+    if (eligibleSO.symbol === symbolToSearch) {
       let parsedState;
       let optionType: CallOrPut;
       try {
-        parsedState = await soHelper.getState(eligibileSO[1], tokenToSplMint(symbol));
+        parsedState = await soHelper.getState(eligibleSO.name, tokenToSplMint(symbolToSearch));
         optionType = CallOrPut.Call;
       } catch {
         try {
-          parsedState = await soHelper.getState(eligibileSO[1], tokenToSplMint('USDC'));
+          parsedState = await soHelper.getState(eligibleSO.name, tokenToSplMint('USDC'));
           optionType = CallOrPut.Put;
         } catch {
           // Skip empty so states
@@ -493,13 +492,13 @@ export async function getTreasuryPositions(
         if (optionType === CallOrPut.Call) {
           soMint = await soHelper.soMint(
             strike.toNumber(),
-            eligibileSO[1],
-            tokenToSplMint(symbol),
+            eligibleSO.name,
+            tokenToSplMint(symbolToSearch),
           );
         } else {
           soMint = await soHelper.soMint(
             strike.toNumber(),
-            eligibileSO[1],
+            eligibleSO.name,
             tokenToSplMint('USDC'),
           );
         }
@@ -535,11 +534,11 @@ export async function getTreasuryPositions(
   }
 
   for (const positions of TREASURY_POSITIONS) {
-    if (symbol === positions.splTokenName) {
+    if (symbolToSearch === positions.splTokenName) {
       dipProduct.push(positions);
     }
   }
-  console.log(`${symbol} tracking ${dipProduct.length} positions`);
+  console.log(`${symbolToSearch} tracking ${dipProduct.length} positions`);
   for (const dip of dipProduct) {
     const dateString = new Date(dip.expirationMs).toDateString();
     console.log(

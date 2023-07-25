@@ -9,7 +9,7 @@ import {
 } from '@solana/web3.js';
 import { Market } from '@project-serum/serum';
 import {
-  maxNotional, TWAP_INTERVAL_SEC, SCALPER_WINDOW_SEC, FILLS_URL,
+  MAX_NOTIONAL, TWAP_INTERVAL_SEC, SCALPER_WINDOW_SEC, FILLS_URL,
   GAMMA_THRESHOLD, MAX_DELTA_HEDGES, MANGO_DOWNTIME_THRESHOLD_MIN,
   PERP_FUNDING_RATE_THRESHOLD, GAMMA_CYCLES, OPENBOOK_FORK_ID, SLIPPAGE_MAX,
   GAMMA_COMPLETE_THRESHOLD_PCT, CLUSTER, PRIORITY_FEE, IS_DEV,
@@ -194,7 +194,7 @@ export async function deltaHedgeMango(
       / orderSpliceMango(
         hedgeDeltaTotal,
         fairValue,
-        maxNotional.get(scalper.symbol),
+        MAX_NOTIONAL.get(scalper.symbol),
         slippageTolerance,
         bookSide,
         perpMarket,

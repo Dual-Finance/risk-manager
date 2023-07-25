@@ -110,7 +110,7 @@ function tokenToChainlinkSymbol(token: SYMBOL) {
   }
 }
 
-export function tokenToPythSymbol(token: SYMBOL) {
+function tokenToPythSymbol(token: SYMBOL) {
   switch (token) {
     case "SOL": {
       return "Crypto.SOL/USD";

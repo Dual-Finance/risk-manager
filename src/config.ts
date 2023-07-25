@@ -1,5 +1,5 @@
 import { Cluster } from '@solana/web3.js';
-import { CallOrPut, DIPDeposit, SYMBOL, ScalperMode } from './common';
+import { DIPDeposit, SYMBOL, ScalperMode } from './common';
 import {
   OPB_DEVNET_PROGRAM_ID, OPB_MAINNET_PROGRAM_ID, USDC_DEVNET_PK, USDC_MAINNET_PK,
 } from './constants';
@@ -36,25 +36,25 @@ export const CLUSTER: Cluster = IS_DEV ? 'devnet' : 'mainnet-beta';
 export const DUAL_API = IS_DEV ? 'https://dev.api.dual.finance' : 'https://api.dual.finance';
 export const FILLS_URL = IS_DEV ? 'ws://api.mngo.cloud:2082' : 'wss://api.mngo.cloud/fills/v1/';
 export const VIAL_WS_URL = 'wss://vial.mngo.cloud/v1/ws';
-export const usdcPk = IS_DEV ? USDC_DEVNET_PK : USDC_MAINNET_PK;
+export const USDC_PK = IS_DEV ? USDC_DEVNET_PK : USDC_MAINNET_PK;
 export const OPENBOOK_FORK_ID = IS_DEV ? OPB_DEVNET_PROGRAM_ID : OPB_MAINNET_PROGRAM_ID;
 
 // Products to not bother pulling Jupiter Mid Market Pricing
 export const LIQUID_SYMBOLS = ['SOL', 'ETH', 'BTC'];
 
-export const MinContractSize = new Map<SYMBOL, number>([
+export const MIN_CONTRACT_SIZE = new Map<SYMBOL, number>([
   ['BTC', 0.0001], ['ETH', 0.001], ['mSOL', 0.01], ['SOL', 0.01], ['MNGO', 0.01], ['BONK', 1000], ['DUAL', 0.01],
 ]);
 
-export const MinOpenBookSize = new Map<SYMBOL, number>([
+export const MIN_OPENBOOK_SIZE = new Map<SYMBOL, number>([
   ['BTC', 0.0001], ['ETH', 0.001], ['mSOL', 0.001], ['SOL', 0.001], ['MNGO', 10], ['BONK', 1000], ['DUAL', 1],
 ]);
 
-export const TickSize = new Map<SYMBOL, number>([
+export const TICK_SIZE = new Map<SYMBOL, number>([
   ['BTC', 0.1], ['ETH', 0.1], ['mSOL', 0.001], ['SOL', 0.001], ['MNGO', 0.000001], ['BONK', 0.000000001], ['DUAL', 0.000001],
 ]);
 
-export const maxNotional = new Map<SYMBOL, number>([
+export const MAX_NOTIONAL = new Map<SYMBOL, number>([
   ['BTC', 20000], ['ETH', 10000], ['mSOL', 5000], ['SOL', 10000], ['MNGO', 2500], ['BONK', 100], ['DUAL', 1000],
 ]); // Max hedging $ notional sizes
 

@@ -85,7 +85,7 @@ export const STORAGE_RATE_MAP = new Map<SYMBOL, number>([
 export const ELIGIBLE_SO_STATES: {symbol: SYMBOL, name: string}[] = [
   { symbol: 'BONK', name: 'GSOBONK_LOYALTY_13'},
   { symbol: 'BONK', name: 'GSOBONK_LOYALTY_12'},
-  { symbol: 'MNGO', name: 'MNGO Buyback 8'},
+  { symbol: 'MNGO', name: 'MNGO Buyback 10'},
   { symbol: 'MNGO', name: 'MNGO Buyback 9'},
 ];
 

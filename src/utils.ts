@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import { PublicKey } from '@solana/web3.js';
 import {
-  RANDOM_SLEEP_MULTIPLIER, usdcPk, TRADING_ACCOUNT,
+  RANDOM_SLEEP_MULTIPLIER, USDC_PK, TRADING_ACCOUNT,
 } from './config';
 import {
   BONK_PK, DUAL_PK, MNGO_PK, BTC_PK, ETH_PK, WSOL_PK, MSOL_PK,
@@ -49,7 +49,7 @@ export function splMintToToken(splMint: PublicKey): SYMBOL {
   if (splMint.toBase58() === DUAL_PK.toBase58()) {
     return 'DUAL';
   }
-  if (splMint.toBase58() === usdcPk.toBase58()) {
+  if (splMint.toBase58() === USDC_PK.toBase58()) {
     return 'USDC';
   }
   console.log(`Unknown token: ${splMint.toBase58()}`);
@@ -79,7 +79,7 @@ export function tokenToSplMint(token: SYMBOL) {
     return DUAL_PK;
   }
   if (token === 'USDC') {
-    return usdcPk;
+    return USDC_PK;
   }
   return undefined;
 }

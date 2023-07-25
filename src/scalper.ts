@@ -8,9 +8,9 @@ import { Jupiter } from '@jup-ag/core';
 import { AnchorProvider, BN, Wallet } from '@coral-xyz/anchor';
 import { StakingOptions } from '@dual-finance/staking-options';
 import {
-  maxNotional, TWAP_INTERVAL_SEC, SCALPER_WINDOW_SEC,
-  Z_SCORE, MinContractSize, TickSize, GAMMA_THRESHOLD, MAX_DELTA_HEDGES,
-  DELTA_OFFSET, GAMMA_CYCLES, MinOpenBookSize, OPENBOOK_FORK_ID,
+  MAX_NOTIONAL, TWAP_INTERVAL_SEC, SCALPER_WINDOW_SEC,
+  Z_SCORE, MIN_CONTRACT_SIZE, TICK_SIZE, GAMMA_THRESHOLD, MAX_DELTA_HEDGES,
+  DELTA_OFFSET, GAMMA_CYCLES, MIN_OPENBOOK_SIZE, OPENBOOK_FORK_ID,
   GAMMA_COMPLETE_THRESHOLD_PCT, CLUSTER, MAX_ORDER_BOOK_SEARCH_DEPTH,
   MAX_BACK_GAMMA_MULTIPLE, API_URL, SCALPER_MODE, WHALE_MAX_SPREAD,
   ORDER_SIZE_BUFFER_PCT, BACK_GAMMA_SPREAD_RATIO, MAX_LOAD_TIME, SLIPPAGE_MAX,
@@ -66,9 +66,9 @@ class Scalper {
 
     this.symbol = symbol;
     this.impliedVol = THEO_VOL;
-    this.minSize = MinContractSize.get(symbol);
-    this.minSpotSize = MinOpenBookSize.get(symbol);
-    this.tickSize = TickSize.get(symbol);
+    this.minSize = MIN_CONTRACT_SIZE.get(symbol);
+    this.minSpotSize = MIN_OPENBOOK_SIZE.get(symbol);
+    this.tickSize = TICK_SIZE.get(symbol);
     this.deltaOffset = DELTA_OFFSET;
     this.zScore = Z_SCORE;
     this.mode = SCALPER_MODE;
@@ -228,7 +228,7 @@ Spot Δ: ${spotDelta} Offset Δ ${this.deltaOffset} Fair Value: ${fairValue}`,
     const spliceFactor = openBookLiquidityCheckAndNumSplices(
       hedgeDeltaTotal,
       hedgePrice,
-      maxNotional.get(this.symbol),
+      MAX_NOTIONAL.get(this.symbol),
       hedgeSide,
       bids,
       asks,

@@ -13,6 +13,12 @@
       "programId": "srmqPvymJeFKQ4zGQed1GFppgkRHL9kaELCbyksJtPX"
     },
     {
+      "address": "EN41nj1uHaTHmJJLPTerwVu2P9r5G8pMiNvfNX5V2PtP",
+      "deprecated": false,
+      "name": "ALL/USDC",
+      "programId": "srmqPvymJeFKQ4zGQed1GFppgkRHL9kaELCbyksJtPX"
+    },
+    {
       "address": "7S2fEFvce5n9hGpjp9jd8JRfuBngcDJfykygeqqzEwmq",
       "deprecated": false,
       "name": "CHAI/USDC",

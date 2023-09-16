@@ -124,6 +124,9 @@ function tokenToPythSymbol(token: SYMBOL) {
     case "mSOL": {
       return "Crypto.MSOL/USD";
     }
+    case "jitoSOL": {
+      return "Crypto.JITOSOL/USD";
+    }
     case "MNGO": {
       return "Crypto.MNGO/USD";
     }

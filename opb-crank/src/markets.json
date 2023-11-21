@@ -29,12 +29,6 @@
       "deprecated": false,
       "name": "TBTC/USDC",
       "programId": "srmqPvymJeFKQ4zGQed1GFppgkRHL9kaELCbyksJtPX"
-    },
-    {
-      "address": "4E17F3BxtNVqzVsirxguuqkpYLtFgCR6NfTpccPh82WE",
-      "deprecated": false,
-      "name": "PYTH/USDC",
-      "programId": "srmqPvymJeFKQ4zGQed1GFppgkRHL9kaELCbyksJtPX"
     }
   ],
   "devnet": [

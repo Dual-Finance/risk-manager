@@ -5,7 +5,7 @@ export const PROTCOL_API_KEY = '033000e0a1c3a87a4ec58c9ecbc0e41da02fd517e313ec60
 export const NUM_DIP_ATOMS_PER_TOKEN = 10 ** 6;
 
 export const OPENBOOK_MKT_MAP = new Map<string, string>([
-  ['BTC', '3BAKsQd3RuhZKES2DGysMhjBdwjZYKYmxRqnSMtZ4KSN'],
+  ['BTC', '6nh2KwhGF8Tott22smj2E3G1R15iXhBrL7Lx6vKgdPFK'],
   ['ETH', 'BbJgE7HZMaDp5NTYvRh5jZSkQPVDTU8ubPFtpogUkEj4'],
   ['SOL', '8BnEgHoWFysVcuFFX7QztDmzuH8r5ZFvyP3sYwn1XTh6'],
   ['MNGO', '3NnxQvDcZXputNMxaxsGvqiKpqgPfSYXpNigZNFcknmD'],
@@ -19,7 +19,7 @@ export const MANGO_MAINNET_GROUP = new PublicKey('78b8f4cGCwmZ9ysPFMWLaLTkkaYnUj
 export const MANGO_DEVNET_GROUP = new PublicKey('Bpk8VzppSEkygd4KgXSgVzgVHib4EArhbDzyRpiS4yaf');
 
 export const WSOL_PK = new PublicKey('So11111111111111111111111111111111111111112');
-export const BTC_PK = new PublicKey('3NZ9JMVBmGAqocybic2c7LQCJScmgsAZ6vQqTDzcqmJh');
+export const BTC_PK = new PublicKey('6DNSN2BJsaPFdFFc1zP37kkeNe4Usc1Sqkzr9C9vPWcU');
 export const ETH_PK = new PublicKey('7vfCXTUXx5WJV5JADk17DUJ4ksgau7utNKj4b963voxs');
 export const MSOL_PK = new PublicKey('mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So');
 export const JITOSOL_PK = new PublicKey('J1toso1uCk3RLmjorhTtrVwY9HJ7X8V9yYac6Y7kGCPn');

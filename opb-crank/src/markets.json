@@ -31,6 +31,12 @@
       "programId": "srmqPvymJeFKQ4zGQed1GFppgkRHL9kaELCbyksJtPX"
     },
     {
+      "address": "3rQH87K3UfrDjbjSktHy7EwQHvX4BoRu3Py52D25gKSS",
+      "deprecated": false,
+      "name": "TBTC/WBTC",
+      "programId": "srmqPvymJeFKQ4zGQed1GFppgkRHL9kaELCbyksJtPX"
+    },
+    {
       "address": "6nh2KwhGF8Tott22smj2E3G1R15iXhBrL7Lx6vKgdPFK",
       "deprecated": false,
       "name": "TBTC/USDC",

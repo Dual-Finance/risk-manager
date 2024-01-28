@@ -31,6 +31,24 @@
       "programId": "srmqPvymJeFKQ4zGQed1GFppgkRHL9kaELCbyksJtPX"
     },
     {
+      "address": "8QCdRwLp5CX2XYVaKX3GFxsbc8n7M2xEtMXyAa8tL7r3",
+      "deprecated": false,
+      "name": "GECKO/USDC",
+      "programId": "srmqPvymJeFKQ4zGQed1GFppgkRHL9kaELCbyksJtPX"
+    },
+    {
+      "address": "9LezACAkFsv78P7nBJEzi6QeF9h1QF8hGx2LRN7u9Vww",
+      "deprecated": false,
+      "name": "MOUTAI/USDC",
+      "programId": "srmqPvymJeFKQ4zGQed1GFppgkRHL9kaELCbyksJtPX"
+    },
+    {
+      "address": "B6yJj37q6bbjp6SWEfzK13ANq7ZZa7M6iVsGsGmk3Cvh",
+      "deprecated": false,
+      "name": "GOFX/USDC",
+      "programId": "srmqPvymJeFKQ4zGQed1GFppgkRHL9kaELCbyksJtPX"
+    },
+    {
       "address": "3rQH87K3UfrDjbjSktHy7EwQHvX4BoRu3Py52D25gKSS",
       "deprecated": false,
       "name": "TBTC/WBTC",

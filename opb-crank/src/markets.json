@@ -43,6 +43,12 @@
       "programId": "srmqPvymJeFKQ4zGQed1GFppgkRHL9kaELCbyksJtPX"
     },
     {
+      "address": "9FjM1wHvGg2ZZaB3XyRsYELoQE7iD6uwHXizQUDKRYff",
+      "deprecated": false,
+      "name": "GOFX/USDC",
+      "programId": "srmqPvymJeFKQ4zGQed1GFppgkRHL9kaELCbyksJtPX"
+    },
+    {
       "address": "3rQH87K3UfrDjbjSktHy7EwQHvX4BoRu3Py52D25gKSS",
       "deprecated": false,
       "name": "TBTC/WBTC",

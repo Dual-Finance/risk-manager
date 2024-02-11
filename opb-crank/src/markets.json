@@ -49,6 +49,12 @@
       "programId": "srmqPvymJeFKQ4zGQed1GFppgkRHL9kaELCbyksJtPX"
     },
     {
+      "address": "AmFXLH3jbcQNqgJjVuMZCeiaU2HmrW1UwMTWR5wU4ijd",
+      "deprecated": false,
+      "name": "ELON/USDC",
+      "programId": "srmqPvymJeFKQ4zGQed1GFppgkRHL9kaELCbyksJtPX"
+    },
+    {
       "address": "3rQH87K3UfrDjbjSktHy7EwQHvX4BoRu3Py52D25gKSS",
       "deprecated": false,
       "name": "TBTC/WBTC",
